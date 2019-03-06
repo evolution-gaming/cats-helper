@@ -18,6 +18,20 @@ scalaVersion := crossScalaVersions.value.head
 
 crossScalaVersions := Seq("2.12.8")
 
+resolvers += Resolver.bintrayRepo("evolutiongaming", "maven")
+
+libraryDependencies ++= Seq(
+  Cats.core,
+  Cats.kernel,
+  Cats.macros,
+  Cats.effect,
+  machinist,
+  scalatest % Test)
+
+licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
+
+releaseCrossBuild := true
+
 scalacOptions ++= Seq(
   "-deprecation",                      // Emit warning and location for usages of deprecated APIs.
   "-encoding", "utf-8",                // Specify character encoding used by source files.
@@ -66,17 +80,3 @@ scalacOptions ++= Seq(
   "-Ywarn-value-discard"               // Warn when non-Unit expression results are unused.
 )
 scalacOptions in(Compile, doc) ++= Seq("-groups", "-implicits", "-no-link-warnings")
-
-resolvers += Resolver.bintrayRepo("evolutiongaming", "maven")
-
-libraryDependencies ++= Seq(
-  Cats.core,
-  Cats.kernel,
-  Cats.macros,
-  Cats.effect,
-  machinist,
-  scalatest % Test)
-
-licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
-
-releaseCrossBuild := true
