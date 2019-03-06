@@ -3,7 +3,6 @@ import sbt._
 object Dependencies {
 
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.6"
-
   val machinist = "org.typelevel" %% "machinist" % "0.6.6"
 
   object Cats {
