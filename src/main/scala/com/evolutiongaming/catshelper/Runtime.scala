@@ -22,6 +22,7 @@ object Runtime {
 
   def apply[F[_]](implicit F: Runtime[F]): Runtime[F] = F
 
+
   def apply[F[_] : Sync](runtime: RuntimeJ): Runtime[F] = new Runtime[F] {
 
     val availableCores = Sync[F].delay { runtime.availableProcessors() }
@@ -35,6 +36,7 @@ object Runtime {
     val gc = Sync[F].delay { runtime.gc() }
   }
 
+
   implicit def lift[F[_] : Sync]: Runtime[F] = apply(RuntimeJ.getRuntime)
 
 
@@ -42,15 +44,15 @@ object Runtime {
 
     def mapK[G[_]](f: F ~> G): Runtime[G] = new Runtime[G] {
 
-      def availableCores = f(self.availableCores)
+      val availableCores = f(self.availableCores)
 
-      def freeMemory = f(self.freeMemory)
+      val freeMemory = f(self.freeMemory)
 
-      def totalMemory = f(self.totalMemory)
+      val totalMemory = f(self.totalMemory)
 
-      def maxMemory = f(self.maxMemory)
+      val maxMemory = f(self.maxMemory)
 
-      def gc = f(self.gc)
+      val gc = f(self.gc)
     }
   }
 }
