@@ -35,5 +35,7 @@ object ClockHelper {
 
       def monotonic(unit: TimeUnit) = unit.convert(nanos, TimeUnit.NANOSECONDS).pure[F]
     }
+
+    def empty[F[_] : Applicative]: Clock[F] = const(nanos = 0, millis = 0)
   }
 }
