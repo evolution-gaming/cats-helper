@@ -26,4 +26,9 @@ class ClockHelperSpec extends FunSuite with Matchers {
   test("instant") {
     clock.instant shouldEqual Instant.ofEpochMilli(2)
   }
+
+  test("empty") {
+    Clock.empty[Id].millis shouldEqual 0
+    Clock.empty[Id].nanos shouldEqual 0
+  }
 }

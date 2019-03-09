@@ -13,6 +13,36 @@ clock.micros // 1
 clock.instant // Instant.ofEpochMilli(2)
 ```
 
+## SerialRef
+
+Ensures that updates are run serially
+
+```scala
+import com.evolutiongaming.catshelper.SerialRef
+
+for {
+  ref <- SerialRef.of[IO, Int](0)
+  _   <- ref.update(a => (a + 1).pure[IO])
+} yield {}
+```
+
+## Runtime
+
+```scala
+trait Runtime[F[_]] {
+
+  def availableCores: F[Int]
+
+  def freeMemory: F[Long]
+
+  def totalMemory: F[Long]
+
+  def maxMemory: F[Long]
+
+  def gc: F[Unit]
+}
+``` 
+
 ## Setup
 
 ```scala
