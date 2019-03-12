@@ -27,7 +27,7 @@ class SerialRefSpec extends AsyncFunSuite {
     }
 
     val result = for {
-      ref0     <- SerialRef.of[IO, Int](0)
+      ref0     <- SerialRef[IO].of(0)
       ref       = ref0.mapK(FunctionK.id, FunctionK.id)
       expected  = 1000
       modifies  = List.fill(expected)(IO.shift *> ref.update(x => IO.delay { x + 1 })).parSequence

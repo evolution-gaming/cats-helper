@@ -14,7 +14,10 @@ trait SerialRef[F[_], A] {
   def update(f: A => F[A]): F[Unit]
 }
 
-object SerialRef {
+object SerialRef { self =>
+
+  def apply[F[_]](implicit F: Concurrent[F]): Apply[F] = new Apply(F)
+
 
   def of[F[_] : Concurrent, A](value: A): F[SerialRef[F, A]] = {
     for {
@@ -47,6 +50,12 @@ object SerialRef {
         }
       }
     }
+  }
+
+
+  class Apply[F[_]](val F: Concurrent[F]) extends AnyVal {
+    
+    def of[A](value: A): F[SerialRef[F, A]] = self.of[F, A](value)(F)
   }
 
 
