@@ -61,5 +61,5 @@ trait Runtime[F[_]] {
 ```scala
 resolvers += Resolver.bintrayRepo("evolutiongaming", "maven")
 
-libraryDependencies += "com.evolutiongaming" %% "cats-helper" % "0.0.1"
+libraryDependencies += "com.evolutiongaming" %% "cats-helper" % "0.0.4"
 ```
