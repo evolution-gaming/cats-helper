@@ -15,6 +15,7 @@ clock.instant // Instant.ofEpochMilli(2)
 
 ## SerialRef
 
+Like [`Ref`](https://typelevel.org/cats-effect/concurrency/ref.html) but allows `A => F[A]` rather than `A => A`  
 Ensures that updates are run serially
 
 ```scala
@@ -24,6 +25,18 @@ for {
   ref <- SerialRef.of[IO, Int](0)
   _   <- ref.update(a => (a + 1).pure[IO])
 } yield {}
+```
+
+## ToFuture & FromFuture
+
+```
+trait ToFuture[F[_]] {
+  def apply[A](fa: F[A]): Future[A]
+}
+
+trait FromFuture[F[_]] {
+  def apply[A](future: => Future[A])(): F[A]
+}
 ```
 
 ## Runtime
