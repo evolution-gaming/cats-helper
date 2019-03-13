@@ -12,9 +12,11 @@ class FromFutureSpec extends AsyncFunSuite with Matchers {
 
   for {
     (name, future, expected) <- List(
-      ("successful future",       () => Future.successful(()), ().asRight[Throwable]),
-      ("failed future",           () => Future.failed(Error),   Error.asLeft[Unit]),
-      ("failed to return future", () => throw Error,            Error.asLeft[Unit]),
+      ("successful completed", () => Future.successful(()),  ().asRight[Throwable]),
+      ("successful running",   () => Future { () },          ().asRight[Throwable]),
+      ("failed completed",     () => Future.failed(Error),   Error.asLeft[Unit]),
+      ("failed running",       () => Future { throw Error }, Error.asLeft[Unit]),
+      ("failed to return",     () => throw Error,            Error.asLeft[Unit]),
     )
   } yield {
     test(name) {
