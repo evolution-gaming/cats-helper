@@ -29,7 +29,7 @@ for {
 
 ## ToFuture & FromFuture
 
-```
+```scala
 trait ToFuture[F[_]] {
   def apply[A](fa: F[A]): Future[A]
 }
