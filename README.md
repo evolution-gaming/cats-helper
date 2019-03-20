@@ -54,6 +54,21 @@ trait Runtime[F[_]] {
 
   def gc: F[Unit]
 }
+```
+
+## ThreadLocalRef
+
+```scala
+trait ThreadLocalRef[F[_], A] {
+
+  def get: F[A]
+
+  def set(a: A): F[Unit]
+
+  def update(f: A => A): F[Unit]
+
+  def modify[B](f: A => (A, B)): F[B]
+}
 ``` 
 
 ## Setup
