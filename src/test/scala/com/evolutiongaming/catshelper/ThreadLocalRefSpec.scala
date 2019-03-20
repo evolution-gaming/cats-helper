@@ -52,7 +52,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
       Resource(result)
     }
 
-    executor(parallelism = 1).use { executor =>
+    executor(parallelism = 2).use { executor =>
 
       for {
         counter     <- Ref[F].of(0)
