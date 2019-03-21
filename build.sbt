@@ -27,6 +27,7 @@ libraryDependencies ++= Seq(
   Cats.effect,
   machinist,
   `cats-par`,
+  `slf4j-api`,
   scalatest % Test)
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))

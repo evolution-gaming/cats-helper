@@ -39,6 +39,23 @@ trait FromFuture[F[_]] {
 }
 ```
 
+## Log
+
+```scala
+trait Log[F[_]] {
+
+  def debug(msg: => String): F[Unit]
+
+  def info(msg: => String): F[Unit]
+
+  def warn(msg: => String): F[Unit]
+
+  def error(msg: => String): F[Unit]
+
+  def error(msg: => String, cause: Throwable): F[Unit]
+}
+```
+
 ## Runtime
 
 ```scala
