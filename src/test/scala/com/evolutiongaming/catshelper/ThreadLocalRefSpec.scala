@@ -7,17 +7,22 @@ import cats.effect._
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import cats.temp.par._
-import org.scalatest.{AsyncFunSuite, Matchers}
 import com.evolutiongaming.catshelper.IOSuite._
+import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 
 class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 
   test("thread local stored per thread") {
-    val result = testF[IO](5).run()
-    Thread.sleep(10000)
-    result
+    val result = executor[IO](5).use { executor =>
+      implicit val contextShiftIO = IO.contextShift(executor)
+      implicit val concurrentIO = IO.ioConcurrentEffect
+      implicit val timerIO = IO.timer(executor)
+      implicit val parallel = IO.ioParallel
+      testF[IO](5)
+    }
+    result.run()
   }
 
   private def testF[F[_] : Sync : ThreadLocalOf : Par : Clock : ContextShift](n: Int): F[Unit] = {
@@ -47,17 +52,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
       } yield a
     }
 
-    def executor(parallelism: Int): Resource[F, ExecutionContextExecutorService] = {
-      val result = Sync[F].delay {
-        val es = Executors.newFixedThreadPool(parallelism)
-        val ec = ExecutionContext.fromExecutorService(es)
-        val release = Sync[F].delay { ec.shutdown() }
-        (ec, release)
-      }
-      Resource(result)
-    }
-
-    executor(parallelism = n).use { executor =>
+    executor[F](parallelism = n).use { executor =>
 
       for {
         counter     <- Ref[F].of(0)
@@ -77,5 +72,15 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
         ()
       }
     }
+  }
+
+  private def executor[F[_] : Sync](parallelism: Int): Resource[F, ExecutionContextExecutorService] = {
+    val result = Sync[F].delay {
+      val es = Executors.newFixedThreadPool(parallelism)
+      val ec = ExecutionContext.fromExecutorService(es)
+      val release = Sync[F].delay { ec.shutdown() }
+      (ec, release)
+    }
+    Resource(result)
   }
 }

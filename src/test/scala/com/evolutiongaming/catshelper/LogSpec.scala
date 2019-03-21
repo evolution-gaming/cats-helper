@@ -14,12 +14,12 @@ class LogSpec extends FunSuite with Matchers {
 
     val stateT = for {
       log0 <- logOf("source")
-      log = log0.mapK(FunctionK.id).prefixed(">")
-      _ <- log.debug("debug")
-      _ <- log.info("info")
-      _ <- log.warn("warn")
-      _ <- log.error("error")
-      _ <- log.error("error", Error)
+      log   = log0.mapK(FunctionK.id).prefixed(">")
+      _    <- log.debug("debug")
+      _    <- log.info("info")
+      _    <- log.warn("warn")
+      _    <- log.error("error")
+      _    <- log.error("error", Error)
     } yield {}
 
 
