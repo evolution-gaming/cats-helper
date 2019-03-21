@@ -15,10 +15,10 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 
   test("thread local stored per thread") {
-    testF[IO].run()
+    testF[IO](5).run()
   }
 
-  private def testF[F[_] : Sync : ThreadLocalOf : Par : Clock : ContextShift]: F[Unit] = {
+  private def testF[F[_] : Sync : ThreadLocalOf : Par : Clock : ContextShift](n: Int): F[Unit] = {
 
     def test(ref: ThreadLocalRef[F, String], executor: ExecutionContext) = {
 
@@ -55,7 +55,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
       Resource(result)
     }
 
-    executor(parallelism = 2).use { executor =>
+    executor(parallelism = n).use { executor =>
 
       for {
         counter     <- Ref[F].of(0)
@@ -66,7 +66,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
         threadLocal  <- ThreadLocalOf[F].apply(thread)
         threadLocal1  = threadLocal.mapK(FunctionK.id)
         a             = test(threadLocal1, executor)
-        treadIds     <- List.fill(5)(a).parSequence
+        treadIds     <- List.fill(n)(a).parSequence
         counter      <- counter.get
       } yield {
         val size = treadIds.distinct.size
