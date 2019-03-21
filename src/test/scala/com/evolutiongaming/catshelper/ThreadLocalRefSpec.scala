@@ -15,7 +15,9 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 
   test("thread local stored per thread") {
-    testF[IO](5).run()
+    val result = testF[IO](5).run()
+    Thread.sleep(10000)
+    result
   }
 
   private def testF[F[_] : Sync : ThreadLocalOf : Par : Clock : ContextShift](n: Int): F[Unit] = {
