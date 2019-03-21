@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import java.util.concurrent.Executors
 
+import cats.arrow.FunctionK
 import cats.effect._
 import cats.effect.concurrent.Ref
 import cats.implicits._
@@ -39,6 +40,8 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
         _  <- check
         _  <- ref.update(_ + "|")
         _  <- check
+        _  <- ref.modify(a => (a + "|", ()))
+        _  <- check
       } yield a
     }
 
@@ -60,10 +63,11 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
           _        <- counter.update(_ + 1)
           thread   <- Sync[F].delay { Thread.currentThread().toString }
         } yield thread
-        threadLocal <- ThreadLocalOf[F].apply(thread)
-        a            = test(threadLocal, executor)
-        treadIds    <- List.fill(5)(a).parSequence
-        counter     <- counter.get
+        threadLocal  <- ThreadLocalOf[F].apply(thread)
+        threadLocal1  = threadLocal.mapK(FunctionK.id)
+        a             = test(threadLocal1, executor)
+        treadIds     <- List.fill(5)(a).parSequence
+        counter      <- counter.get
       } yield {
         val size = treadIds.distinct.size
         size should be > 1
