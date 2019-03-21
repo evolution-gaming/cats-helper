@@ -47,7 +47,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 
     def executor(parallelism: Int): Resource[F, ExecutionContextExecutorService] = {
       val result = Sync[F].delay {
-        val es = Executors.newWorkStealingPool(parallelism)
+        val es = Executors.newFixedThreadPool(parallelism)
         val ec = ExecutionContext.fromExecutorService(es)
         val release = Sync[F].delay { ec.shutdown() }
         (ec, release)
