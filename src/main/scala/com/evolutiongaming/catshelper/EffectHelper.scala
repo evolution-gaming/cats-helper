@@ -2,6 +2,8 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.Bracket
 
+import scala.util.Try
+
 object EffectHelper {
 
   implicit class BracketOps[F[_], E](val self: Bracket[F, E]) extends AnyVal {
@@ -27,5 +29,7 @@ object EffectHelper {
     def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: Bracket[F, E]): F[B] = {
       bracket.redeemWith(self)(recover, flatMap)
     }
+
+    def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
   }
 }

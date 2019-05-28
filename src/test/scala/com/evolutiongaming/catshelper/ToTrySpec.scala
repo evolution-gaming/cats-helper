@@ -3,6 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
+import com.evolutiongaming.catshelper.EffectHelper._
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.util.{Failure, Success, Try}
@@ -21,7 +22,7 @@ class ToTrySpec extends FunSuite with Matchers {
     )
   } {
     test(name) {
-      ToTry[IO].apply(value) shouldEqual expected
+      value.toTry shouldEqual expected
     }
   }
 
