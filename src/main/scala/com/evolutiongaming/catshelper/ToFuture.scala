@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.Id
 import cats.effect.IO
 
 import scala.concurrent.Future
@@ -14,7 +15,18 @@ object ToFuture {
   def apply[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F
 
 
-  implicit val io: ToFuture[IO] = new ToFuture[IO] {
+  @deprecated("use ioToFuture instead", "0.0.10")
+  val io: ToFuture[IO] = new ToFuture[IO] {
     def apply[A](fa: IO[A]) = fa.unsafeToFuture()
+  }
+
+
+  implicit val ioToFuture: ToFuture[IO] = new ToFuture[IO] {
+    def apply[A](fa: IO[A]) = fa.unsafeToFuture()
+  }
+
+
+  implicit val idToFuture: ToFuture[Id] = new ToFuture[Id] {
+    def apply[A](fa: Id[A]) = Future.successful(fa)
   }
 }

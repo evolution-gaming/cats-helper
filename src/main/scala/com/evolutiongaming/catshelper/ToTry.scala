@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.Id
 import cats.effect.IO
 
 import scala.concurrent.TimeoutException
@@ -31,4 +32,9 @@ object ToTry {
 
 
   implicit val ioToTry: ToTry[IO] = ioToTry(1.minute)
+
+
+  implicit val idToTry: ToTry[Id] = new ToTry[Id] {
+    def apply[A](fa: Id[A]) = Success(fa)
+  }
 }

@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.Bracket
 
+import scala.concurrent.Future
 import scala.util.Try
 
 object EffectHelper {
@@ -30,6 +31,10 @@ object EffectHelper {
       bracket.redeemWith(self)(recover, flatMap)
     }
 
+
     def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
+
+
+    def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
   }
 }
