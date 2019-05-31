@@ -8,7 +8,7 @@ import scala.util.{Failure, Success}
 
 trait FromFuture[F[_]] {
 
-  def apply[A](future: => Future[A])(): F[A]
+  def apply[A](future: => Future[A]): F[A]
 }
 
 object FromFuture {
@@ -20,7 +20,7 @@ object FromFuture {
 
     new FromFuture[F] {
 
-      def apply[A](future: => Future[A])() = {
+      def apply[A](future: => Future[A]) = {
         for {
           future <- Sync[F].delay(future)
           result <- future.value.fold {

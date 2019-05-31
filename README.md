@@ -35,7 +35,7 @@ trait ToFuture[F[_]] {
 }
 
 trait FromFuture[F[_]] {
-  def apply[A](future: => Future[A])(): F[A]
+  def apply[A](future: => Future[A]): F[A]
 }
 ```
 
