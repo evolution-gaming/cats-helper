@@ -1,6 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.{Concurrent, Resource, Timer}
+import cats.effect.implicits._
 import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
@@ -24,7 +25,7 @@ object Schedule {
     } yield {}
 
     val result = for {
-      fiber <- Concurrent[F].start { daemon }
+      fiber <- daemon.start
     } yield {
       ((), fiber.cancel)
     }
