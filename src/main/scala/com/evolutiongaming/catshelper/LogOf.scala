@@ -1,8 +1,8 @@
 package com.evolutiongaming.catshelper
 
-import cats.Applicative
 import cats.effect.Sync
 import cats.implicits._
+import cats.{Applicative, FlatMap, ~>}
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 trait LogOf[F[_]] {
@@ -47,5 +47,28 @@ object LogOf {
     def apply(source: String) = log
 
     def apply(source: Class[_]) = log
+  }
+
+
+  implicit class LogOfOps[F[_]](val self: LogOf[F]) extends AnyVal {
+
+    def mapK[G[_] : FlatMap](f: F ~> G): LogOf[G] = new LogOf[G] {
+
+      def apply(source: String) = {
+        for {
+          log <- f(self(source))
+        } yield {
+          log.mapK(f)
+        }
+      }
+
+      def apply(source: Class[_]) = {
+        for {
+          log <- f(self(source))
+        } yield {
+          log.mapK(f)
+        }
+      }
+    }
   }
 }

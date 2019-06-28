@@ -14,7 +14,7 @@ class LogSpec extends FunSuite with Matchers {
 
     val stateT = for {
       log0 <- logOf("source")
-      log   = log0.mapK(FunctionK.id).prefixed(">")
+      log   = log0.prefixed(">")
       _    <- log.debug("debug")
       _    <- log.info("info")
       _    <- log.warn("warn")
@@ -36,59 +36,67 @@ class LogSpec extends FunSuite with Matchers {
 
 object LogSpec {
 
-  val logOf: LogOf[StateT] = new LogOf[StateT] {
+  val logOf: LogOf[StateT] = {
+    val logOf = new LogOf[StateT] {
 
-    def apply(source: String) = {
-      StateT { state =>
-        val action = Action.OfStr(source)
-        (state.add(action), log)
+      def apply(source: String) = {
+        StateT { state =>
+          val action = Action.OfStr(source)
+          (state.add(action), log)
+        }
+      }
+
+      def apply(source: Class[_]) = {
+        StateT { state =>
+          val action = Action.OfClass(source)
+          (state.add(action), log)
+        }
       }
     }
 
-    def apply(source: Class[_]) = {
-      StateT { state =>
-        val action = Action.OfClass(source)
-        (state.add(action), log)
-      }
-    }
+    logOf.mapK(FunctionK.id)
   }
 
-  val log: Log[StateT] = new Log[StateT] {
+  val log: Log[StateT] = {
+    val log = new Log[StateT] {
 
-    def debug(msg: => String) = {
-      StateT { state =>
-        val action = Action.Debug(msg)
-        (state.add(action), ())
+      def debug(msg: => String) = {
+        StateT { state =>
+          val action = Action.Debug(msg)
+          (state.add(action), ())
+        }
+      }
+
+      def info(msg: => String) = {
+        StateT { state =>
+          val action = Action.Info(msg)
+          (state.add(action), ())
+        }
+      }
+
+      def warn(msg: => String) = {
+        StateT { state =>
+          val action = Action.Warn(msg)
+          (state.add(action), ())
+        }
+      }
+
+      def error(msg: => String) = {
+        StateT { state =>
+          val action = Action.Error1(msg)
+          (state.add(action), ())
+        }
+      }
+
+      def error(msg: => String, cause: Throwable) = {
+        StateT { state =>
+          val action = Action.Error2(msg, cause)
+          (state.add(action), ())
+        }
       }
     }
 
-    def info(msg: => String) = {
-      StateT { state =>
-        val action = Action.Info(msg)
-        (state.add(action), ())
-      }
-    }
-
-    def warn(msg: => String) = {
-      StateT { state =>
-        val action = Action.Warn(msg)
-        (state.add(action), ())
-      }
-    }
-
-    def error(msg: => String) = {
-      StateT { state =>
-        val action = Action.Error1(msg)
-        (state.add(action), ())
-      }
-    }
-
-    def error(msg: => String, cause: Throwable) = {
-      StateT { state =>
-        val action = Action.Error2(msg, cause)
-        (state.add(action), ())
-      }
-    }
+    log.mapK(FunctionK.id)
   }
 
 
