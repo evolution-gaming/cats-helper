@@ -4,6 +4,7 @@ import cats.data.{NonEmptyList => Nel}
 import cats.effect.implicits._
 import cats.effect.{Clock, Concurrent, Resource, Timer}
 import cats.implicits._
+import cats.{Applicative, ~>}
 import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration.FiniteDuration
@@ -109,5 +110,23 @@ object GroupWithin {
   trait Enqueue[F[_], A] {
 
     def apply(a: A): F[Unit]
+  }
+
+  object Enqueue {
+
+    def empty[F[_] : Applicative, A]: Enqueue[F, A] = const[F, A](().pure[F])
+
+
+    def const[F[_], A](value: F[Unit]): Enqueue[F, A] = new Enqueue[F, A] {
+      def apply(a: A) = value
+    }
+
+
+    implicit class EnqueueOps[F[_], A](val self: Enqueue[F, A]) extends AnyVal {
+
+      def mapK[G[_]](f: F ~> G): Enqueue[G, A] = new Enqueue[G, A] {
+        def apply(a: A) = f(self(a))
+      }
+    }
   }
 }

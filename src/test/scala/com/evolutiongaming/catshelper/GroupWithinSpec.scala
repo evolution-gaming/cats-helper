@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.arrow.FunctionK
 import cats.data.{NonEmptyList => Nel}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Timer}
@@ -32,7 +33,8 @@ class GroupWithinSpec extends AsyncFunSuite with Matchers {
     for {
       ref         <- Ref[F].of(List.empty[Nel[Int]])
       groupWithin  = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
-      _           <- groupWithin.use { enqueue =>
+      _           <- groupWithin.use { enqueue0 =>
+        val enqueue = enqueue0.mapK(FunctionK.id)
         for {
           _ <- enqueue(1)
           _ <- enqueue(2)
