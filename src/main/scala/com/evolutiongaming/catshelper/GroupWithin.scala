@@ -20,6 +20,17 @@ object GroupWithin {
   final case class Settings(delay: FiniteDuration, size: Int)
 
 
+  def empty[F[_] : Applicative]: GroupWithin[F] = new GroupWithin[F] {
+
+    def apply[A](settings: Settings)(f: Nel[A] => F[Unit]) = {
+      val enqueue = new Enqueue[F, A] {
+        def apply(a: A) = f(Nel.of(a))
+      }
+      Resource.liftF(enqueue.pure[F])
+    }
+  }
+
+
   def apply[F[_] : Concurrent : Timer]: GroupWithin[F] = {
 
     new GroupWithin[F] {
