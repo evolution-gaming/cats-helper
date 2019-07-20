@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.IO
 import cats.implicits._
+import com.evolutiongaming.catshelper.EffectHelper._
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.{AsyncFunSuite, Matchers}
 
@@ -16,11 +17,15 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
     )
   } {
     test(name) {
-      val future = for {
-        value <- ToFuture[IO].apply(value)
+      val either = for {
+        value <- value
       } yield {
         value.asRight[Throwable]
       }
+
+      val future = either.toFuture
+
+      future.value.isDefined shouldEqual true
 
       for {
         actual <- future.recover { case error => error.asLeft }
