@@ -12,6 +12,8 @@ trait Log[F[_]] {
 
   def warn(msg: => String): F[Unit]
 
+  def warn(msg: => String, cause: Throwable): F[Unit]
+
   def error(msg: => String): F[Unit]
 
   def error(msg: => String, cause: Throwable): F[Unit]
@@ -42,6 +44,12 @@ object Log {
       }
     }
 
+    def warn(msg: => String, cause: Throwable) = {
+      Sync[F].delay {
+        if (logger.isWarnEnabled) logger.warn(msg, cause)
+      }
+    }
+
     def error(msg: => String) = {
       Sync[F].delay {
         if (logger.isErrorEnabled) logger.error(msg)
@@ -64,6 +72,8 @@ object Log {
 
     def warn(msg: => String) = unit
 
+    def warn(msg: => String, cause: Throwable) = unit
+
     def error(msg: => String) = unit
 
     def error(msg: => String, cause: Throwable) = unit
@@ -83,6 +93,8 @@ object Log {
 
       def warn(msg: => String) = f(self.warn(msg))
 
+      def warn(msg: => String, cause: Throwable) = f(self.warn(msg, cause))
+
       def error(msg: => String) = f(self.error(msg))
 
       def error(msg: => String, cause: Throwable) = f(self.error(msg, cause))
@@ -96,6 +108,8 @@ object Log {
       def info(msg: => String) = self.info(f(msg))
 
       def warn(msg: => String) = self.warn(f(msg))
+
+      def warn(msg: => String, cause: Throwable) = self.warn(f(msg), cause)
 
       def error(msg: => String) = self.error(f(msg))
 

@@ -14,10 +14,11 @@ class LogSpec extends FunSuite with Matchers {
 
     val stateT = for {
       log0 <- logOf("source")
-      log   = log0.prefixed(">")
+      log   = log0.prefixed(">").mapK(FunctionK.id)
       _    <- log.debug("debug")
       _    <- log.info("info")
       _    <- log.warn("warn")
+      _    <- log.warn("warn", Error)
       _    <- log.error("error")
       _    <- log.error("error", Error)
     } yield {}
@@ -25,9 +26,10 @@ class LogSpec extends FunSuite with Matchers {
 
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
-      Action.Error2("> error", Error),
-      Action.Error1("> error"),
-      Action.Warn("> warn"),
+      Action.Error1("> error", Error),
+      Action.Error0("> error"),
+      Action.Warn1("> warn", Error),
+      Action.Warn0("> warn"),
       Action.Info("> info"),
       Action.Debug("> debug"),
       Action.OfStr("source")))
@@ -76,21 +78,28 @@ object LogSpec {
 
       def warn(msg: => String) = {
         StateT { state =>
-          val action = Action.Warn(msg)
+          val action = Action.Warn0(msg)
+          (state.add(action), ())
+        }
+      }
+
+      def warn(msg: => String, cause: Throwable) = {
+        StateT { state =>
+          val action = Action.Warn1(msg, cause)
           (state.add(action), ())
         }
       }
 
       def error(msg: => String) = {
         StateT { state =>
-          val action = Action.Error1(msg)
+          val action = Action.Error0(msg)
           (state.add(action), ())
         }
       }
 
       def error(msg: => String, cause: Throwable) = {
         StateT { state =>
-          val action = Action.Error2(msg, cause)
+          val action = Action.Error1(msg, cause)
           (state.add(action), ())
         }
       }
@@ -120,9 +129,10 @@ object LogSpec {
     final case class OfClass(source: Class[_]) extends Action
     final case class Debug(msg: String) extends Action
     final case class Info(msg: String) extends Action
-    final case class Warn(msg: String) extends Action
-    final case class Error1(msg: String) extends Action
-    final case class Error2(msg: String, throwable: Throwable) extends Action
+    final case class Warn0(msg: String) extends Action
+    final case class Warn1(msg: String, throwable: Throwable) extends Action
+    final case class Error0(msg: String) extends Action
+    final case class Error1(msg: String, throwable: Throwable) extends Action
   }
 
   case object Error extends RuntimeException with NoStackTrace
