@@ -21,7 +21,7 @@ object FromTry {
   }
 
 
-  implicit val idToTry: FromTry[Id] = new FromTry[Id] {
+  implicit val idFromTry: FromTry[Id] = new FromTry[Id] {
     def apply[A](fa: Try[A]) = fa.get
   }
 }
