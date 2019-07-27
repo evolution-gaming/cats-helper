@@ -8,6 +8,8 @@ import scala.util.Try
 trait FromTry[F[_]] {
 
   def apply[A](fa: Try[A]): F[A]
+
+  final def unsafe[A](a: => A): F[A] = apply(Try(a))
 }
 
 object FromTry {
