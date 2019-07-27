@@ -22,7 +22,7 @@ class FromTrySpec extends FunSuite with Matchers {
     )
   } {
     test(name) {
-      value.fromTry shouldEqual expected
+      value.fromTry[IO] shouldEqual expected
     }
   }
 

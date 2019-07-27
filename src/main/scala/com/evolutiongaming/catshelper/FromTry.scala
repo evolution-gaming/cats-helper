@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.Id
 import cats.effect.IO
 
 import scala.util.Try
@@ -15,5 +16,10 @@ object FromTry {
 
   implicit val ioFromTry: FromTry[IO] = new FromTry[IO] {
     def apply[A](fa: Try[A]) = IO.fromTry(fa)
+  }
+
+
+  implicit val idToTry: FromTry[Id] = new FromTry[Id] {
+    def apply[A](fa: Try[A]) = fa.get
   }
 }
