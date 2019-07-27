@@ -3,6 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.Id
 import cats.effect.IO
 
+import scala.concurrent.Future
 import scala.util.Try
 
 trait FromTry[F[_]] {
@@ -23,5 +24,10 @@ object FromTry {
 
   implicit val idFromTry: FromTry[Id] = new FromTry[Id] {
     def apply[A](fa: Try[A]) = fa.get
+  }
+
+
+  implicit val futureFromTry: FromTry[Future] = new FromTry[Future] {
+    def apply[A](fa: Try[A]) = Future.fromTry(fa)
   }
 }
