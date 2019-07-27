@@ -39,6 +39,20 @@ trait FromFuture[F[_]] {
 }
 ```
 
+## ToTry & FromTry
+
+```scala
+trait ToTry[F[_]] {
+
+  def apply[A](fa: F[A]): Try[A]
+}
+
+trait FromTry[F[_]] {
+
+  def apply[A](fa: Try[A]): F[A]
+}
+```
+
 ## Log
 
 ```scala
@@ -49,6 +63,8 @@ trait Log[F[_]] {
   def info(msg: => String): F[Unit]
 
   def warn(msg: => String): F[Unit]
+
+  def warn(msg: => String, cause: Throwable): F[Unit]
 
   def error(msg: => String): F[Unit]
 
