@@ -98,4 +98,10 @@ object EffectHelper {
 
     def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
   }
+
+
+  implicit class EffectHelperTryOps[A](val self: Try[A]) extends AnyVal {
+
+    def fromTry[F[_]](implicit fromTry: FromTry[F]): F[A] = fromTry(self)
+  }
 }
