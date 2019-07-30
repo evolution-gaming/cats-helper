@@ -66,8 +66,7 @@ object ThreadLocalOf {
 
   def apply[F[_]](implicit F: ThreadLocalOf[F]): ThreadLocalOf[F] = F
 
-
-  implicit val io: ThreadLocalOf[IO] = new ThreadLocalOf[IO] {
+  implicit val ioThreadLocalOf: ThreadLocalOf[IO] = new ThreadLocalOf[IO] {
 
     def apply[A](fa: IO[A]) = {
       val threadLocal = Sync[IO].delay {
@@ -80,4 +79,7 @@ object ThreadLocalOf {
       }
     }
   }
+
+  @deprecated("use ioThreadLocalOf instead", "0.0.26")
+  val io: ThreadLocalOf[IO] = ioThreadLocalOf
 }
