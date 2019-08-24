@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.arrow.FunctionK
 import cats.effect.{Async, Sync}
 import cats.implicits._
 
@@ -36,5 +37,17 @@ object FromFuture {
         } yield result
       }
     }
+  }
+
+
+  def functionK[F[_] : FromFuture]: FunctionK[Future, F] = new FunctionK[Future, F] {
+
+    def apply[A](fa: Future[A]) = FromFuture[F].apply(fa)
+  }
+
+
+  implicit class FromFutureOps[F[_]](val self: FromFuture[F]) extends AnyVal {
+
+    def toFunctionK: FunctionK[Future, F] = functionK(self)
   }
 }

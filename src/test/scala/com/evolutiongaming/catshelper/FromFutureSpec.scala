@@ -36,5 +36,15 @@ class FromFutureSpec extends AsyncFunSuite with Matchers {
     }
   }
 
+  test("functionK") {
+    val functionK = FromFuture[IO].toFunctionK
+    val fa = for {
+      a <- functionK(Future.successful(0))
+    } yield {
+      a shouldEqual 0
+    }
+    fa.run()
+  }
+
   private case object Error extends RuntimeException with NoStackTrace
 }

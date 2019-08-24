@@ -12,7 +12,7 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
 
   for {
     (name, value, expected) <- List(
-      ("success", ().pure[IO],                ().asRight[Throwable]),
+      ("success", ().pure[IO], ().asRight[Throwable]),
       ("failure", Error.raiseError[IO, Unit], Error.asLeft[Unit])
     )
   } {
@@ -35,6 +35,14 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
     }
   }
 
+  test("functionK") {
+    val functionK = ToFuture[IO].toFunctionK
+    for {
+      a <- functionK(0.pure[IO])
+    } yield {
+      a shouldEqual 0
+    }
+  }
 
   private case object Error extends RuntimeException with NoStackTrace
 }
