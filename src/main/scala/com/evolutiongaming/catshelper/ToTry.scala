@@ -37,4 +37,9 @@ object ToTry {
   implicit val idToTry: ToTry[Id] = new ToTry[Id] {
     def apply[A](fa: Id[A]) = Success(fa)
   }
+
+
+  implicit val tryToTry: ToTry[Try] = new ToTry[Try] {
+    def apply[A](fa: Try[A]) = fa
+  }
 }

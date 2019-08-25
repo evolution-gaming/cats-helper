@@ -30,4 +30,9 @@ object FromTry {
   implicit val futureFromTry: FromTry[Future] = new FromTry[Future] {
     def apply[A](fa: Try[A]) = Future.fromTry(fa)
   }
+
+
+  implicit val tryFromTry: FromTry[Try] = new FromTry[Try] {
+    def apply[A](fa: Try[A]) = fa
+  }
 }
