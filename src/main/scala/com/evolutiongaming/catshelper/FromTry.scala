@@ -1,7 +1,8 @@
 package com.evolutiongaming.catshelper
 
-import cats.Id
 import cats.effect.IO
+import cats.implicits._
+import cats.{ApplicativeError, Id}
 
 import scala.concurrent.Future
 import scala.util.Try
@@ -17,9 +18,13 @@ object FromTry {
 
   def apply[F[_]](implicit F: FromTry[F]): FromTry[F] = F
 
-  implicit val ioFromTry: FromTry[IO] = new FromTry[IO] {
-    def apply[A](fa: Try[A]) = IO.fromTry(fa)
+
+  def lift[F[_]](implicit F: ApplicativeError[F, Throwable]): FromTry[F] = new FromTry[F] {
+    def apply[A](fa: Try[A]) = F.fromTry(fa)
   }
+
+
+  implicit val ioFromTry: FromTry[IO] = lift
 
 
   implicit val idFromTry: FromTry[Id] = new FromTry[Id] {
@@ -32,7 +37,5 @@ object FromTry {
   }
 
 
-  implicit val tryFromTry: FromTry[Try] = new FromTry[Try] {
-    def apply[A](fa: Try[A]) = fa
-  }
+  implicit val tryFromTry: FromTry[Try] = lift
 }
