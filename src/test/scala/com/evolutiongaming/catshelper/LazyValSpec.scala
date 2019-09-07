@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.arrow.FunctionK
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Sync}
 import cats.implicits._
@@ -32,7 +33,8 @@ class LazyValSpec extends AsyncFunSuite with Matchers {
         a <- deferred.get
       } yield a
 
-      lazyRef  <- LazyVal.of(load)
+      lazyRef0 <- LazyVal.of(load)
+      lazyRef   = lazyRef0.mapK(FunctionK.id)
       count    <- ref.get
       _        <- Sync[F].delay { count shouldEqual 0 }
       a0       <- lazyRef.get.startEnsure

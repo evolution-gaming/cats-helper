@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
 
-import cats.Functor
+import cats.{Functor, ~>}
 import cats.effect.Concurrent
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
@@ -73,6 +73,17 @@ object LazyVal {
           a <- a.fold(none[A].pure[F])(_.get.flatMap(_.map(_.some)))
         } yield a
       }
+    }
+  }
+
+
+  implicit class LazyValOps[F[_], A](val self: LazyVal[F, A]) extends AnyVal {
+
+    def mapK[G[_]](f: F ~> G): LazyVal[G, A] = new LazyVal[G, A] {
+
+      def get = f(self.get)
+
+      def getLoaded = f(self.getLoaded)
     }
   }
 }
