@@ -27,6 +27,19 @@ for {
 } yield {}
 ```
 
+## LazyVal
+
+Functional alternative to `lazy` keyword in Scala
+
+```scala
+trait LazyVal[F[_], A] {
+
+  def get: F[A]
+
+  def getLoaded: F[Option[A]]
+}
+```
+
 ## ToFuture & FromFuture
 
 ```scala

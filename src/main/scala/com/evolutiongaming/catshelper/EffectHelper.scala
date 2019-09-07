@@ -3,6 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.effect.concurrent.Deferred
 import cats.effect.{Bracket, Concurrent, Fiber}
 import cats.implicits._
+import cats.effect.implicits._
 
 import scala.concurrent.Future
 import scala.util.Try
@@ -52,8 +53,7 @@ object EffectHelper {
 
       for {
         started <- Deferred[F, Unit]
-        fa       = faOf(started)
-        fiber   <- Concurrent[F].start(fa)
+        fiber   <- faOf(started).start
         _       <- started.get
       } yield fiber
     }
