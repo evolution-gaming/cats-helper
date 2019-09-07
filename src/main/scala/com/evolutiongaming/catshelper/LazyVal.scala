@@ -1,6 +1,7 @@
 package com.evolutiongaming.catshelper
 
 
+import cats.Functor
 import cats.effect.Concurrent
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
@@ -14,6 +15,14 @@ trait LazyVal[F[_], A] {
 }
 
 object LazyVal {
+
+  def const[F[_] : Functor, A](a: F[A]): LazyVal[F, A] = new LazyVal[F, A] {
+
+    def get = a
+
+    def getLoaded = a.map(_.some)
+  }
+
 
   def of[F[_] : Concurrent, A](load: => F[A]): F[LazyVal[F, A]] = {
     for {
@@ -29,7 +38,7 @@ object LazyVal {
   ): LazyVal[F, A] = {
     new LazyVal[F, A] {
 
-      def get = {
+      val get = {
 
         def loaded = {
 
@@ -58,7 +67,7 @@ object LazyVal {
         } yield a
       }
 
-      def getLoaded = {
+      val getLoaded = {
         for {
           a <- ref.get
           a <- a.fold(none[A].pure[F])(_.get.flatMap(_.map(_.some)))
