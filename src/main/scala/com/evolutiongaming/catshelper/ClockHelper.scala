@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import cats.effect.Clock
 import cats.implicits._
-import cats.{Applicative, FlatMap}
+import cats.{Applicative, Functor}
 
 object ClockHelper {
 
@@ -17,7 +17,7 @@ object ClockHelper {
 
     def micros: F[Long] = self.monotonic(TimeUnit.MICROSECONDS)
 
-    def instant(implicit flatMap: FlatMap[F]): F[Instant] = {
+    def instant(implicit F: Functor[F]): F[Instant] = {
       for {
         millis <- millis
       } yield {
