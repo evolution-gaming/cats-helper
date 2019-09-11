@@ -22,7 +22,7 @@ class RuntimeSpec extends AsyncFunSuite with Matchers {
   test("freeMemory") {
     val result = for {
       cores <- runtime.freeMemory
-      _       = cores should be > 0l
+      _       = cores should be > 0L
     } yield {}
     result.run()
   }
@@ -30,7 +30,7 @@ class RuntimeSpec extends AsyncFunSuite with Matchers {
   test("totalMemory") {
     val result = for {
       cores <- runtime.totalMemory
-      _       = cores should be > 0l
+      _       = cores should be > 0L
     } yield {}
     result.run()
   }
@@ -38,7 +38,7 @@ class RuntimeSpec extends AsyncFunSuite with Matchers {
   test("maxMemory") {
     val result = for {
       cores <- runtime.maxMemory
-      _       = cores should be > 0l
+      _       = cores should be > 0L
     } yield {}
     result.run()
   }

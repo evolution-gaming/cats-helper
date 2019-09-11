@@ -2,11 +2,11 @@ package com.evolutiongaming.catshelper
 
 import java.util.concurrent.Executors
 
+import cats.Parallel
 import cats.arrow.FunctionK
 import cats.effect._
 import cats.effect.concurrent.Ref
 import cats.implicits._
-import cats.temp.par._
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.{AsyncFunSuite, Matchers}
 
@@ -25,7 +25,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
     result.run()
   }
 
-  private def testF[F[_] : Sync : ThreadLocalOf : Par : Clock : ContextShift](n: Int): F[Unit] = {
+  private def testF[F[_] : Sync : ThreadLocalOf : Parallel : Clock : ContextShift](n: Int): F[Unit] = {
 
     def test(ref: ThreadLocalRef[F, String], executor: ExecutionContext) = {
 
