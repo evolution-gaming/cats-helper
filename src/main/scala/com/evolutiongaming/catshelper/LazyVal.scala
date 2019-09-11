@@ -45,7 +45,7 @@ object LazyVal {
           def complete(d: Deferred[F, F[A]]) = {
             for {
               a  <- load.attempt
-              af  = a.raiseOrPure[F]
+              af  = a.liftTo[F]
               _  <- d.complete(af)
             } yield af
           }
