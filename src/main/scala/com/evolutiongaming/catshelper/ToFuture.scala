@@ -32,10 +32,6 @@ object ToFuture {
   }
 
 
-  @deprecated("use ioToFuture instead", "0.0.10")
-  val io: ToFuture[IO] = ioToFuture
-
-
   implicit class ToFutureOps[F[_]](val self: ToFuture[F]) extends AnyVal {
 
     def toFunctionK: FunctionK[F, Future] = functionK(self)

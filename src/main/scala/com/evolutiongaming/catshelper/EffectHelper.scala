@@ -10,8 +10,8 @@ import scala.util.Try
 
 object EffectHelper {
 
-  @deprecated("use EffectHelperBracketOps", "0.0.18")
-  class BracketOps[F[_], E](val self: Bracket[F, E]) extends AnyVal {
+  @deprecated("use BracketOpsEffectHelper", "1.0.0")
+  class EffectHelperBracketOps[F[_], E](val self: Bracket[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, map: A => B): F[B] = {
       val fb = self.map(fa)(map)
@@ -25,7 +25,7 @@ object EffectHelper {
   }
 
 
-  implicit class EffectHelperBracketOps[F[_], E](val self: Bracket[F, E]) extends AnyVal {
+  implicit class BracketOpsEffectHelper[F[_], E](val self: Bracket[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, map: A => B): F[B] = {
       val fb = self.map(fa)(map)
@@ -39,7 +39,8 @@ object EffectHelper {
   }
 
 
-  implicit class EffectHelperConcurrentOps[F[_]](val self: Concurrent[F]) extends AnyVal {
+  @deprecated("use ConcurrentOpsEffectHelper instead", "1.0.0")
+  class EffectHelperConcurrentOps[F[_]](val self: Concurrent[F]) extends AnyVal {
     
     def startEnsure[A](fa: F[A]): F[Fiber[F, A]] = {
       implicit val F = self
@@ -60,8 +61,29 @@ object EffectHelper {
   }
 
 
-  @deprecated("use EffectHelperFOps", "0.0.18")
-  class FOps[F[_], A](val self: F[A]) extends AnyVal {
+  implicit class ConcurrentOpsEffectHelper[F[_]](val self: Concurrent[F]) extends AnyVal {
+
+    def startEnsure[A](fa: F[A]): F[Fiber[F, A]] = {
+      implicit val F = self
+
+      def faOf(started: Deferred[F, Unit]) = {
+        for {
+          _ <- started.complete(())
+          a <- fa
+        } yield a
+      }
+
+      for {
+        started <- Deferred[F, Unit]
+        fiber   <- faOf(started).start
+        _       <- started.get
+      } yield fiber
+    }
+  }
+
+
+  @deprecated("use FOpsEffectHelper instead", "1.0.0")
+  class EffectHelperFOps[F[_], A](val self: F[A]) extends AnyVal {
 
     def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: Bracket[F, E]): F[B] = {
       bracket.redeem(self)(recover, map)
@@ -72,6 +94,9 @@ object EffectHelper {
     }
 
 
+    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)
+
+
     def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
 
 
@@ -79,7 +104,7 @@ object EffectHelper {
   }
 
 
-  implicit class EffectHelperFOps[F[_], A](val self: F[A]) extends AnyVal {
+  implicit class FOpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
 
     def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: Bracket[F, E]): F[B] = {
       bracket.redeem(self)(recover, map)

@@ -79,7 +79,4 @@ object ThreadLocalOf {
       }
     }
   }
-
-  @deprecated("use ioThreadLocalOf instead", "0.0.26")
-  val io: ThreadLocalOf[IO] = ioThreadLocalOf
 }
