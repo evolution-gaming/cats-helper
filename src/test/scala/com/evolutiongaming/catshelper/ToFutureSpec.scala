@@ -2,8 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.IO
 import cats.implicits._
-import com.evolutiongaming.catshelper.EffectHelper._
-import com.evolutiongaming.catshelper.IOSuite._
+import com.evolutiongaming.catshelper.CatsHelper._
 import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.util.control.NoStackTrace

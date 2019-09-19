@@ -4,7 +4,7 @@ import cats.arrow.FunctionK
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Sync}
 import cats.implicits._
-import com.evolutiongaming.catshelper.EffectHelper._
+import com.evolutiongaming.catshelper.CatsHelper._
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.{AsyncFunSuite, Matchers}
 

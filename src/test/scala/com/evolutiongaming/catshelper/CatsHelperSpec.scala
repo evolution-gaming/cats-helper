@@ -2,12 +2,12 @@ package com.evolutiongaming.catshelper
 
 import cats.effect._
 import cats.implicits._
-import com.evolutiongaming.catshelper.EffectHelper._
+import com.evolutiongaming.catshelper.CatsHelper._
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.util.control.NoStackTrace
 
-class EffectHelperSpec extends FunSuite with Matchers {
+class CatsHelperSpec extends FunSuite with Matchers {
 
   for {
     (name, a, expected) <- List(

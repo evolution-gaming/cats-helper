@@ -9,6 +9,7 @@ import cats.effect.implicits._
 import scala.concurrent.Future
 import scala.util.Try
 
+@deprecated("use CatsHelper instead", "1.0.1")
 object EffectHelper {
 
   @deprecated("use BracketOpsEffectHelper", "1.0.0")
@@ -144,12 +145,12 @@ object EffectHelper {
 
   implicit class OpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
 
-    def redeem[B, E](recover: E => B, ab: A => B)(implicit bracket: Bracket[F, E]): F[B] = {
-      bracket.redeem(self)(recover, ab)
+    def redeem[B, E](recover: E => B, ab: A => B)(implicit F: ApplicativeError[F, E]): F[B] = {
+      F.redeem(self)(recover, ab)
     }
 
-    def redeemWith[B, E](recover: E => F[B], ab: A => F[B])(implicit bracket: Bracket[F, E]): F[B] = {
-      bracket.redeemWith(self)(recover, ab)
+    def redeemWith[B, E](recover: E => F[B], ab: A => F[B])(implicit F: MonadError[F, E]): F[B] = {
+      F.redeemWith(self)(recover, ab)
     }
 
 
