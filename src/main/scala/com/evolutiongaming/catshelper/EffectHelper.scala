@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.{ApplicativeError, MonadError}
 import cats.effect.concurrent.Deferred
 import cats.effect.{Bracket, Concurrent, Fiber}
 import cats.implicits._
@@ -14,26 +15,41 @@ object EffectHelper {
   class EffectHelperBracketOps[F[_], E](val self: Bracket[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, map: A => B): F[B] = {
-      val fb = self.map(fa)(map)
-      self.handleError(fb)(recover)
+      self.redeem(fa)(recover, map)
     }
 
     def redeemWith[A, B](fa: F[A])(recover: E => F[B], flatMap: A => F[B]): F[B] = {
-      val fb = self.flatMap(fa)(flatMap)
-      self.handleErrorWith(fb)(recover)
+      self.redeemWith(fa)(recover, flatMap)
     }
   }
 
 
-  implicit class BracketOpsEffectHelper[F[_], E](val self: Bracket[F, E]) extends AnyVal {
+  @deprecated("use ApplicativeErrorOpsEffectHelper or MonadErrorOpsEffectHelper instead", "1.0.1")
+  class BracketOpsEffectHelper[F[_], E](val self: Bracket[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, map: A => B): F[B] = {
-      val fb = self.map(fa)(map)
-      self.handleError(fb)(recover)
+      self.redeem(fa)(recover, map)
     }
 
     def redeemWith[A, B](fa: F[A])(recover: E => F[B], flatMap: A => F[B]): F[B] = {
-      val fb = self.flatMap(fa)(flatMap)
+      self.redeemWith(fa)(recover, flatMap)
+    }
+  }
+
+
+  implicit class ApplicativeErrorOpsEffectHelper[F[_], E](val self: ApplicativeError[F, E]) extends AnyVal {
+
+    def redeem[A, B](fa: F[A])(recover: E => B, ab: A => B): F[B] = {
+      val fb = self.map(fa)(ab)
+      self.handleError(fb)(recover)
+    }
+  }
+
+
+  implicit class MonadErrorOpsEffectHelper[F[_], E](val self: MonadError[F, E]) extends AnyVal {
+
+    def redeemWith[A, B](fa: F[A])(recover: E => F[B], ab: A => F[B]): F[B] = {
+      val fb = self.flatMap(fa)(ab)
       self.handleErrorWith(fb)(recover)
     }
   }
@@ -104,14 +120,36 @@ object EffectHelper {
   }
 
 
-  implicit class FOpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
+  @deprecated("use FOpsEffectHelper instead", "1.0.1")
+  class FOpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
 
     def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: Bracket[F, E]): F[B] = {
-      bracket.redeem(self)(recover, map)
+      self.redeem(recover, map)
     }
 
     def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: Bracket[F, E]): F[B] = {
-      bracket.redeemWith(self)(recover, flatMap)
+      self.redeemWith(recover, flatMap)
+    }
+
+
+    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = self.startEnsure
+
+
+    def toTry(implicit F: ToTry[F]): Try[A] = self.toTry
+
+
+    def toFuture(implicit F: ToFuture[F]): Future[A] = self.toFuture
+  }
+
+
+  implicit class OpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
+
+    def redeem[B, E](recover: E => B, ab: A => B)(implicit bracket: Bracket[F, E]): F[B] = {
+      bracket.redeem(self)(recover, ab)
+    }
+
+    def redeemWith[B, E](recover: E => F[B], ab: A => F[B])(implicit bracket: Bracket[F, E]): F[B] = {
+      bracket.redeemWith(self)(recover, ab)
     }
 
 
