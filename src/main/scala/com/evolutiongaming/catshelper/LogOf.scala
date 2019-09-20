@@ -30,7 +30,10 @@ object LogOf {
   }
 
 
-  def slfj4[F[_] : Sync]: F[LogOf[F]] = {
+  @deprecated("use `slf4j` instead", "1.0.4")
+  def slfj4[F[_] : Sync]: F[LogOf[F]] = slf4j[F]
+
+  def slf4j[F[_] : Sync]: F[LogOf[F]] = {
     for {
       factory <- Sync[F].delay { LoggerFactory.getILoggerFactory }
     } yield {
