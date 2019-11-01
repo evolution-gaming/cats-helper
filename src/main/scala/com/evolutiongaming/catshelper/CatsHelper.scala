@@ -1,10 +1,10 @@
 package com.evolutiongaming.catshelper
 
-import cats.{ApplicativeError, MonadError}
 import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, Fiber}
-import cats.implicits._
 import cats.effect.implicits._
+import cats.effect.{Concurrent, Fiber, Resource}
+import cats.implicits._
+import cats.{ApplicativeError, MonadError}
 
 import scala.concurrent.Future
 import scala.util.Try
@@ -74,5 +74,11 @@ object CatsHelper {
   implicit class TryOpsCatsHelper[A](val self: Try[A]) extends AnyVal {
 
     def fromTry[F[_]](implicit fromTry: FromTry[F]): F[A] = fromTry(self)
+  }
+
+
+  implicit class ResourceOpsCatsHelper[F[_], A](val self: Resource[F, A]) extends AnyVal {
+
+    def fenced(implicit F: Concurrent[F]): Resource[F, A] = ResourceFenced(self)
   }
 }

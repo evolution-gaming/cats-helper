@@ -115,7 +115,17 @@ trait ThreadLocalRef[F[_], A] {
 
   def modify[B](f: A => (A, B)): F[B]
 }
-``` 
+```
+
+## ResourceFenced
+
+This is useful to ensure `release` called at most once, in cases when "unsafe" api like `Resource.allocated` being used
+
+```scala
+val resource: Resource[F, A] = ???
+resource.fenced
+```
+ 
 
 ## Setup
 
