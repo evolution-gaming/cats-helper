@@ -5,9 +5,9 @@ import cats.arrow.FunctionK
 import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
-import org.scalatest.AsyncFunSuite
 
 import scala.concurrent.duration._
+import org.scalatest.funsuite.AsyncFunSuite
 
 class SerialRefSpec extends AsyncFunSuite {
 

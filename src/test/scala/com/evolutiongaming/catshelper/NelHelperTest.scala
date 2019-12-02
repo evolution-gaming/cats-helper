@@ -2,9 +2,10 @@ package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
 import com.evolutiongaming.catshelper.NelHelper._
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class NelHelperTest extends FunSuite with Matchers {
+class NelHelperTest extends AnyFunSuite with Matchers {
 
   test("grouped") {
     val actual = Nel

@@ -3,9 +3,10 @@ package com.evolutiongaming.catshelper
 import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
-import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.util.control.NoStackTrace
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
 class ToFutureSpec extends AsyncFunSuite with Matchers {
 
