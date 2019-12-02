@@ -5,9 +5,10 @@ import java.time.Instant
 import cats.Id
 import cats.effect.Clock
 import com.evolutiongaming.catshelper.ClockHelper._
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class ClockHelperSpec extends FunSuite with Matchers {
+class ClockHelperSpec extends AnyFunSuite with Matchers {
 
   private val clock = Clock.const[Id](nanos = 1000, millis = 2)
 

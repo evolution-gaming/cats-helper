@@ -4,12 +4,13 @@ import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
 import com.evolutiongaming.catshelper.IOSuite._
-import org.scalatest.{FunSuite, Matchers}
 
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class FromTrySpec extends FunSuite with Matchers {
+class FromTrySpec extends AnyFunSuite with Matchers {
 
   def failure[A](a: Throwable): Try[A] = Failure(a)
 

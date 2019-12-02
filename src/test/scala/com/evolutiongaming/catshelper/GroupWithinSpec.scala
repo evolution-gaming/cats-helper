@@ -6,9 +6,10 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Timer}
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
-import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.concurrent.duration._
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
 class GroupWithinSpec extends AsyncFunSuite with Matchers {
 

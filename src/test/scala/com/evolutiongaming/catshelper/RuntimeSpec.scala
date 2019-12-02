@@ -4,7 +4,8 @@ import cats.arrow.FunctionK
 import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
-import org.scalatest.{AsyncFunSuite, Matchers}
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
 
 class RuntimeSpec extends AsyncFunSuite with Matchers {
