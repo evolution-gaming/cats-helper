@@ -1,21 +1,14 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
+import com.evolutiongaming.catshelper.DataHelper._
 
+@deprecated("use DataHelper instead", "1.2.0")
 object NelHelper {
 
-  implicit class NelOpsNelHelper[A](val self: Nel[A]) extends AnyVal {
+  @deprecated("use DataHelper instead", "1.2.0")
+  class NelOpsNelHelper[A](val self: Nel[A]) extends AnyVal {
 
-    def grouped(n: Int): Nel[Nel[A]] = {
-      if (n <= 0) Nel.of(self)
-      else {
-        val groups = for {
-          a <- self.toList.grouped(n).toList
-        } yield {
-          Nel(a.head, a.tail)
-        }
-        Nel(groups.head, groups.tail)
-      }
-    }
+    def grouped(n: Int): Nel[Nel[A]] = self.grouped(n)
   }
 }
