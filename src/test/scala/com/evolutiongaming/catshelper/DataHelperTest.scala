@@ -1,12 +1,12 @@
 package com.evolutiongaming.catshelper
 
-import cats.data.{NonEmptyMap => Nem, NonEmptyList => Nel}
+import cats.data.{NonEmptyList => Nel, NonEmptyMap => Nem, NonEmptySet => Nes}
 import cats.implicits._
 import com.evolutiongaming.catshelper.DataHelper._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import scala.collection.immutable.SortedMap
+import scala.collection.immutable.{SortedMap, SortedSet}
 
 class DataHelperTest extends AnyFunSuite with Matchers {
 
@@ -29,5 +29,15 @@ class DataHelperTest extends AnyFunSuite with Matchers {
       Nel.of(2, 3),
       Nel.of(4))
     actual shouldEqual expected
+  }
+
+  test("Iterable.toSortedSet") {
+    List.empty[Int].toSortedSet shouldEqual SortedSet.empty[Int]
+    List(1, 0, 1).toSortedSet shouldEqual SortedSet(0, 1)
+  }
+
+  test("Iterable.toNes") {
+    List.empty[Int].toNes shouldEqual none
+    List(1, 0, 1).toNes shouldEqual Nes.of(0, 1).some
   }
 }

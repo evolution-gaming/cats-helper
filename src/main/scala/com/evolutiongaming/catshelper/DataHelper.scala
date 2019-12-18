@@ -1,24 +1,54 @@
 package com.evolutiongaming.catshelper
 
 import cats.Order
-import cats.data.{NonEmptyMap => Nem, NonEmptyList => Nel}
+import cats.data.{NonEmptyList => Nel, NonEmptyMap => Nem, NonEmptySet => Nes}
 
-import scala.collection.immutable.{Iterable, SortedMap}
+import scala.collection.immutable.{Iterable, SortedMap, SortedSet}
 
 object DataHelper {
+
+  implicit class SortedMapOpsDataHelper[K, V](val self: SortedMap[K, V]) extends AnyVal {
+
+    def toNem(implicit order: Order[K]): Option[Nem[K, V]] = Nem.fromMap(self)
+  }
+
+
+  implicit class SortedSetOpsDataHelper[A](val self: SortedSet[A]) extends AnyVal {
+
+    def toNes: Option[Nes[A]] = Nes.fromSet(self)
+  }
+
 
   implicit class IterableOpsDataHelper[K, V](val self: Iterable[(K, V)]) extends AnyVal {
 
     def toSortedMap(implicit order: Order[K]): SortedMap[K, V] = {
       implicit val ordering = order.toOrdering
       val builder = SortedMap.newBuilder[K, V]
-      val result = builder ++= self
-      result.result()
+      builder ++= self
+      builder.result()
     }
 
     def toNem(implicit order: Order[K]): Option[Nem[K, V]] = {
-      val sortedMap = self.toSortedMap
-      Nem.fromMap(sortedMap)
+      self
+        .toSortedMap
+        .toNem
+    }
+  }
+
+
+  implicit class IterableOps1DataHelper[A](val self: Iterable[A]) extends AnyVal {
+
+    def toSortedSet(implicit order: Order[A]): SortedSet[A] = {
+      implicit val ordering = Order[A].toOrdering
+      val builder = SortedSet.newBuilder[A]
+      builder ++= self
+      builder.result()
+    }
+
+    def toNes(implicit order: Order[A]): Option[Nes[A]] = {
+      self
+        .toSortedSet
+        .toNes
     }
   }
 
