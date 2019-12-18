@@ -89,5 +89,11 @@ object DataHelper {
       }
     }
   }
+
+
+  implicit class NesOpsDataHelper[A](val self: Nes[A]) extends AnyVal {
+
+    def toNel: Nel[A] = self.toNonEmptyList
+  }
 }
 

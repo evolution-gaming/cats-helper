@@ -40,4 +40,12 @@ class DataHelperTest extends AnyFunSuite with Matchers {
     List.empty[Int].toNes shouldEqual none
     List(1, 0, 1).toNes shouldEqual Nes.of(0, 1).some
   }
+
+  test("Nes.toNel") {
+    Nes.of(1, 0).toNel shouldEqual Nel.of(0, 1)
+  }
+
+  test("Nel.toNes") {
+    Nel.of(1, 0).toNes shouldEqual Nes.of(0, 1)
+  }
 }
