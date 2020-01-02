@@ -36,11 +36,6 @@ class DataHelperTest extends AnyFunSuite with Matchers {
     List(1, 0, 1).toSortedSet shouldEqual SortedSet(0, 1)
   }
 
-  test("Iterable.toNes") {
-    List.empty[Int].toNes shouldEqual none
-    List(1, 0, 1).toNes shouldEqual Nes.of(0, 1).some
-  }
-
   test("Nes.toNel") {
     Nes.of(1, 0).toNel shouldEqual Nel.of(0, 1)
   }

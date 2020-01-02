@@ -13,12 +13,6 @@ object DataHelper {
   }
 
 
-  implicit class SortedSetOpsDataHelper[A](val self: SortedSet[A]) extends AnyVal {
-
-    def toNes: Option[Nes[A]] = Nes.fromSet(self)
-  }
-
-
   implicit class IterableOpsDataHelper[K, V](val self: Iterable[(K, V)]) extends AnyVal {
 
     def toSortedMap(implicit order: Order[K]): SortedMap[K, V] = {
@@ -43,12 +37,6 @@ object DataHelper {
       val builder = SortedSet.newBuilder[A]
       builder ++= self
       builder.result()
-    }
-
-    def toNes(implicit order: Order[A]): Option[Nes[A]] = {
-      self
-        .toSortedSet
-        .toNes
     }
   }
 
