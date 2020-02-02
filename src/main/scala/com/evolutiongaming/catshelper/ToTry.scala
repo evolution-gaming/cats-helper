@@ -3,9 +3,9 @@ package com.evolutiongaming.catshelper
 import cats.Id
 import cats.effect.IO
 
-import scala.concurrent.Await
+import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 trait ToTry[F[_]] {
 
@@ -20,8 +20,13 @@ object ToTry {
   def ioToTry(timeout: FiniteDuration): ToTry[IO] = new ToTry[IO] {
 
     def apply[A](fa: IO[A]) = {
-      val future = fa.unsafeToFuture
-      Try { Await.result(future, timeout) }
+
+      def error: Try[A] = Failure[A](new TimeoutException(timeout.toString()))
+
+      for {
+        a <- Try { fa.unsafeRunTimed(timeout) }
+        a <- a.fold(error) { a => Success(a) }
+      } yield a
     }
   }
 
