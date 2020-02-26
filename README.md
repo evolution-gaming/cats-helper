@@ -125,7 +125,20 @@ This is useful to ensure `release` called at most once, in cases when "unsafe" a
 val resource: Resource[F, A] = ???
 resource.fenced
 ```
- 
+
+## PureTest
+
+This helper lives in a separate `cats-helper-testkit` module. It is makes testing `F[_]`-based code easier.
+
+```scala
+"what time is it now?" in PureTest[IO].of { env =>
+  import env._
+  for {
+    _ <- IO.sleep(1.hour)
+    _ <- testRuntime.getTimeSinceStart.map(_ shouldBe 1.hour)
+  } yield ()
+}
+```
 
 ## Setup
 
