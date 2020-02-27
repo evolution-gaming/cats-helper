@@ -7,7 +7,7 @@ import cats.implicits._
 import cats.{Applicative, ~>}
 import com.evolutiongaming.catshelper.ClockHelper._
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 trait GroupWithin[F[_]] {
   import GroupWithin._
@@ -39,7 +39,7 @@ object GroupWithin {
 
         case class State(as: Nel[A], timestamp: Long, cancel: F[Unit])
 
-        if (settings.size <= 1) {
+        if (settings.size <= 1 || settings.delay <= 0.millis) {
           val enqueue = new Enqueue[F, A] {
             def apply(a: A) = f(Nel.of(a))
           }
