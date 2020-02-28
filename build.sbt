@@ -45,6 +45,9 @@ lazy val core = project
       scalatest % Test,
     ),
   )
+  .dependsOn(
+    testkit % Test,
+  )
 
 lazy val testkit = project
   .settings(

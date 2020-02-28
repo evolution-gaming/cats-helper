@@ -5,28 +5,32 @@ import cats.data.{NonEmptyList => Nel}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Timer}
 import cats.implicits._
-import com.evolutiongaming.catshelper.IOSuite._
-
-import scala.concurrent.duration._
-import org.scalatest.funsuite.AsyncFunSuite
+import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
+import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-class GroupWithinSpec extends AsyncFunSuite with Matchers {
+import scala.concurrent.duration._
 
-  test("support settings = 0") {
-    `support settings = 0`[IO].run()
+class GroupWithinSpec extends AnyFreeSpec with Matchers {
+
+  "support settings = 0" in ioTest { env =>
+    import env._
+    `support settings = 0`[IO]
   }
 
-  test("collect until size reached") {
-    `collect until size reached`[IO].run()
+  "collect until size reached" in ioTest { env =>
+    import env._
+    `collect until size reached`[IO]
   }
 
-  test("collect until deadline reached") {
-    `collect until deadline reached`[IO].run()
+  "collect until deadline reached" in ioTest { env =>
+    import env._
+    `collect until deadline reached`[IO]
   }
 
-  test("consume on release") {
-    `consume on release`[IO].run()
+  "consume on release" in ioTest { env =>
+    import env._
+    `consume on release`[IO]
   }
 
   private def `support settings = 0`[F[_] : Concurrent : Timer] = {
@@ -67,19 +71,26 @@ class GroupWithinSpec extends AsyncFunSuite with Matchers {
   }
 
   private def `collect until deadline reached`[F[_] : Concurrent : Timer] = {
-    val settings = GroupWithin.Settings(delay = 300.millis, size = 100)
+    val delay = 1.minute
+    val settings = GroupWithin.Settings(delay = delay, size = 100)
     for {
-      deferred    <- Deferred[F, Nel[Int]]
-      groupWithin  = GroupWithin[F].apply[Int](settings) { a => deferred.complete(a) }
+      ref         <- Ref[F].of(List.empty[Nel[Int]])
+      groupWithin  = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
       a           <- groupWithin.use { enqueue =>
         for {
           _ <- enqueue(1)
           _ <- enqueue(2)
-          a <- deferred.get
+          // 1.nano is needed to avoid a race between end-of-group and the subsequent elements
+          _ <- Timer[F].sleep(delay + 1.nano)
+          _ <- enqueue(3)
+          _ <- enqueue(4)
+          _ <- Timer[F].sleep(delay + 1.nano)
+          _ <- enqueue(5) // this won't be seen yet
+          a <- ref.get
         } yield a
       }
     } yield {
-      a shouldEqual Nel.of(1, 2)
+      a shouldEqual List(Nel.of(3, 4), Nel.of(1, 2))
     }
   }
 
