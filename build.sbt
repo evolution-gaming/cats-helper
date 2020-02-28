@@ -16,6 +16,8 @@ inThisBuild(Seq(
   releaseCrossBuild := true,
 
   resolvers += Resolver.bintrayRepo("evolutiongaming", "maven"),
+
+  addCompilerPlugin(cpKindProjector),
 ))
 
 lazy val root = project
@@ -25,6 +27,7 @@ lazy val root = project
   )
   .aggregate(
     core,
+    testkit,
   )
 
 lazy val core = project
@@ -40,5 +43,18 @@ lazy val core = project
       machinist,
       `slf4j-api`,
       scalatest % Test,
+    ),
+  )
+  .dependsOn(
+    testkit % Test,
+  )
+
+lazy val testkit = project
+  .settings(
+    name := "cats-helper-testkit",
+
+    libraryDependencies ++= Seq(
+      Cats.effectLaws,
+      scalatest,
     ),
   )

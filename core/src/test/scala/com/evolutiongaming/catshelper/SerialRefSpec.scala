@@ -1,39 +1,31 @@
 package com.evolutiongaming.catshelper
 
-import cats._
 import cats.arrow.FunctionK
 import cats.effect.IO
+import cats.effect.concurrent.Ref
 import cats.implicits._
-import com.evolutiongaming.catshelper.IOSuite._
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers._
+import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 
 import scala.concurrent.duration._
-import org.scalatest.funsuite.AsyncFunSuite
 
-class SerialRefSpec extends AsyncFunSuite {
+class SerialRefSpec extends AnyFreeSpec {
 
-  test("modify") {
-    val delay = timerIO.sleep(10.millis)
+  "modify serially" in ioTest { env =>
+    import env._
 
-    def expect[A: Eq](t: IO[A], expected: A): IO[Unit] = {
-      for {
-        a <- t
-        r <- {
-          if (Eq[A].eqv(a, expected)) IO.unit
-          else delay *> expect(t, expected)
-        }
-      } yield {
-        r
-      }
-    }
-
-    val result = for {
+    for {
       ref0     <- SerialRef[IO].of(0)
-      ref       = ref0.mapK(FunctionK.id, FunctionK.id)
-      expected  = 1000
-      modifies  = List.fill(expected)(IO.shift *> ref.update(x => IO.delay { x + 1 })).parSequence
-      result   <- IO.shift *> modifies.start *> expect(ref.get, expected)
-    } yield result
+      ref       = ref0.mapK(FunctionK.id, FunctionK.id) // make sure mapK works
+      runCount <- Ref[IO].of(0)
 
-    result.run()
+      // As a side-effect we increment run count. SerialRef makes sure it happens exactly once.
+      inc       = ref.update(x => runCount.update(_ + 1) *> IO.sleep(1.second) as (x + 1))
+      expected  = 1000
+      _        <- List.fill(expected)(inc).parSequence_
+
+      _        <- (ref.get, runCount.get).tupled.map(_ shouldBe (expected -> expected))
+    } yield ()
   }
 }
