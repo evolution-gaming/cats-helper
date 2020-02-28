@@ -126,6 +126,10 @@ val resource: Resource[F, A] = ???
 resource.fenced
 ```
 
+## ReadWriteRef
+
+A mutable reference to `A` value with read-write lock semantics.
+
 ## PureTest
 
 This helper lives in a separate `cats-helper-testkit` module. It is makes testing `F[_]`-based code easier.
