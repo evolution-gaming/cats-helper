@@ -23,6 +23,7 @@ inThisBuild(Seq(
 lazy val root = project
   .in(file("."))
   .settings(
+    publish / skip := true,
     publishArtifact := false,
   )
   .aggregate(
