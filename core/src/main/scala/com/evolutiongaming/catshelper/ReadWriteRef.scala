@@ -46,7 +46,7 @@ object ReadWriteRef {
       def plain(f: A => A)(implicit F: Applicative[F]): F[A] = self(a => F.pure(f(a)))
 
       /** A shorthand for non-effectful update that ignores previous value. */
-      def const(a: A)(implicit F: Applicative[F]): F[A] = self(_ => F.pure(a))
+      def set(a: A)(implicit F: Applicative[F]): F[A] = self(_ => F.pure(a))
     }
   }
 
