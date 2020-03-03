@@ -13,16 +13,22 @@ inThisBuild(Seq(
 
   crossScalaVersions := Seq("2.13.1", "2.12.10"),
   scalaVersion := crossScalaVersions.value.head,
-  releaseCrossBuild := true,
 
   resolvers += Resolver.bintrayRepo("evolutiongaming", "maven"),
 
   addCompilerPlugin(cpKindProjector),
 ))
 
+// Settings that can't be defined on a higher level go here.
+// Usually such settings have defaults defined by some plugin in its `projectSettings`.
+lazy val commonSettings = Seq(
+  releaseCrossBuild := true,
+)
+
 lazy val root = project
   .in(file("."))
   .settings(
+    commonSettings,
     publish / skip := true,
     publishArtifact := false,
   )
@@ -33,6 +39,8 @@ lazy val root = project
 
 lazy val core = project
   .settings(
+    commonSettings,
+
     // formerly this was a top-level module and thus it retains the old name
     name := "cats-helper",
 
@@ -52,6 +60,8 @@ lazy val core = project
 
 lazy val testkit = project
   .settings(
+    commonSettings,
+
     name := "cats-helper-testkit",
 
     libraryDependencies ++= Seq(
