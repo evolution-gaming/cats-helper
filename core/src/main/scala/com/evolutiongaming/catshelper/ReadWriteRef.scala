@@ -3,17 +3,31 @@ package com.evolutiongaming.catshelper
 import cats.Applicative
 import cats.effect.{Concurrent, Resource}
 import cats.effect.concurrent.Ref
+import cats.effect.implicits._
 import cats.implicits._
+
+import scala.annotation.tailrec
+import scala.collection.immutable.Queue
 
 /**
  * A mutable reference to `A` value with read-write lock semantics:
- *  - multiple "read" operations are allowed as long as there's no "write" running.
+ *  - multiple "read" operations are allowed as long as there's no "write" running or pending.
  *  - "write" operation is exclusive.
- *  - NB: "read" can't be promoted to "write" yet. Attempting a "write" inside "read" will deadlock.
  *
  * Build it with [[ReadWriteRef.PartialApply.of `ReadWriteRef[F].of(a)`]] or
  * [[ReadWriteRef.of `ReadWriteRef.of[F, A](a)`]].
  *
+ * IMPORTANT: Nested operations may ``block indefinitely`` when used to produce a result for
+ * the outer scope. Not using a result of an inner operation (e.g. forking a fiber) will not block.
+ *
+ * @example This will block {{{
+ *   rw.read.use(_ => rw.write.use(…))
+ * }}}
+ *
+ * Cases that will currently block:
+ *  - `write` in `read` or `write`.
+ *  - `read`  in `read` or `write` when there is another `write` pending.
+
  * @note Both [[ReadWriteRef.read `read`]] and [[ReadWriteRef.write `write`]] are implemented as `Resource`
  *       since it has clear mental model of something that may be "in use".
  */
@@ -57,12 +71,23 @@ object ReadWriteRef {
   def apply[F[_]: Concurrent]: PartialApply[F] = new PartialApply[F]
 
   def of[F[_], A](init: A)(implicit F: Concurrent[F]): F[ReadWriteRef[F, A]] = {
+    sealed trait Pending
+    case class PendingRead(listener: A => F[Unit]) extends Pending
+    case class PendingWrite(listener: A => F[Unit]) extends Pending
+
     case class State(
       a: A,
       inUse: Int = 0, // -1 -- exclusive write, 0 -- not in use, >0 -- readers
-      pendingReads: List[A => F[Unit]] = List.empty,
-      pendingWrites: List[A => F[Unit]] = List.empty,
-    )
+      pending: Queue[Pending] = Queue.empty,
+    ) {
+      def canRead: Boolean = inUse >= 0 && pending.isEmpty
+      def canWrite: Boolean = inUse == 0 && pending.isEmpty
+
+      def without(p: Pending): State = {
+        // Might want to optimise this later.
+        copy(pending = pending.filterNot(_ == p))
+      }
+    }
 
     Ref[F].of(State(init)) map { stateRef =>
       // The `release` function "commits" A back to the state, adjusts `inUse` count,
@@ -74,16 +99,22 @@ object ReadWriteRef {
         .modify { s0 =>
           val inUse = useChange(s0.inUse)
 
-          s0.pendingWrites match {
-            // Give writers a priority
-            case writeListener :: rest if inUse == 0 =>
-              val s1 = s0.copy(a = a, inUse = inUse, pendingWrites = rest)
-              val effect = writeListener(a)
+          s0.pending match {
+            case PendingWrite(listener) +: rest if inUse == 0 =>
+              val s1 = s0.copy(a = a, inUse = -1, pending = rest)
+              val effect = listener(a).start.void
               s1 -> effect
 
             case _ =>
-              val s1 = s0.copy(a = a, inUse = inUse, pendingReads = List.empty)
-              val effect = s0.pendingReads.traverse_(l => l(a))
+              // A slightly optimized way to split the pending ops in two and start the first batch
+              @tailrec def startPending(effect: F[Unit], n: Int, ps: Queue[Pending]): (F[Unit], Int, Queue[Pending]) = {
+                ps match {
+                  case PendingRead(listener) +: tail => startPending(effect <* listener(a).start, n + 1, tail)
+                  case _                             => (effect, n, ps)
+                }
+              }
+              val (effect, nStarted, rest) = startPending(F.unit, 0, s0.pending)
+              val s1 = s0.copy(a = a, inUse = inUse + nStarted, pending = rest)
               s1 -> effect
           }
         }
@@ -101,16 +132,17 @@ object ReadWriteRef {
 
             stateRef
               .modify {
-                case s0 if s0.inUse >= 0 => // can read
+                case s0 if s0.canRead =>
                   val s1 = s0.copy(inUse = s0.inUse + 1)
                   val effect = listener(s0.a)
                   val cancel = F.unit
                   s1 -> (effect as cancel)
 
                 case s0 => // have to wait for writer
-                  val s1 = s0.copy(pendingReads = listener :: s0.pendingReads)
+                  val pending = PendingRead(listener)
+                  val s1 = s0.copy(pending = s0.pending :+ pending)
                   val effect = F.unit
-                  val cancel = stateRef.update(s => s.copy(pendingReads = s.pendingReads.filterNot(_ eq listener)))
+                  val cancel = stateRef.update(_.without(pending))
                   s1 -> (effect as cancel)
               }
               .flatten
@@ -134,16 +166,17 @@ object ReadWriteRef {
 
             stateRef
               .modify {
-                case s0 if s0.inUse == 0 => // can write
+                case s0 if s0.canWrite =>
                   val s1 = s0.copy(inUse = -1)
                   val effect = listener(s0.a)
                   val cancel = F.unit
                   s1 -> (effect as cancel)
 
                 case s0 => // can't write
-                  val s1 = s0.copy(pendingWrites = listener :: s0.pendingWrites)
+                  val pending = PendingWrite(listener)
+                  val s1 = s0.copy(pending = s0.pending :+ pending)
                   val effect = F.unit
-                  val cancel = stateRef.update(s => s.copy(pendingWrites = s.pendingWrites.filterNot(_ eq listener)))
+                  val cancel = stateRef.update(_.without(pending))
                   s1 -> (effect as cancel)
               }
               .flatten

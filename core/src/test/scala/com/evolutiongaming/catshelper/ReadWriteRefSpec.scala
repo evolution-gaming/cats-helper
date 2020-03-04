@@ -14,51 +14,38 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     (read, inc, read, inc, read).tupled.map(_ shouldBe ((0, (), 1, (), 2)))
   }
 
-  "allow concurrent reads" in scope { s =>
+  "enforce fair execution" in scope { s =>
     import s._, env._
-    val d = 1.minute
-    val readAndGetTime = readFor(d) *> getTime
-    (readAndGetTime, readAndGetTime).parTupled.map(_ shouldBe ((d, d)))
-  }
+    // We're going to start a bunch of reads and writes so that
+    //  - they all get "scheduled" before any of them completes;
+    //  - they all have a short delay to have a predictable scheduling order.
+    // We will measure the time when each operation starts to check for the fairness.
 
-  "allow writes only when unused" in scope { s =>
-    import s._, env._
+    // Note that this test case also covers parallelism of `read` and exclusiveness of `wright`.
 
-    val d = 1.minute
+    val dr = 10.millis  // read duration
+    val dw = 1.second   // write duration
+    val ds = 1.nano     // scheduling delay duration
 
-    // This read takes some time and then does an _inner_ read to make sure there was no increment.
-    val readLong = rw.read.use(i => IO.sleep(d) *> read.tupleLeft(i))
+    val r: IO[(Int, FiniteDuration)] =
+      rw.read.use(i => (IO.pure(i), getTime).tupled <* IO.sleep(dr))
 
-    // For the write part we introduce some sleep to make sure read starts first,
-    // and we track the time when it ends.
-    val lateInc = sleepNs *> inc *> getTime
+    val w: IO[(Int, FiniteDuration)] =
+      rw.write.use(upd => (upd.plain(_ + 1), getTime).tupled <* IO.sleep(dw))
 
-    // Double check the increment with a late read
-    val sanityCheck = IO.sleep(d + d) *> read
-
-    (readLong, lateInc, sanityCheck).parTupled.map(_ shouldBe (((0, 0), d, 1)))
-  }
-
-  "disallow reads during write" in scope { s =>
-    import s._, env._
-
-    val d = 1.minute
-
-    // Race an increment with delayed read and check that read completes strictly after the increment.
-    (incFor(d), sleepNs *> (read, getTime).tupled).parTupled.map(_ shouldBe (((), (1, d))))
-  }
-
-  "disallow write during another write" in scope { s =>
-    import s._, env._
-
-    val d = 1.minute
-
-    // Late increment should wait for the first to complete
-    val lateInc = sleepNs *> inc *> getTime
-
-    val sanityCheck = IO.sleep(d + d) *> read
-
-    (incFor(d), lateInc, sanityCheck).parTupled.map(_ shouldBe (((), d, 2)))
+    List(r, r, w, r, w, w, r, r)
+      .traverse(op => op.start <* IO.sleep(ds))
+      .flatMap(_.traverse(_.join))
+      .map(_ shouldBe List(
+        (0, 0.nanos),
+        (0, ds), // here we have our scheduling delay
+        (1, ds + dr), // this is our first write started after both reads complete
+        (1, ds + dr + dw), // this is the next read
+        (2, ds + dr + dw + dr), // write
+        (3, ds + dr + dw + dr + dw), // another write
+        (3, ds + dr + dw + dr + dw + dw), // last two …
+        (3, ds + dr + dw + dr + dw + dw), // … concurrent reads
+      ))
   }
 
   "can cancel blocked read" in scope { s =>
@@ -77,12 +64,20 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     (incFor(1.minute), lateIncWithTimeout).parTupled.map(_ shouldBe (((), 2.seconds.asRight)))
   }
 
-  // This is a scary case we might want to improve later.
-  "upgrade read to write BLOCKS INDEFINITELY" in scope { s =>
+  // This is a scary cases we might want to improve later.
+  "read within write BLOCKS INDEFINITELY" in scope { s =>
     import s._, env._
 
-    val upgrade = rw.read.use(_ => inc)
-    IO.race(upgrade, IO.sleep(1.minute)).map(_ shouldBe ().asRight)
+    val writeInRead = rw.read.use(_ => inc)
+    IO.race(writeInRead, IO.sleep(1.minute)).map(_ shouldBe ().asRight)
+  }
+
+  // This is a scary cases we might want to improve later.
+  "read within read when write is pending BLOCKS INDEFINITELY" in scope { s =>
+    import s._, env._
+
+    val readInRead = rw.read.use(_ => inc.start *> IO.sleep(1.nano) *> read)
+    IO.race(readInRead, IO.sleep(1.minute)).map(_ shouldBe ().asRight)
   }
 
   private case class Scope(env: PureTest.Env[IO], rw: ReadWriteRef[IO, Int]) {
@@ -94,11 +89,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     def inc: IO[Unit] =
       rw.write.use(_.plain(_ + 1).void)
 
-    def readFor(duration: FiniteDuration): IO[Int] = rw.read.use(i => IO.sleep(duration) as i)
-
     def read: IO[Int] = rw.read.use(IO.pure)
-
-    def sleepNs: IO[Unit] = IO.sleep(1.nano)
 
     def getTime: IO[FiniteDuration] = testRuntime.getTimeSinceStart
   }
