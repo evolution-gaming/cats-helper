@@ -130,6 +130,30 @@ resource.fenced
 
 A mutable reference to `A` value with read-write lock semantics.
 
+## FeatureToggled
+
+Manages a given `Resource[F, A]` providing access to it only when a feature-toggle is on.
+
+```scala
+val serviceResource: Resource[F, AService] = ???
+val flag: F[Boolean] = ???
+
+val ftService: Resource[F, Resource[F, Option[AService]]] = FeatureToggled
+  .polling(
+    serviceResource,
+    flag,
+    pollInterval = 10.seconds,
+    gracePeriod = 30.seconds,
+  )
+
+ftService.use { access =>
+  access.use {
+    case Some(service) => service.doStuff(…)
+    case None          => F.unit
+  }
+}
+```
+
 ## PureTest
 
 This helper lives in a separate `cats-helper-testkit` module. It is makes testing `F[_]`-based code easier.
