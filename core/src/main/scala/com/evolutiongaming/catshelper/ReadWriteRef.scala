@@ -195,6 +195,6 @@ object ReadWriteRef {
     }
   }
 
-  final case class Impl[F[_], A](read: Resource[F, A], write: Resource[F, ReadWriteRef.Upd[F, A]])
+  private final case class Impl[F[_], A](read: Resource[F, A], write: Resource[F, ReadWriteRef.Upd[F, A]])
     extends ReadWriteRef[F, A]
 }
