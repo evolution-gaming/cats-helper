@@ -108,9 +108,16 @@ object ReadWriteRef {
             case _ =>
               // A slightly optimized way to split the pending ops in two and start the first batch
               @tailrec def startPending(effect: F[Unit], n: Int, ps: Queue[Pending]): (F[Unit], Int, Queue[Pending]) = {
-                ps match {
-                  case PendingRead(listener) +: tail => startPending(effect <* listener(a).start, n + 1, tail)
-                  case _                             => (effect, n, ps)
+                ps.dequeueOption match {
+                  case Some((PendingRead(listener), tail)) =>
+                    startPending(effect <* listener(a).start, n + 1, tail)
+
+                  case Some((other, tail)) =>
+                    // Here we reconstruct the queue in its "optimal" form.
+                    (effect, n, other +: tail)
+
+                  case _ =>
+                    (effect, n, ps)
                 }
               }
               val (effect, nStarted, rest) = startPending(F.unit, 0, s0.pending)
