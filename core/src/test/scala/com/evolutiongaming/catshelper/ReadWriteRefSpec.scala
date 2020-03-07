@@ -94,7 +94,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     def getTime: IO[FiniteDuration] = testRuntime.getTimeSinceStart
   }
 
-  private def scope[A](body: Scope => IO[A]): A = PureTest.ioTest.apply[A] { env =>
+  private def scope[A](body: Scope => IO[A]): A = PureTest.ioTest { env =>
     import env._
     for {
       rw <- ReadWriteRef[IO].of(0)
