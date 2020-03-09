@@ -1,8 +1,9 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
+import cats.effect.concurrent.Ref
 import cats.implicits._
-import com.evolutiongaming.catshelper.testkit.PureTest.{AbnormalTermination, ioTest}
+import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
@@ -32,7 +33,18 @@ class PureTestSpec extends AnyFreeSpec {
 
   "hot loop fails a test" in {
     assertThrows[AbnormalTermination] {
-      ioTest(hotLoopTimeout = 100.millis) { _ => IO.unit.foreverM }
+      PureTest.hotLoopTimeout(100.millis).ioTest { _ => IO.unit.foreverM }
+    }
+  }
+
+  "flakiness check" in {
+    // Usually flakiness comes from undefined concurrent execution order.
+    // Here we simulate it with a shared mutable state.
+    val counter = Ref.unsafe[IO, Int](0)
+    assertThrows[TestFailedException] {
+      PureTest.flakinessCheckIterations(5).ioTest { _ =>
+        counter.modify(i => (i + 1) -> i).map(_ should not be (4))
+      }
     }
   }
 
@@ -41,5 +53,9 @@ class PureTestSpec extends AnyFreeSpec {
     val main = IO.sleep(1.milli)
     val loop = IO.sleep(1.nano).foreverM
     loop.start *> main
+  }
+
+  "F[_] syntax" in {
+    PureTest[IO].of { _ => IO.unit  }
   }
 }

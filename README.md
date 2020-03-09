@@ -158,6 +158,9 @@ ftService.use { access =>
 
 This helper lives in a separate `cats-helper-testkit` module. It is makes testing `F[_]`-based code easier.
 
+**NOTE:** `cats-helper-testkit` is an experimental module and may break SemVer guarantees from time to time.
+However we will do our best to avoid unnecessary breakages.
+
 ```scala
 "what time is it now?" in PureTest[IO].of { env =>
   import env._

@@ -1,15 +1,9 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.implicits._
-import cats.effect.laws.util.TestContext
-import cats.effect.{Async, ContextShift, Effect, IO, LiftIO, Sync, Timer}
-import cats.implicits._
-import cats.{Id, ~>}
-import org.scalatest.exceptions.{TestCanceledException, TestFailedException}
+import cats.effect.{ContextShift, Effect, IO, Timer}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.util.control.NoStackTrace
 
 /**
  * Provides a boilerplate for writing "pure FP" tests (usually using `IO` and for-comprehensions).
@@ -37,7 +31,7 @@ import scala.util.control.NoStackTrace
  *   }
  * }}}
  */
-object PureTest {
+object PureTest extends PureTest {
   /** An environment that is injected into every test. */
   trait Env[F[_]] {
     implicit def ec: ExecutionContext
@@ -46,114 +40,73 @@ object PureTest {
     implicit def testRuntime: TestRuntime[F]
   }
 
-  type TestBody[F[_], A] = Env[F] => F[A]
-  type RunTest[F[_]] = TestBody[F, *] ~> Id
+  private val default: PureTest = Impl(Config())
+
+  protected def config = default.config
+  protected def withConfigMod(f: Config => Config) = default.withConfigMod(f)
+
+  private case class Impl(config: Config) extends PureTest {
+    protected def withConfigMod(f: Config => Config) = copy(f(config))
+  }
+
+  private[testkit] case class Config(
+    testFrameworkApi: TestFrameworkApi = TestFrameworkApi.resolveDefault,
+    backgroundEc: ExecutionContext = ExecutionContext.global,
+    hotLoopTimeout: FiniteDuration = 10.seconds,
+    flakinessCheckIterations: Int = 1,
+  )
+}
+
+/**
+ * Holds a test configuration. May be configured further or used to build and run a test.
+ */
+sealed trait PureTest { self =>
+  import PureTest._
 
   /**
-   * First step of building your test.
-   *
-   * @see [[PartialApply the rest of the builder]]
-   * @see [[ioTest:* `ioTest`]] – a shortcut for `IO`-based tests.
+   * A follow-up to [[apply `PureTest[F]`]].
    */
-  def apply[F[_] : Effect]: PartialApply[F] = new PartialApply[F]
-
-  /** A follow-up to [[apply `PureTest[F]`]]. */
-  final class PartialApply[F[_] : Effect] {
-    /** Builds and runs the test with default settings. */
-    def of: RunTest[F] = of(defaultHotLoopTimeout)
-
+  final class PartialApply[F[_]: Effect] {
     /**
-     * Builds and runs the test. You may customise its settings.
-     *
-     * @param hotLoopTimeout – a time it takes to decide that test is spinning in a hot loop and kill it.
+     * Builds and runs the test with previously defined settings.
      */
-    def of(hotLoopTimeout: FiniteDuration = defaultHotLoopTimeout): RunTest[F] =
-      Lambda[TestBody[F, *] ~> Id](body => runTest(body, hotLoopTimeout))
+    def of[A](body: Env[F] => F[A]): A = PureTestRunner.doRunTest(body, config)
   }
 
-  /** A shorter version of [[PartialApply.of:* `PureTest[IO].of`]]. */
-  def ioTest: RunTest[IO] = PureTest[IO].of
+  /**
+   * A first half of [[PartialApply.of `PureTest[F].of`]].
+   *
+   * @see [[ioTest `ioTest`]] – a shortcut for `IO`-based tests.
+   */
+  final def apply[F[_]: Effect]: PartialApply[F] = new PartialApply[F]
 
-  /** A shorter version of [[PartialApply.of(* `PureTest[IO].of(…)`]]. */
-  def ioTest(hotLoopTimeout: FiniteDuration = defaultHotLoopTimeout): RunTest[IO] =
-    PureTest[IO].of(hotLoopTimeout)
+  /**
+   * A shorter version of [[PartialApply.of `PureTest[IO].of`]].
+   */
+  final def ioTest[A](body: Env[IO] => IO[A]): A = PureTestRunner.doRunTest(body, config)
 
-  /** A default timeout for hot loop detection. */
-  def defaultHotLoopTimeout: FiniteDuration = 10.seconds
+  protected def config: Config
 
-  private def runTest[F[_] : Effect, A](body: TestBody[F, A], hotLoopTimeout: FiniteDuration) = {
-    val testControl = new TestControl(
-      hotLoopGuard = IO.timer(ExecutionContext.global).sleep(hotLoopTimeout),
-    )
-    val testIO = wrap(body, testControl)
-    testIO.unsafeRunSync()
-  }
+  protected def withConfigMod(f: Config => Config): PureTest
 
-  private def wrap[F[_] : Effect, A](body: TestBody[F, A], testControl: TestControl): IO[A] = IO.suspend {
-    val env = new EnvImpl[F]
+  /**
+   * Sets a test-framework integration layer. Currently defaults to ScalaTest.
+   */
+  final def testFrameworkApi(v: TestFrameworkApi): PureTest = withConfigMod(_.copy(testFrameworkApi = v))
 
-    val testIo = (env.cs.shift *> body(env)).toIO
+  /**
+   * Sets hot-loop detection timeout. Use it CPU-bound part of your SUT or test requires longer time.
+   */
+  final def hotLoopTimeout(v: FiniteDuration): PureTest = withConfigMod(_.copy(hotLoopTimeout = v))
 
-    @volatile var outcome: Option[Either[Throwable, A]] = None
-    val cancel = testIo.unsafeRunCancelable { r => outcome = Some(r) }
+  /**
+   * Sets an `ExecutionContext` used for background tasks, such as hot loop detection.
+   * Defaults to `ExecutionContext.global`.
+   */
+  final def backgroundEc(v: ExecutionContext): PureTest = withConfigMod(_.copy(backgroundEc = v))
 
-    val testThread = Thread.currentThread()
-
-    val stopHotLoop = IO.suspend {
-      val err = new IllegalStateException("Still running")
-      err.setStackTrace(testThread.getStackTrace)
-      outcome = Some(Left(err))
-      cancel
-    }
-
-    val timeoutCancel = (testControl.hotLoopGuard *> stopHotLoop).unsafeRunCancelable(_ => ())
-
-    while (outcome.isEmpty && env.testContext.state.tasks.nonEmpty) {
-      val step = env.testContext.state.tasks.iterator.map(_.runsAt).min
-      env.testContext.tick(step)
-    }
-
-    timeoutCancel.unsafeRunSync()
-
-    testControl.completeWith(outcome, env.testContext.state)
-  }
-
-  private class EnvImpl[F[_] : Async : LiftIO] extends Env[F] {
-    val testContext: TestContext = TestContext()
-
-    implicit def ec: ExecutionContext = testContext
-    implicit val cs: ContextShift[F] = testContext.contextShift[F]
-    implicit val timer: Timer[F] = testContext.timer[F]
-
-    implicit val testRuntime: TestRuntime[F] = new TestRuntime[F] {
-
-      /** NB: We exploit the fact that TestContext starts from 0. */
-      def getTimeSinceStart: F[FiniteDuration] = Sync[F].delay(testContext.state.clock)
-    }
-  }
-
-  private class TestControl(val hotLoopGuard: IO[Unit]) {
-    def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A] = IO {
-      def boo(cause: Either[Throwable, String]): Nothing = {
-        val err = cause match {
-          case Left(e: TestFailedException)   => e
-          case Left(e: TestCanceledException) => e
-          case abnormal                       => AbnormalTermination(abnormal, tcState)
-        }
-        throw err
-      }
-
-      outcome match {
-        case Some(Right(a)) => a
-        case Some(Left(e))  => boo(Left(e))
-        case None           => boo(Right(s"Not completed. State: $tcState"))
-      }
-    }
-  }
-
-  final case class AbnormalTermination(
-    cause: Either[Throwable, String],
-    tcState: TestContext.State,
-  ) extends RuntimeException(s"${ cause.fold(_.toString, identity) }. $tcState", cause.left.toOption.orNull)
-    with NoStackTrace
+  /**
+   * Sets a number of times to run a test to make sure it's not flaky. Defaults to `1`.
+   */
+  final def flakinessCheckIterations(v: Int): PureTest = withConfigMod(_.copy(flakinessCheckIterations = v))
 }

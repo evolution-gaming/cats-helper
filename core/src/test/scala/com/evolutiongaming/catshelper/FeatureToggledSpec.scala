@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.concurrent.{MVar, Ref}
-import cats.effect.{IO, Resource, Timer}
+import cats.effect.{IO, Resource}
 import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import com.evolutiongaming.catshelper.testkit.{PureTest, TestRuntime}
@@ -153,6 +153,5 @@ class FeatureToggledSpec extends AnyFreeSpec {
 
   private def getTime(implicit rt: TestRuntime[IO]) = rt.getTimeSinceStart
 
-  private def sleepUntil(t1: FiniteDuration)(implicit t: Timer[IO], rt: TestRuntime[IO]) =
-    rt.getTimeSinceStart.flatMap(t0 => IO.sleep(t1 - t0))
+  private def sleepUntil(dt: FiniteDuration)(implicit rt: TestRuntime[IO]) = rt.sleepUntil(dt)
 }
