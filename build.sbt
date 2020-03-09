@@ -66,6 +66,6 @@ lazy val testkit = project
 
     libraryDependencies ++= Seq(
       Cats.effectLaws,
-      scalatest,
+      scalatest % Optional,
     ),
   )

@@ -50,7 +50,7 @@ object PureTest extends PureTest {
   }
 
   private[testkit] case class Config(
-    testFrameworkApi: TestFrameworkApi = ScalaTestApi,
+    testFrameworkApi: TestFrameworkApi = TestFrameworkApi.resolveDefault,
     backgroundEc: ExecutionContext = ExecutionContext.global,
     hotLoopTimeout: FiniteDuration = 10.seconds,
     flakinessCheckIterations: Int = 1,

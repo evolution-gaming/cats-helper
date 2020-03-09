@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
 import cats.effect.laws.util.TestContext
+import cats.implicits._
 import org.scalatest.exceptions.{TestCanceledException, TestFailedException}
 
 /**
@@ -17,7 +18,46 @@ trait TestFrameworkApi {
   def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A]
 }
 
-object ScalaTestApi extends TestFrameworkApi {
+object TestFrameworkApi {
+  /**
+   * Returns either a default API (ScalaTest as of now) if it's available on the classpath.
+   * Uses [[NoFrameworkApi]] as a fallback.
+   */
+  def resolveDefault(implicit l: Lookup): TestFrameworkApi = l.instance
+
+  private[testkit] trait Lookup {
+    def instance: TestFrameworkApi
+  }
+
+  private[testkit] object Lookup extends LookupLowPriority {
+    implicit def scalaTestIsDefault(implicit ev: TestFailedException =:= TestFailedException): Lookup = {
+      if (ev == null) () else ()  // A kludge to avoid "unused" warning :(
+      new Lookup {
+        def instance: TestFrameworkApi = ScalaTestApi
+      }
+    }
+  }
+
+  private[testkit] sealed trait LookupLowPriority {
+    implicit def fallbackToNoFramework: Lookup = new Lookup {
+      def instance: TestFrameworkApi = NoFrameworkApi
+    }
+  }
+}
+
+/**
+ * A stub implementation to use when no test framework is available.
+ */
+object NoFrameworkApi extends TestFrameworkApi {
+  def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A] = {
+    IO.fromEither(outcome.toRight(new IllegalStateException(s"Not completed. State: $tcState")).flatten)
+  }
+}
+
+/**
+ * ScalaTest integration.
+ */
+private[testkit] object ScalaTestApi extends TestFrameworkApi {
   def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A] = IO {
     def boo(cause: Either[Throwable, String]): Nothing = {
       val err = cause match {
@@ -31,7 +71,7 @@ object ScalaTestApi extends TestFrameworkApi {
     outcome match {
       case Some(Right(a)) => a
       case Some(Left(e))  => boo(Left(e))
-      case None           => boo(Right(s"Not completed. State: $tcState"))
+      case None           => boo(Right("Not completed"))
     }
   }
 }
