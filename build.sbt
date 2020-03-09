@@ -29,6 +29,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     commonSettings,
+    name := "cats-helper",
     publish / skip := true,
     publishArtifact := false,
   )
