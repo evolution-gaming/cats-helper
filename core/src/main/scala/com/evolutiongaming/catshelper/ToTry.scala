@@ -1,6 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.Id
+import cats.arrow.FunctionK
 import cats.effect.IO
 
 import scala.concurrent.TimeoutException
@@ -15,6 +16,12 @@ trait ToTry[F[_]] {
 object ToTry {
 
   def apply[F[_]](implicit F: ToTry[F]): ToTry[F] = F
+
+
+  def functionK[F[_] : ToTry]: FunctionK[F, Try] = new FunctionK[F, Try] {
+
+    def apply[A](fa: F[A]): Try[A] = ToTry[F].apply(fa)
+  }
 
 
   def ioToTry(timeout: FiniteDuration): ToTry[IO] = new ToTry[IO] {
