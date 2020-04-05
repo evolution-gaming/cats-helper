@@ -46,4 +46,91 @@ class NonEmptyListPartitionOpsSpec extends AnyFreeSpec with Matchers {
       )
     }
   }
+
+  "NonEmptyListPartitions.reverse should" - {
+    "return Both when accepting Both" in {
+      Both(
+        NonEmptyList.of(1, 2),
+        NonEmptyList.of("hi", "bye")
+      ).reverse shouldBe Both(
+        NonEmptyList.of(2, 1),
+        NonEmptyList.of("bye", "hi")
+      )
+    }
+
+    "return AllRight when accepting AllRight" in {
+      AllRight(
+        NonEmptyList.of(1, 2),
+      ).reverse shouldBe AllRight(
+        NonEmptyList.of(2, 1)
+      )
+    }
+
+    "return AllLeft when accepting AllLeft" in {
+      AllLeft(
+        NonEmptyList.of(1, 2),
+      ).reverse shouldBe AllLeft(
+        NonEmptyList.of(2, 1)
+      )
+    }
+  }
+
+  "NonEmptyListPartitions.prependLeft should" - {
+    "return Both when accepting Both" in {
+      Both(
+        NonEmptyList.of(1, 2),
+        NonEmptyList.of("hi", "bye")
+      ).prependLeft(0) shouldBe Both(
+        NonEmptyList.of(0, 1, 2),
+        NonEmptyList.of("hi", "bye")
+      )
+    }
+
+    "return Both when accepting AllRight" in {
+      AllRight(
+        NonEmptyList.of(1, 2),
+      ).prependLeft("hi") shouldBe Both(
+        NonEmptyList.one("hi"),
+        NonEmptyList.of(1, 2)
+      )
+    }
+
+    "return AllLeft when accepting AllLeft" in {
+      AllLeft(
+        NonEmptyList.of(1, 2),
+      ).prependLeft(0) shouldBe AllLeft(
+        NonEmptyList.of(0, 1, 2)
+      )
+    }
+  }
+
+  "NonEmptyListPartitions.prependRight should" - {
+    "return Both when accepting Both" in {
+      Both(
+        NonEmptyList.of(1, 2),
+        NonEmptyList.of("hi", "bye")
+      ).prependRight("emm") shouldBe Both(
+        NonEmptyList.of(1, 2),
+        NonEmptyList.of("emm", "hi", "bye")
+      )
+    }
+
+    "return AllRight when accepting AllRight" in {
+      AllRight(
+        NonEmptyList.of(1, 2),
+      ).prependRight(0) shouldBe AllRight(
+        NonEmptyList.of(0,1, 2)
+      )
+    }
+
+    "return Both when accepting AllLeft" in {
+      AllLeft(
+        NonEmptyList.of(1, 2),
+      ).prependRight("hi") shouldBe Both(
+        NonEmptyList.of( 1, 2),
+        NonEmptyList.one("hi")
+      )
+    }
+  }
+
 }

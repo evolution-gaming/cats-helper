@@ -7,28 +7,30 @@ object NonEmptyListPartitionOps {
 
   implicit class NonEmptyListPartitionOpsC[T](nel: NonEmptyList[T]) {
     def split[L, R](classifier: T => Either[L, R]): NonEmptyListPartitions[L, R] = {
-      val value: NonEmptyListPartitions[ L, R] = classifier(nel.head).fold(AllLeft.one, AllRight.one)
+      val value: NonEmptyListPartitions[L, R] = classifier(nel.head).fold(AllLeft.one, AllRight.one)
 
       nel.tail.foldLeft(value) { case (acc, nextElement) =>
         classifier(nextElement).fold(
-          acc.appendLeft,
-          acc.appendRight
+          acc.prependLeft,
+          acc.prependRight
         )
-      }
+      }.reverse
     }
   }
 }
 
 sealed trait NonEmptyListPartitions[L, R] {
-  def appendLeft(l: L): NonEmptyListPartitions[L, R]
-  def appendRight(r: R): NonEmptyListPartitions[L, R]
+  def prependLeft(l: L): NonEmptyListPartitions[L, R]
+  def prependRight(r: R): NonEmptyListPartitions[L, R]
+  def reverse: NonEmptyListPartitions[L, R]
 }
 
 object NonEmptyListPartitions {
 
   case class AllLeft[L, R](left: NonEmptyList[L]) extends NonEmptyListPartitions[L, R] {
-    def appendLeft(l: L): NonEmptyListPartitions[L, R] = AllLeft(left :+ l)
-    def appendRight(r: R): NonEmptyListPartitions[L, R] = Both(left, NonEmptyList.one(r))
+    def prependLeft(l: L): NonEmptyListPartitions[L, R] = AllLeft(l :: left)
+    def prependRight(r: R): NonEmptyListPartitions[L, R] = Both(left, NonEmptyList.one(r))
+    def reverse: AllLeft[L, R] = AllLeft(left.reverse)
   }
 
   object AllLeft {
@@ -36,8 +38,9 @@ object NonEmptyListPartitions {
   }
 
   case class AllRight[L, R](right: NonEmptyList[R]) extends NonEmptyListPartitions[L, R] {
-    def appendLeft(l: L): NonEmptyListPartitions[L, R] = Both(NonEmptyList.one(l), right)
-    def appendRight(r: R): NonEmptyListPartitions[L, R] = AllRight(right :+ r)
+    def prependLeft(l: L): NonEmptyListPartitions[L, R] = Both(NonEmptyList.one(l), right)
+    def prependRight(r: R): NonEmptyListPartitions[L, R] = AllRight(r :: right)
+    def reverse: AllRight[L, R] = AllRight(right.reverse)
   }
 
   object AllRight {
@@ -45,7 +48,8 @@ object NonEmptyListPartitions {
   }
 
   case class Both[L, R](left: NonEmptyList[L], right: NonEmptyList[R]) extends NonEmptyListPartitions[L, R] {
-    def appendLeft(l: L): NonEmptyListPartitions[L, R] = copy(left = left :+ l)
-    def appendRight(r: R): NonEmptyListPartitions[L, R] = copy(right = right :+ r)
+    def prependLeft(l: L): NonEmptyListPartitions[L, R] = copy(left = l :: left)
+    def prependRight(r: R): NonEmptyListPartitions[L, R] = copy(right = r :: right)
+    def reverse: Both[L, R] = Both(left.reverse, right.reverse)
   }
 }
