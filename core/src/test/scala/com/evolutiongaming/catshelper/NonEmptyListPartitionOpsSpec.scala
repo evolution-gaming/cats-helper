@@ -4,9 +4,9 @@ import cats.data.NonEmptyList
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.freespec.AnyFreeSpec
 import NonEmptyListPartitions._
+import NonEmptyListPartitionOps._
 
 class NonEmptyListPartitionOpsSpec extends AnyFreeSpec with Matchers {
-  import NonEmptyListPartitionOps._
 
   "NonEmptyList should" - {
     "return LeftNonEmpty if first element is L" in {
