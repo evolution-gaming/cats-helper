@@ -7,7 +7,8 @@ import cats.implicits._
 import cats.{ApplicativeError, MonadError}
 
 import scala.concurrent.Future
-import scala.util.Try
+import scala.reflect.ClassTag
+import scala.util.{Either, Try}
 
 object CatsHelper {
 
@@ -50,6 +51,20 @@ object CatsHelper {
   }
 
 
+  implicit class IdOpsCatsHelper[A](val self: A) extends AnyVal {
+
+    def castM[F[_]: MonadThrowable, B <: A](implicit tag: ClassTag[B]): F[B] = {
+
+      def error = new ClassCastException(s"${ self.getClass.getName } cannot be cast to ${ tag.runtimeClass.getName }")
+
+      castOpt[B].fold { error.raiseError[F, B] } { _.pure[F] }
+    }
+
+
+    def castOpt[B <: A](implicit tag: ClassTag[B]): Option[B] = tag.unapply(self)
+  }
+
+
   implicit class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
 
     def redeem[B, E](recover: E => B, ab: A => B)(implicit F: ApplicativeError[F, E]): F[B] = {
@@ -80,5 +95,17 @@ object CatsHelper {
   implicit class ResourceOpsCatsHelper[F[_], A](val self: Resource[F, A]) extends AnyVal {
 
     def fenced(implicit F: Concurrent[F]): Resource[F, A] = ResourceFenced(self)
+  }
+
+
+  implicit class BooleanOpsCatsHelper(val self: Boolean) extends AnyVal {
+
+    def trueOr[A](a: => A): Either[A, Unit] = {
+      if (self) ().asRight else a.asLeft
+    }
+
+    def falseOr[A](a: => A): Either[A, Unit] = {
+      if (self) a.asLeft else ().asRight
+    }
   }
 }

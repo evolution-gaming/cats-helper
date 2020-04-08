@@ -8,6 +8,8 @@ import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import scala.util.{Failure, Try}
+
 class CatsHelperSpec extends AnyFunSuite with Matchers {
 
   for {
@@ -23,6 +25,21 @@ class CatsHelperSpec extends AnyFunSuite with Matchers {
       redeemWith(a).unsafeRunSync() shouldEqual expected
     }
   }
+
+  
+  test("castM") {
+    val a: Any = ""
+    a.castM[Try, String] shouldEqual "".pure[Try]
+    a.castM[Try, Int] should matchPattern { case Failure(_: ClassCastException) => }
+  }
+
+
+  test("castOpt") {
+    val a: Any = ""
+    a.castOpt[String] shouldEqual "".some
+    a.castOpt[Int] shouldEqual none
+  }
+
 
   private def redeem[F[_], A, E](a: F[A])(implicit bracket: Bracket[F, E]) = {
     a.redeem[String, E](_.toString, _.toString)
