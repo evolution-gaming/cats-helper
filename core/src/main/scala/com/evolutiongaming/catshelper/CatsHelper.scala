@@ -65,29 +65,7 @@ object CatsHelper {
   }
 
 
-  case class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
-
-    def redeem[B, E](recover: E => B, ab: A => B)(implicit F: ApplicativeError[F, E]): F[B] = {
-      F.redeem(self)(recover, ab)
-    }
-
-    def redeemWith[B, E](recover: E => F[B], ab: A => F[B])(implicit F: MonadError[F, E]): F[B] = {
-      F.redeemWith(self)(recover, ab)
-    }
-
-
-    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)
-
-
-    def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
-
-
-    def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
-  }
-
-
-  implicit class Ops1CatsHelper[F[_], A](val self: F[A]) extends AnyVal {
-
+  implicit class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
 
     def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)
 
