@@ -91,7 +91,7 @@ object FeatureToggled {
               runManaged(rwLock.read.use(_ => awaitTermination)) as a.some
 
             case Empty =>
-              Resource.pure(None)
+              none[A].pure[Resource[F, *]]
           }
         }
 

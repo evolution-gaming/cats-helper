@@ -42,11 +42,11 @@ class CatsHelperSpec extends AnyFunSuite with Matchers {
 
 
   private def redeem[F[_], A, E](a: F[A])(implicit bracket: Bracket[F, E]) = {
-    a.redeem[String, E](_.toString, _.toString)
+    new OpsCatsHelper(a).redeem[String, E](_.toString, _.toString)
   }
 
   private def redeemWith[F[_], A, E](a: F[A])(implicit bracket: Bracket[F, E]) = {
-    a.redeemWith[String, E](_.toString.pure[F], _.toString.pure[F])
+    new OpsCatsHelper(a).redeemWith[String, E](_.toString.pure[F], _.toString.pure[F])
   }
 
   case object TestError extends RuntimeException with NoStackTrace {

@@ -12,7 +12,7 @@ import scala.util.{Either, Try}
 
 object CatsHelper {
 
-  implicit class ApplicativeErrorOpsCatsHelper[F[_], E](val self: ApplicativeError[F, E]) extends AnyVal {
+  class ApplicativeErrorOpsCatsHelper[F[_], E](val self: ApplicativeError[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, ab: A => B): F[B] = {
       val fb = self.map(fa)(ab)
@@ -65,7 +65,7 @@ object CatsHelper {
   }
 
 
-  implicit class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
+  class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
 
     def redeem[B, E](recover: E => B, ab: A => B)(implicit F: ApplicativeError[F, E]): F[B] = {
       F.redeem(self)(recover, ab)
@@ -74,6 +74,19 @@ object CatsHelper {
     def redeemWith[B, E](recover: E => F[B], ab: A => F[B])(implicit F: MonadError[F, E]): F[B] = {
       F.redeemWith(self)(recover, ab)
     }
+
+
+    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)
+
+
+    def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
+
+
+    def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
+  }
+
+
+  implicit class Ops1CatsHelper[F[_], A](val self: F[A]) extends AnyVal {
 
 
     def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)

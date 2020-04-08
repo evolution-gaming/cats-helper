@@ -11,7 +11,7 @@ inThisBuild(Seq(
   startYear := Some(2019),
   licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.1", "2.12.10"),
+  crossScalaVersions := Seq("2.13.1", "2.12.11"),
   scalaVersion := crossScalaVersions.value.head,
 
   resolvers += Resolver.bintrayRepo("evolutiongaming", "maven"),
