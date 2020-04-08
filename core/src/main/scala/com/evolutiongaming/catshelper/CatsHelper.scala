@@ -65,7 +65,7 @@ object CatsHelper {
   }
 
 
-  class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
+  case class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
 
     def redeem[B, E](recover: E => B, ab: A => B)(implicit F: ApplicativeError[F, E]): F[B] = {
       F.redeem(self)(recover, ab)
