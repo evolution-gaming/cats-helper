@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
 import org.scalatest.funsuite.AnyFunSuite
@@ -19,5 +20,9 @@ class CatsHelperSpec extends AnyFunSuite with Matchers {
     val a: Any = ""
     a.castOpt[String] shouldEqual "".some
     a.castOpt[Int] shouldEqual none
+  }
+
+  test("toResource") {
+    "".pure[IO].toResource.use { _.pure[IO] }.toTry shouldEqual "".pure[Try]
   }
 }

@@ -4,7 +4,7 @@ import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.effect.{Concurrent, Fiber, Resource}
 import cats.implicits._
-import cats.{ApplicativeError, MonadError}
+import cats.{Applicative, ApplicativeError, MonadError}
 
 import scala.concurrent.Future
 import scala.reflect.ClassTag
@@ -74,6 +74,9 @@ object CatsHelper {
 
 
     def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
+
+
+    def toResource(implicit F: Applicative[F]): Resource[F, A] = Resource.liftF(self)
   }
 
 
