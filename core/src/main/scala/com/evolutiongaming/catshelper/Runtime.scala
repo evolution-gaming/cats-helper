@@ -20,7 +20,10 @@ trait Runtime[F[_]] {
 
 object Runtime {
 
+  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: Runtime[F]): Runtime[F] = F
+
+  def summon[F[_]](implicit F: Runtime[F]): Runtime[F] = F
 
 
   def apply[F[_] : Sync](runtime: RuntimeJ): Runtime[F] = new Runtime[F] {

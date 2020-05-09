@@ -14,7 +14,10 @@ trait FromFuture[F[_]] {
 
 object FromFuture {
 
+  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: FromFuture[F]): FromFuture[F] = F
+
+  def summon[F[_]](implicit F: FromFuture[F]): FromFuture[F] = F
 
 
   implicit def lift[F[_] : Async](implicit executor: ExecutionContext): FromFuture[F] = {
@@ -42,7 +45,7 @@ object FromFuture {
 
   def functionK[F[_] : FromFuture]: FunctionK[Future, F] = new FunctionK[Future, F] {
 
-    def apply[A](fa: Future[A]) = FromFuture[F].apply(fa)
+    def apply[A](fa: Future[A]) = FromFuture.summon[F].apply(fa)
   }
 
 

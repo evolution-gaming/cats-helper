@@ -14,7 +14,10 @@ trait LogOf[F[_]] {
 
 object LogOf {
 
+  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: LogOf[F]): LogOf[F] = F
+
+  def summon[F[_]](implicit F: LogOf[F]): LogOf[F] = F
 
 
   def apply[F[_] : Sync](factory: ILoggerFactory): LogOf[F] = new LogOf[F] {

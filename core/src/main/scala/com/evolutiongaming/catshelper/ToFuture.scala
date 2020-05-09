@@ -13,12 +13,15 @@ trait ToFuture[F[_]] {
 
 object ToFuture {
 
+  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F
+
+  def summon[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F
 
 
   def functionK[F[_] : ToFuture]: FunctionK[F, Future] = new FunctionK[F, Future] {
 
-    def apply[A](fa: F[A]) = ToFuture[F].apply(fa)
+    def apply[A](fa: F[A]) = ToFuture.summon[F].apply(fa)
   }
 
 

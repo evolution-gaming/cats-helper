@@ -61,7 +61,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
           _        <- counter.update(_ + 1)
           thread   <- Sync[F].delay { Thread.currentThread().toString }
         } yield thread
-        threadLocal  <- ThreadLocalOf[F].apply(thread)
+        threadLocal  <- ThreadLocalOf.summon[F].apply(thread)
         threadLocal1  = threadLocal.mapK(FunctionK.id)
         a             = test(threadLocal1, executor)
         treadIds     <- List.fill(n)(a).parSequence

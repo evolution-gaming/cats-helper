@@ -16,7 +16,10 @@ trait FromTry[F[_]] {
 
 object FromTry {
 
+  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: FromTry[F]): FromTry[F] = F
+
+  def summon[F[_]](implicit F: FromTry[F]): FromTry[F] = F
 
 
   def lift[F[_]](implicit F: ApplicativeError[F, Throwable]): FromTry[F] = new FromTry[F] {

@@ -29,7 +29,7 @@ class FromFutureSpec extends AsyncFunSuite with Matchers {
     future: () => Future[Unit],
     expected: Either[Throwable, Unit]
   ) = {
-    val fa = FromFuture[F].apply(future())
+    val fa = FromFuture.summon[F].apply(future())
     for {
       actual <- fa.attempt
     } yield {
@@ -38,7 +38,7 @@ class FromFutureSpec extends AsyncFunSuite with Matchers {
   }
 
   test("functionK") {
-    val functionK = FromFuture[IO].toFunctionK
+    val functionK = FromFuture.summon[IO].toFunctionK
     val fa = for {
       a <- functionK(Future.successful(0))
     } yield {

@@ -64,7 +64,10 @@ trait ThreadLocalOf[F[_]] {
 
 object ThreadLocalOf {
 
+  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: ThreadLocalOf[F]): ThreadLocalOf[F] = F
+
+  def summon[F[_]](implicit F: ThreadLocalOf[F]): ThreadLocalOf[F] = F
 
   implicit val ioThreadLocalOf: ThreadLocalOf[IO] = new ThreadLocalOf[IO] {
 

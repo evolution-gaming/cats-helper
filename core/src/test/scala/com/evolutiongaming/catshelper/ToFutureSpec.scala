@@ -36,7 +36,7 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
   }
 
   test("functionK") {
-    val functionK = ToFuture[IO].toFunctionK
+    val functionK = ToFuture.summon[IO].toFunctionK
     for {
       a <- functionK(0.pure[IO])
     } yield {
