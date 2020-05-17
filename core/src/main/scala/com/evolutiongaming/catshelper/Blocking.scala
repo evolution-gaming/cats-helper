@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.arrow.FunctionK
 import cats.effect.{Blocker, ContextShift}
 import cats.~>
 
@@ -43,6 +44,11 @@ object Blocking {
 
     def mapK[G[_]](fg: F ~> G, gf: G ~> F): Blocking[G] = new Blocking[G] {
       def apply[A](fa: G[A]) = fg(self(gf(fa)))
+    }
+
+
+    def functionK: FunctionK[F, F] = new FunctionK[F, F] {
+      def apply[A](fa: F[A]) = self(fa)
     }
   }
 }
