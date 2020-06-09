@@ -2,7 +2,6 @@ package com.evolutiongaming.catshelper
 
 import cats.Parallel
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
-import cats.implicits._
 import org.scalatest.Succeeded
 
 import scala.concurrent.duration._
