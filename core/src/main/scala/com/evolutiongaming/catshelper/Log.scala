@@ -21,7 +21,6 @@ trait Log[F[_]] {
 
 object Log {
 
-  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: Log[F]): Log[F] = F
 
   def summon[F[_]](implicit F: Log[F]): Log[F] = F

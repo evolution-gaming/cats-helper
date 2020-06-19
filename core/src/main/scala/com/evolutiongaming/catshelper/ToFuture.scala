@@ -13,7 +13,6 @@ trait ToFuture[F[_]] {
 
 object ToFuture {
 
-  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F
 
   def summon[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F

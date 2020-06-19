@@ -15,7 +15,6 @@ trait ToTry[F[_]] {
 
 object ToTry {
 
-  @deprecated("use `summon` instead", "2.0.2")
   def apply[F[_]](implicit F: ToTry[F]): ToTry[F] = F
 
   def summon[F[_]](implicit F: ToTry[F]): ToTry[F] = F

@@ -9,7 +9,6 @@ package object catshelper {
 
   object ApplicativeThrowable {
 
-    @deprecated("use `summon` instead", "2.0.2")
     def apply[F[_]](implicit F: ApplicativeThrowable[F]): ApplicativeThrowable[F] = F
 
     def summon[F[_]](implicit F: ApplicativeThrowable[F]): ApplicativeThrowable[F] = F
@@ -20,7 +19,6 @@ package object catshelper {
 
   object MonadThrowable {
 
-    @deprecated("use `summon` instead", "2.0.2")
     def apply[F[_]](implicit F: MonadThrowable[F]): MonadThrowable[F] = F
 
     def summon[F[_]](implicit F: MonadThrowable[F]): MonadThrowable[F] = F
@@ -32,7 +30,6 @@ package object catshelper {
 
   object BracketThrowable {
 
-    @deprecated("use `summon` instead", "2.0.2")
     def apply[F[_]](implicit F: BracketThrowable[F]): BracketThrowable[F] = F
 
     def summon[F[_]](implicit F: BracketThrowable[F]): BracketThrowable[F] = F
