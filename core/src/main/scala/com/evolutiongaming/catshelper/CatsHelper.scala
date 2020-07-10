@@ -89,6 +89,18 @@ object CatsHelper {
   implicit class ResourceOpsCatsHelper[F[_], A](val self: Resource[F, A]) extends AnyVal {
 
     def fenced(implicit F: Concurrent[F]): Resource[F, A] = ResourceFenced(self)
+
+    def semiflatMap[B, G[x] >: F[x]](f: A => G[B])(implicit F: Applicative[G]): Resource[G, B] = {
+      self.flatMap { a => Resource.liftF(f(a)) }
+    }
+  }
+
+
+  implicit class ResourceObjOpsCatsHelper(val self: Resource.type) extends AnyVal {
+
+    def release[F[_]: Applicative](release: F[Unit]): Resource[F, Unit] = {
+      Resource.make(().pure[F])(_ => release)
+    }
   }
 
 
