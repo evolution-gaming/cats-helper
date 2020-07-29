@@ -1,11 +1,12 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class ReadWriteRefSpec extends AnyFreeSpec {
@@ -64,6 +65,20 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     (incFor(1.minute), lateIncWithTimeout).parTupled.map(_ shouldBe (((), 2.seconds.asRight)))
   }
 
+  "cancelled write unblocks pending reads" in scope { s =>
+    import s._, env._
+
+    val readForever = rw.read.use(_ => IO.never)
+    val cancelTime = 1.minute
+    val writeThatGetsCancelled = IO.race(inc, testRuntime.sleepUntil(cancelTime))
+
+    IO.race(
+      readForever.start *> IO.sleep(1.nano) *> writeThatGetsCancelled *> IO.never,
+      IO.sleep(1.second) *> (read, getTime).tupled
+    ).map(_ shouldBe Right((0, cancelTime)))
+
+  }
+
   // This is a scary cases we might want to improve later.
   "read within write BLOCKS INDEFINITELY" in scope { s =>
     import s._, env._
@@ -78,6 +93,40 @@ class ReadWriteRefSpec extends AnyFreeSpec {
 
     val readInRead = rw.read.use(_ => inc.start *> IO.sleep(1.nano) *> read)
     IO.race(readInRead, IO.sleep(1.minute)).map(_ shouldBe ().asRight)
+  }
+
+  "race conditions" - {
+    // Unfortunately PureTest can't catch every race-condition. E.g concurrent cancellation issues may
+    // go undetected, since IO run loop may execute a cancellable batch as a single fused runnable.
+    // Hence here we resort to actual multi-threaded executors for actual concurrency.
+
+    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Timer[IO])
+    val env = cats.effect.Resource {
+      IO {
+        val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
+        val ec = scala.concurrent.ExecutionContext.fromExecutor(tp)
+        val env = new Env()(ec, IO.contextShift(ec), IO.timer(ec))
+        env -> IO { tp.shutdown() }
+      }
+    }
+
+    "read cancellation does not break things" in {
+      env
+        .use { env =>
+          import env._
+
+          for {
+            rw <- ReadWriteRef[IO].of(1)
+            _  <- {
+              val tryReadAndCancel = rw.read.use(_ => IO.unit).start.flatMap(_.cancel) *> IO.shift
+              val repeated = List.fill(1000)(tryReadAndCancel).sequence_
+              List.fill(16)(repeated).parSequence_
+            }
+            _  <- rw.write.use(_ => IO.unit).timeout(100.millis)
+          } yield ()
+        }
+        .unsafeRunTimed(10.seconds)
+    }
   }
 
   private case class Scope(env: PureTest.Env[IO], rw: ReadWriteRef[IO, Int]) {

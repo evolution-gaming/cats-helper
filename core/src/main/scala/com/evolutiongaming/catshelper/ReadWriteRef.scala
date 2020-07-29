@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.Applicative
 import cats.effect.{Concurrent, Resource}
-import cats.effect.concurrent.Ref
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.implicits._
 
@@ -27,7 +27,7 @@ import scala.collection.immutable.Queue
  * Cases that will currently block:
  *  - `write` in `read` or `write`.
  *  - `read`  in `read` or `write` when there is another `write` pending.
-
+ *
  * @note Both [[ReadWriteRef.read `read`]] and [[ReadWriteRef.write `write`]] are implemented as `Resource`
  *       since it has clear mental model of something that may be "in use".
  */
@@ -71,124 +71,166 @@ object ReadWriteRef {
   def apply[F[_]: Concurrent]: PartialApply[F] = new PartialApply[F]
 
   def of[F[_], A](init: A)(implicit F: Concurrent[F]): F[ReadWriteRef[F, A]] = {
-    sealed trait Pending
-    case class PendingRead(listener: A => F[Unit]) extends Pending
-    case class PendingWrite(listener: A => F[Unit]) extends Pending
+    /**
+     * Represents a pending operation on inner `A` reference.
+     * Each operation has a "version" `v` that's used by completion/cancellation callbacks.
+     * Each operation also has a `trigger` effect that starts pending operations.
+     */
+    sealed trait Pending {
+      def v: Long
+    }
+    object Pending {
+      /**
+       * Represents a "read" operation. Multiple reads can run in parallel.
+       * @param active a number of not-yet-complete operations. Grows when new reads get added to this batch.
+       *               Decreases when operations complete. `0` means that the batch can be discarded.
+       * @param await completes when `trigger` is activated. Used to attach new operations to the same trigger.
+       */
+      final case class Read(v: Long, trigger: Option[F[Unit]], active: Int, await: F[Unit]) extends Pending {
+        def incActive: Read = copy(active = active + 1)
+        def decActive: Read = copy(active = active - 1)
+      }
 
-    case class State(
-      a: A,
-      inUse: Int = 0, // -1 -- exclusive write, 0 -- not in use, >0 -- readers
-      pending: Queue[Pending] = Queue.empty,
-    ) {
-      def canRead: Boolean = inUse >= 0 && pending.isEmpty
-      def canWrite: Boolean = inUse == 0 && pending.isEmpty
+      /**
+       * Represents a "write" operation. Writes are exclusive.
+       * @param nextRead A "read" batch that shall be executed after this write. Can be empty.
+       *                 This field effectively guarantees that non-empty queue of `Pending` items
+       *                 always has a `Read` as the last element.
+       */
+      final case class Write(v: Long, trigger: Option[F[Unit]], nextRead: Read) extends Pending
+    }
 
-      def without(p: Pending): State = {
-        // Might want to optimise this later.
-        copy(pending = pending.filterNot(_ == p))
+    /**
+     * Holds a queue of `Pending` items. The head, if such exists, is considered "active".
+     */
+    case class State(pending: Queue[Pending] = Queue.empty, v: Long = 0) {
+      self =>
+
+      def withoutRead(v: Long): State = {
+        updateIndex(v) {
+          case r: Pending.Read  => if (r.active > 1) Some(r.decActive) else None
+          case w: Pending.Write => Some(w.copy(nextRead = w.nextRead.decActive))
+        }
+      }
+
+      def withoutWrite(v: Long): State = {
+        updateIndex(v) {
+          case w: Pending.Write => if (w.nextRead.active > 0) Some(w.nextRead) else None
+          case unchanged        => Some(unchanged)
+        }
+      }
+
+      private def updateIndex(v: Long)(f: Pending => Option[Pending]): State = {
+        // Versions grow monotonically, so we can stop as soon as we find one or go beyond it
+        // Note that we don't account for the overflow yet. But even with increments happening
+        // each nanosecond we have 292 years to hit it.
+        @tailrec def loop(head: Queue[Pending], q: Queue[Pending]): State = {
+          q match {
+            case (p: Pending) +: tail if p.v < v  => loop(head :+ p, tail)
+            case (p: Pending) +: tail if p.v == v => self.copy(pending = head ++: (f(p) ++: tail))
+            case _                                => self
+          }
+        }
+        loop(Queue.empty, self.pending)
       }
     }
 
-    Ref[F].of(State(init)) map { stateRef =>
-      // The `release` function "commits" A back to the state, adjusts `inUse` count,
-      // and notifies pending listeners.
-      //
-      // IMPORTANT:
-      //   This function must be called only from uncancellable blocks (e.g. Resource release).
-      def release(a: A, useChange: Int => Int): F[Unit] = stateRef
-        .modify { s0 =>
-          val inUse = useChange(s0.inUse)
+    (Ref[F].of(init), Ref[F].of(State())) mapN { (aRef, stateRef) =>
+      val upd: Upd[F, A] = (f: A => F[A]) => aRef.get
+        .flatMap(f)
+        .flatTap(aRef.set)
 
-          s0.pending match {
-            case PendingWrite(listener) +: rest if inUse == 0 =>
-              val s1 = s0.copy(a = a, inUse = -1, pending = rest)
-              val effect = listener(a).start.void
-              s1 -> effect
+      def release(stateMod: State => State): F[Unit] = {
+        stateRef
+          .modify { s =>
+            val s0 = stateMod(s)
+            s0.pending match {
+              case (w: Pending.Write) +: tail =>
+                w.trigger match {
+                  case Some(trigger) =>
+                    val s1 = s0.copy(pending = w.copy(trigger = None) +: tail)
+                    s1 -> trigger
 
-            case _ =>
-              // A slightly optimized way to split the pending ops in two and start the first batch
-              @tailrec def startPending(effect: F[Unit], n: Int, ps: Queue[Pending]): (F[Unit], Int, Queue[Pending]) = {
-                ps.dequeueOption match {
-                  case Some((PendingRead(listener), tail)) =>
-                    startPending(effect <* listener(a).start, n + 1, tail)
-
-                  case Some((other, tail)) =>
-                    // Here we reconstruct the queue in its "optimal" form.
-                    (effect, n, other +: tail)
-
-                  case _ =>
-                    (effect, n, ps)
+                  case None => // already triggered
+                    s0 -> F.unit
                 }
-              }
-              val (effect, nStarted, rest) = startPending(F.unit, 0, s0.pending)
-              val s1 = s0.copy(a = a, inUse = inUse + nStarted, pending = rest)
-              s1 -> effect
+
+              case q =>
+                @tailrec def loop(head: Queue[Pending.Read], q: Queue[Pending], effect: F[Unit]): (State, F[Unit]) = {
+                  q match {
+                    case (r: Pending.Read) +: tail =>
+                      r.trigger match {
+                        case Some(trigger) => loop(head :+ r.copy(trigger = None), tail, effect *> trigger)
+                        case None          => loop(head :+ r, tail, effect)
+                      }
+
+                    case _ =>
+                      s0.copy(pending = head ++: q) -> effect
+                  }
+                }
+
+                loop(Queue.empty, q, F.unit)
+            }
           }
-        }
-        .flatten
+          .flatten
+      }
 
       val read: Resource[F, A] = {
-        // `suspend` makes it possible to cancel `.use` that waits for resource availability.
-        Resource.suspend {
-          Concurrent.cancelableF[F, Resource[F, A]] { cb =>
-            // Listener emits a resource when it's ready for immediate use.
-            val listener = (a: A) => {
-              val r = Resource { F.pure(a -> release(a, _ - 1)) }
-              F.delay(cb(r.asRight))
-            }
+        for {
+          access <- Resource {
+            stateRef.modify { s0 =>
+              val (s1, r1) = s0.pending match {
+                case init :+ (r: Pending.Read) =>
+                  val r1 = r.incActive
+                  val s1 = s0.copy(pending = init :+ r1)
+                  (s1, r1)
 
-            stateRef
-              .modify {
-                case s0 if s0.canRead =>
-                  val s1 = s0.copy(inUse = s0.inUse + 1)
-                  val effect = listener(s0.a)
-                  val cancel = F.unit
-                  s1 -> (effect as cancel)
+                case init :+ (w: Pending.Write) =>
+                  val r1 = w.nextRead.incActive
+                  val w1 = w.copy(nextRead = r1)
+                  val s1 = s0.copy(pending = init :+ w1)
+                  (s1, r1)
 
-                case s0 => // have to wait for writer
-                  val pending = PendingRead(listener)
-                  val s1 = s0.copy(pending = s0.pending :+ pending)
-                  val effect = F.unit
-                  val cancel = stateRef.update(_.without(pending))
-                  s1 -> (effect as cancel)
+                case Queue() =>
+                  val r1 = Pending.Read(s0.v, None, 1, F.unit)
+                  val s1 = s0.copy(pending = Queue(r1), v = s0.v + 1)
+                  (s1, r1)
               }
-              .flatten
+
+              val access = r1.await *> aRef.get
+              s1 -> (access -> release(_.withoutRead(r1.v)))
+            }
           }
-        }
+          a <- Resource.liftF(access)
+        } yield a
+
       }
 
       val write: Resource[F, Upd[F, A]] = {
-        Resource.suspend {
-          Concurrent.cancelableF[F, Resource[F, Upd[F, A]]] { cb =>
-            val listener = (a: A) => {
-              val r = Resource {
-                Ref[F].of(a) map { aRef =>
-                  val upd: Upd[F, A] = (f: A => F[A]) => aRef.get.flatMap(f).flatTap(aRef.set)
-                  val commit = aRef.get.flatMap(a => release(a, _ => 0))
-                  upd -> commit
-                }
-              }
-              F.delay(cb(r.asRight))
+        for {
+          wTrigger <- Resource.liftF(Deferred[F, Unit])
+          rTrigger <- Resource.liftF(Deferred[F, Unit])
+          access   <- Resource {
+            stateRef.modify { s0 =>
+              val writeTrigger = if (s0.pending.isEmpty) None else Some(wTrigger)
+              val w1 = Pending.Write(
+                s0.v,
+                trigger = writeTrigger.map(_.complete(()).start.void),
+                nextRead = Pending.Read(
+                  s0.v,
+                  trigger = Some(rTrigger.complete(()).start.void),
+                  active = 0,
+                  rTrigger.get,
+                ),
+              )
+              val s1 = s0.copy(s0.pending :+ w1, s0.v + 1)
+              val await = writeTrigger.map(_.get).getOrElse(F.unit)
+              val access = await as upd
+              s1 -> (access -> release(_.withoutWrite(w1.v)))
             }
-
-            stateRef
-              .modify {
-                case s0 if s0.canWrite =>
-                  val s1 = s0.copy(inUse = -1)
-                  val effect = listener(s0.a)
-                  val cancel = F.unit
-                  s1 -> (effect as cancel)
-
-                case s0 => // can't write
-                  val pending = PendingWrite(listener)
-                  val s1 = s0.copy(pending = s0.pending :+ pending)
-                  val effect = F.unit
-                  val cancel = stateRef.update(_.without(pending))
-                  s1 -> (effect as cancel)
-              }
-              .flatten
           }
-        }
+          upd <- Resource.liftF(access)
+        } yield upd
       }
 
       Impl(read, write)
