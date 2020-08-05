@@ -72,9 +72,7 @@ object ReadWriteRef {
   def apply[F[_]: Concurrent]: PartialApply[F] = new PartialApply[F]
 
   def of[F[_], A](init: A)(implicit F: Concurrent[F]): F[ReadWriteRef[F, A]] = {
-    /**
-     * Just a stable `val` that holds `F.unit`. Used in some optimizations here.
-     */
+    /* Just a stable `val` that holds `F.unit`. Used in some optimizations here. */
     val FUnit: F[Unit] = F.unit
 
     /**
@@ -106,9 +104,7 @@ object ReadWriteRef {
       final case class Write(v: Long, trigger: F[Unit], nextRead: Read) extends Pending
     }
 
-    /**
-     * Holds a queue of `Pending` items. The head, if such exists, is considered "active".
-     */
+    /* Holds a queue of `Pending` items. The head, if such exists, is considered "active". */
     case class State(pending: Queue[Pending] = Queue.empty, v: Long = 0) {
       self =>
 
