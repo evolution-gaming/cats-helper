@@ -20,7 +20,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
     val d = 10.seconds
     for {
       flag <- Ref[IO].of(false)
-      ftr = FeatureToggled.polling(baseResource, flag.get, d)
+      ftr   = FeatureToggled.polling(baseResource, flag.get, d)
 
       _ <- ftr.use { access =>
         def expect(fetchResult: Option[Int], es: List[Int])(implicit pos: Position): IO[Unit] = {
@@ -74,7 +74,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
 
       for {
         toggle <- MVar[IO].of(true)
-        ftr = FeatureToggled.of(baseResource, gracePeriod)(toggle.take.flatMap(_).foreverM)
+        ftr     = FeatureToggled.of(baseResource, gracePeriod)(toggle.take.flatMap(_).foreverM)
 
         _ <- ftr.use { access =>
           IO.sleep(1.nano) *> f((s, access, toggle.put(_)))
@@ -91,21 +91,21 @@ class FeatureToggledSpec extends AnyFreeSpec {
       for {
         f1 <- access.use(_ => sleepUntil(targetTime) *> events).start
 
-        _ <- IO.sleep(1.nano)
-        _ <- toggle(false)
+        _  <- IO.sleep(1.nano)
+        _  <- toggle(false)
 
         // Resource must become immediately unavailable for new access.
-        _ <- IO.sleep(1.nano)
-        _ <- access.use(IO.pure).timeout(1.nano).map(_ shouldBe None)
+        _  <- IO.sleep(1.nano)
+        _  <- access.use(IO.pure).timeout(1.nano).map(_ shouldBe None)
 
         // But must be still alive while it's in use.
-        _ <- sleepUntil(targetTime - 1.nano)
-        _ <- events.map(_ shouldBe List(1))
-        _ <- f1.join.map(_ shouldBe List(1))
+        _  <- sleepUntil(targetTime - 1.nano)
+        _  <- events.map(_ shouldBe List(1))
+        _  <- f1.join.map(_ shouldBe List(1))
 
         // Finally it goes down as soon as there is no usages.
-        _ <- sleepUntil(targetTime + 1.nano)
-        _ <- events.map(_ shouldBe List(1, -1))
+        _  <- sleepUntil(targetTime + 1.nano)
+        _  <- events.map(_ shouldBe List(1, -1))
       } yield ()
     }
 
