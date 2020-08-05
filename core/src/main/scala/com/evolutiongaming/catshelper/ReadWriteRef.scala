@@ -5,6 +5,7 @@ import cats.effect.{Concurrent, Resource}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.implicits._
+import com.evolutiongaming.catshelper.CatsHelper._
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Queue
@@ -201,15 +202,15 @@ object ReadWriteRef {
               s1 -> (access -> release(_.withoutRead(r1.v)))
             }
           }
-          a <- Resource.liftF(access)
+          a <- access.toResource
         } yield a
 
       }
 
       val write: Resource[F, Upd[F, A]] = {
         for {
-          wTrigger <- Resource.liftF(Deferred[F, Unit])
-          rTrigger <- Resource.liftF(Deferred[F, Unit])
+          wTrigger <- Deferred[F, Unit].toResource
+          rTrigger <- Deferred[F, Unit].toResource
           access   <- Resource {
             stateRef.modify { s0 =>
               val writeTrigger = if (s0.pending.isEmpty) None else Some(wTrigger)
@@ -229,7 +230,7 @@ object ReadWriteRef {
               s1 -> (access -> release(_.withoutWrite(w1.v)))
             }
           }
-          upd <- Resource.liftF(access)
+          upd <- access.toResource
         } yield upd
       }
 
