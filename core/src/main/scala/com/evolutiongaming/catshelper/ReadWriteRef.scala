@@ -73,6 +73,11 @@ object ReadWriteRef {
 
   def of[F[_], A](init: A)(implicit F: Concurrent[F]): F[ReadWriteRef[F, A]] = {
     /**
+     * Just a stable `val` that holds `F.unit`. Used in some optimizations here.
+     */
+    val FUnit: F[Unit] = F.unit
+
+    /**
      * Represents a pending operation on inner `A` reference.
      * Each operation has a "version" `v` that's used by completion/cancellation callbacks.
      * Each operation also has a `trigger` effect that starts pending operations.
@@ -87,7 +92,7 @@ object ReadWriteRef {
        *               Decreases when operations complete. `0` means that the batch can be discarded.
        * @param await completes when `trigger` is activated. Used to attach new operations to the same trigger.
        */
-      final case class Read(v: Long, trigger: Option[F[Unit]], active: Int, await: F[Unit]) extends Pending {
+      final case class Read(v: Long, trigger: F[Unit], active: Int, await: F[Unit]) extends Pending {
         def incActive: Read = copy(active = active + 1)
         def decActive: Read = copy(active = active - 1)
       }
@@ -98,7 +103,7 @@ object ReadWriteRef {
        *                 This field effectively guarantees that non-empty queue of `Pending` items
        *                 always has a `Read` as the last element.
        */
-      final case class Write(v: Long, trigger: Option[F[Unit]], nextRead: Read) extends Pending
+      final case class Write(v: Long, trigger: F[Unit], nextRead: Read) extends Pending
     }
 
     /**
@@ -147,22 +152,18 @@ object ReadWriteRef {
             val s0 = stateMod(s)
             s0.pending match {
               case (w: Pending.Write) +: tail =>
-                w.trigger match {
-                  case Some(trigger) =>
-                    val s1 = s0.copy(pending = w.copy(trigger = None) +: tail)
-                    s1 -> trigger
-
-                  case None => // already triggered
-                    s0 -> F.unit
-                }
+                val s1 =
+                  if (w.trigger == FUnit) s0
+                  else s0.copy(pending = w.copy(trigger = FUnit) +: tail)
+                s1 -> w.trigger
 
               case q =>
                 @tailrec def loop(head: Queue[Pending.Read], q: Queue[Pending], effect: F[Unit]): (State, F[Unit]) = {
                   q match {
                     case (r: Pending.Read) +: tail =>
                       r.trigger match {
-                        case Some(trigger) => loop(head :+ r.copy(trigger = None), tail, effect *> trigger)
-                        case None          => loop(head :+ r, tail, effect)
+                        case FUnit   => loop(head :+ r, tail, effect)
+                        case trigger => loop(head :+ r.copy(trigger = FUnit), tail, effect *> trigger)
                       }
 
                     case _ =>
@@ -170,7 +171,7 @@ object ReadWriteRef {
                   }
                 }
 
-                loop(Queue.empty, q, F.unit)
+                loop(Queue.empty, q, FUnit)
             }
           }
           .flatten
@@ -193,7 +194,7 @@ object ReadWriteRef {
                   (s1, r1)
 
                 case Queue() =>
-                  val r1 = Pending.Read(s0.v, None, 1, F.unit)
+                  val r1 = Pending.Read(s0.v, trigger = FUnit, active = 1, await = FUnit)
                   val s1 = s0.copy(pending = Queue(r1), v = s0.v + 1)
                   (s1, r1)
               }
@@ -213,20 +214,23 @@ object ReadWriteRef {
           rTrigger <- Deferred[F, Unit].toResource
           access   <- Resource {
             stateRef.modify { s0 =>
-              val writeTrigger = if (s0.pending.isEmpty) None else Some(wTrigger)
+              val (writeTrigger, writeAwait) =
+                if (s0.pending.isEmpty) FUnit -> FUnit
+                else wTrigger.complete(()).start.void -> wTrigger.get
+
               val w1 = Pending.Write(
                 s0.v,
-                trigger = writeTrigger.map(_.complete(()).start.void),
+                trigger = writeTrigger,
                 nextRead = Pending.Read(
                   s0.v,
-                  trigger = Some(rTrigger.complete(()).start.void),
+                  trigger = rTrigger.complete(()).start.void,
                   active = 0,
                   rTrigger.get,
                 ),
               )
+
               val s1 = s0.copy(s0.pending :+ w1, s0.v + 1)
-              val await = writeTrigger.map(_.get).getOrElse(F.unit)
-              val access = await as upd
+              val access = writeAwait as upd
               s1 -> (access -> release(_.withoutWrite(w1.v)))
             }
           }
