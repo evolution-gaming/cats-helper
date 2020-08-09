@@ -62,4 +62,13 @@ object Serial {
         }
       }
   }
+
+
+  object implicits {
+
+    implicit class OpsSerial[F[_], A](val self: F[A]) extends AnyVal {
+
+      def serial(implicit serial: Serial[F]): F[F[A]] = serial(self)
+    }
+  }
 }
