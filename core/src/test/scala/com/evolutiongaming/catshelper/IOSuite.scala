@@ -18,7 +18,7 @@ object IOSuite {
   implicit val parallel: Parallel[IO] = IO.ioParallel
 
   def runIO[A](io: IO[A], timeout: FiniteDuration = Timeout): Future[Succeeded.type] = {
-    io.timeout(timeout).as(Succeeded).unsafeToFuture
+    io.timeout(timeout).as(Succeeded).unsafeToFuture()
   }
 
   implicit class IOOps[A](val self: IO[A]) extends AnyVal {
