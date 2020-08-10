@@ -32,7 +32,7 @@ object Serial {
                 .tailRecM[F, Unit] { fs =>
                   fs
                     .reverse
-                    .sequence
+                    .foldMapM(identity)
                     .productR {
                       ref.modify {
                         case Some(f :: fs) => (List.empty[F[Unit]].some, Nel(f, fs).asLeft[Unit])
