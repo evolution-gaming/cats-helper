@@ -10,23 +10,22 @@ jobs:
     strategy:
       matrix:
         scala:
-          - 2.13.3
+          - 2.13.4
           - 2.12.12
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
 
-    - uses: actions/cache@v1
+    - name: Cache SBT
+      uses: actions/cache@v2
       with:
-        path: ~/.cache/coursier/v1
-        key: ${{ runner.os }}-coursier-${{ hashFiles('**/build.sbt') }}
+        path: |
+          ~/.ivy2/cache
+          ~/.sbt
+        key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
 
-    - uses: actions/cache@v1
-      with:
-        path: ~/.sbt
-        key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.properties') }}
-
-    - uses: olafurpg/setup-scala@v5
+    - name: Setup Java
+      uses: olafurpg/setup-scala@v5
       with:
         java-version: openjdk@1.11
 
@@ -39,7 +38,7 @@ jobs:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
       run: sbt ++${{ matrix.scala }} coverageReport coverageAggregate coveralls
 
-    - name: Slack Notification
+    - name: Slack notification
       uses: homoluctus/slatify@master
       if: failure() && github.ref == 'refs/heads/master'
       with:
