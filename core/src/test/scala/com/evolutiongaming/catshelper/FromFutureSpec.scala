@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.{IO, Sync}
-import cats.implicits._
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.IOSuite._
 
 import scala.concurrent.Future

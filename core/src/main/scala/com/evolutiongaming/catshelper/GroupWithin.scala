@@ -3,7 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.data.{NonEmptyList => Nel}
 import cats.effect.implicits._
 import cats.effect.{Clock, Concurrent, Resource, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Applicative, ~>}
 import com.evolutiongaming.catshelper.ClockHelper._
 

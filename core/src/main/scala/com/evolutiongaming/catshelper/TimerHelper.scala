@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.Applicative
 import cats.effect.{Clock, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration.FiniteDuration

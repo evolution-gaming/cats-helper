@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
-import cats.implicits._
 import cats.{ApplicativeError, Id}
 
 import scala.concurrent.Future

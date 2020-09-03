@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.{IO, Resource}
-import cats.implicits._
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.CatsHelper._
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite

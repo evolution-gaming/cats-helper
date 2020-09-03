@@ -4,7 +4,7 @@ import cats.data.{NonEmptyList => Nel}
 import cats.effect.Concurrent
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
-import cats.implicits._
+import cats.syntax.all._
 
 trait Serial[F[_]] {
 

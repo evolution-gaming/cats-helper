@@ -3,7 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.effect.{Async, Concurrent, Resource, Timer}
-import cats.implicits._
+import cats.syntax.all._
 
 import scala.concurrent.duration._
 

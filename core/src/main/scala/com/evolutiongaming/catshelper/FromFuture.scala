@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.arrow.FunctionK
 import cats.effect.{Async, Sync}
-import cats.implicits._
+import cats.syntax.all._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}

@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect._
 import cats.effect.concurrent.{Ref, Semaphore}
-import cats.implicits._
+import cats.syntax.all._
 import cats.~>
 
 trait SerialRef[F[_], A] {

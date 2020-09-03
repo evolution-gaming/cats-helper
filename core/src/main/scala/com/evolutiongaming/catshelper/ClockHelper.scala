@@ -4,7 +4,7 @@ import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 import cats.effect.Clock
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Applicative, Functor}
 
 object ClockHelper {

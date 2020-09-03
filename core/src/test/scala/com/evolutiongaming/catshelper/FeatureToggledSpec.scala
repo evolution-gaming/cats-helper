@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.concurrent.{MVar, Ref}
 import cats.effect.{ContextShift, IO, Resource, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import com.evolutiongaming.catshelper.testkit.{PureTest, TestRuntime}
 import org.scalactic.source.Position

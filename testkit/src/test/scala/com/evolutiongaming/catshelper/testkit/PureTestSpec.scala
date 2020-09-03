@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref
-import cats.implicits._
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.freespec.AnyFreeSpec

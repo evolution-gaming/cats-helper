@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.concurrent.Ref
 import cats.effect.{IO, Resource}
-import cats.implicits._
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.CatsHelper._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers

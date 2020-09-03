@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Sync
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Applicative, Functor, ~>}
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 

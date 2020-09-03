@@ -4,7 +4,7 @@ import cats.arrow.FunctionK
 import cats.data.{NonEmptyList => Nel}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

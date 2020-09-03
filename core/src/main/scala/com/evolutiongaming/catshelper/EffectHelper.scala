@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.concurrent.Deferred
 import cats.effect.{Bracket, Concurrent, Fiber}
-import cats.implicits._
+import cats.syntax.all._
 import cats.effect.implicits._
 
 import scala.concurrent.Future

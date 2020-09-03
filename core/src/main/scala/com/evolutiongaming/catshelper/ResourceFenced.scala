@@ -5,7 +5,7 @@ package com.evolutiongaming.catshelper
  */
 import cats.effect.implicits._
 import cats.effect.{Concurrent, Resource}
-import cats.implicits._
+import cats.syntax.all._
 
 object ResourceFenced {
 
