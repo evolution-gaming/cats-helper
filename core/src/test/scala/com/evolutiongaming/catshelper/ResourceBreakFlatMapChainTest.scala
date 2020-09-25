@@ -7,7 +7,6 @@ import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 
 
