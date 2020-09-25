@@ -48,7 +48,6 @@ lazy val core = project
     libraryDependencies ++= Seq(
       Cats.core,
       Cats.kernel,
-      Cats.macros,
       Cats.effect,
       machinist,
       `slf4j-api`,

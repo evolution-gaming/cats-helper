@@ -7,7 +7,6 @@ import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 
 
@@ -28,7 +27,7 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
       .apply { result.toFuture }
       .timeout(1.second)
       .attempt
-      .flatMap { a => IO { a should matchPattern { case Left(_: TimeoutException) => } } }
+      .flatMap { a => IO { a should matchPattern { case Right(()) => } } }
       .run()
   }
 
