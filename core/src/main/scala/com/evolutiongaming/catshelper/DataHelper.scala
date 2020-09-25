@@ -9,7 +9,10 @@ object DataHelper {
 
   implicit class SortedMapOpsDataHelper[K, V](val self: SortedMap[K, V]) extends AnyVal {
 
-    def toNem: Option[Nem[K, V]] = Nem.fromMap(self)
+    @deprecated("no longer required by cats" , since = "2.1.1")
+    def toNem(implicit order: Order[K]): Option[Nem[K, V]] = Nem.fromMap(self)
+
+    def toNem(): Option[Nem[K, V]] = Nem.fromMap(self)
   }
 
 
@@ -25,7 +28,7 @@ object DataHelper {
     def toNem(implicit order: Order[K]): Option[Nem[K, V]] = {
       self
         .toSortedMap
-        .toNem
+        .toNem()
     }
   }
 
@@ -48,7 +51,7 @@ object DataHelper {
       self
         .toSortedMap
         .map { case (k, v) => f(k, v) }
-        .toNem
+        .toNem()
         .get
     }
 
@@ -57,7 +60,7 @@ object DataHelper {
       self
         .toSortedMap
         .map { case (k, v) => (f(k), v) }
-        .toNem
+        .toNem()
         .get
     }
   }

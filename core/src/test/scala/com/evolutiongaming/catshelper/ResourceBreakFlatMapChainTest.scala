@@ -17,15 +17,15 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
     val result = ()
       .pure[IO]
       .toResource
-      .multiply(1000)
-      .multiply(1000)
+      .multiply(100)
+      .multiply(100)
       .use { _ => ().pure[IO] }
       .attempt
       .void
 
     FromFuture[IO]
       .apply { result.toFuture }
-      .timeout(3.second)
+      .timeout(1.second)
       .attempt
       .flatMap { a => IO { a should matchPattern { case Right(()) => } } }
       .run()
