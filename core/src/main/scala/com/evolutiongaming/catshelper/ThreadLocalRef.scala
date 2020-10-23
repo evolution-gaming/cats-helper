@@ -1,6 +1,7 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.{IO, Sync}
+import cats.implicits._
+import cats.effect.Sync
 import cats.~>
 
 trait ThreadLocalRef[F[_], A] {
@@ -41,6 +42,18 @@ object ThreadLocalRef {
   }
 
 
+  def of[F[_] : Sync : ToTry, A](fa: F[A]): F[ThreadLocalRef[F, A]] = {
+    for {
+      threadLocal <- Sync[F].delay { ThreadLocal.withInitial { () => ToTry[F].apply(fa).get } }
+    } yield {
+      ThreadLocalRef(threadLocal)
+    }
+  }
+
+
+  def of[F[_] : Sync : ToTry, A](a: => A): F[ThreadLocalRef[F, A]] = of(Sync[F].delay(a))
+
+
   implicit class ThreadLocalRefOps[F[_], A](val self: ThreadLocalRef[F, A]) extends AnyVal {
 
     def mapK[G[_]](f: F ~> G): ThreadLocalRef[G, A] = new ThreadLocalRef[G, A] {
@@ -60,6 +73,8 @@ object ThreadLocalRef {
 trait ThreadLocalOf[F[_]] {
 
   def apply[A](fa: F[A]): F[ThreadLocalRef[F, A]]
+
+  def apply[A](a: => A): F[ThreadLocalRef[F, A]]
 }
 
 object ThreadLocalOf {
@@ -68,17 +83,10 @@ object ThreadLocalOf {
 
   def summon[F[_]](implicit F: ThreadLocalOf[F]): ThreadLocalOf[F] = F
 
-  implicit val ioThreadLocalOf: ThreadLocalOf[IO] = new ThreadLocalOf[IO] {
+  implicit def threadLocalOf[F[_] : Sync : ToTry]: ThreadLocalOf[F] = new ThreadLocalOf[F] {
 
-    def apply[A](fa: IO[A]) = {
-      val threadLocal = Sync[IO].delay {
-        new ThreadLocal[A] { override def initialValue() = fa.unsafeRunSync() }
-      }
-      for {
-        threadLocal <- threadLocal
-      } yield {
-        ThreadLocalRef[IO, A](threadLocal)
-      }
-    }
+    override def apply[A](fa: F[A]): F[ThreadLocalRef[F, A]] = ThreadLocalRef.of(fa)
+
+    override def apply[A](a: => A): F[ThreadLocalRef[F, A]] = ThreadLocalRef.of(a)
   }
 }
