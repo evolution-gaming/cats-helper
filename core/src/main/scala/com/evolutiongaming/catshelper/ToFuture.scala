@@ -18,7 +18,7 @@ object ToFuture {
   def summon[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F
 
 
-  def functionK[F[_] : ToFuture]: FunctionK[F, Future] = new FunctionK[F, Future] {
+  def functionK[F[_]: ToFuture]: FunctionK[F, Future] = new FunctionK[F, Future] {
 
     def apply[A](fa: F[A]) = ToFuture.summon[F].apply(fa)
   }
@@ -31,6 +31,10 @@ object ToFuture {
 
   implicit val idToFuture: ToFuture[Id] = new ToFuture[Id] {
     def apply[A](fa: Id[A]) = Future.successful(fa)
+  }
+
+  implicit val futureToFuture: ToFuture[Future] = new ToFuture[Future] {
+    def apply[A](fa: Future[A]) = fa
   }
 
 

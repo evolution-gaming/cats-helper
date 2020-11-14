@@ -19,7 +19,7 @@ object FromFuture {
   def summon[F[_]](implicit F: FromFuture[F]): FromFuture[F] = F
 
 
-  implicit def lift[F[_] : Async](implicit executor: ExecutionContext): FromFuture[F] = {
+  implicit def lift[F[_]: Async](implicit executor: ExecutionContext): FromFuture[F] = {
 
     new FromFuture[F] {
 
@@ -42,9 +42,14 @@ object FromFuture {
   }
 
 
-  def functionK[F[_] : FromFuture]: FunctionK[Future, F] = new FunctionK[Future, F] {
+  def functionK[F[_]: FromFuture]: FunctionK[Future, F] = new FunctionK[Future, F] {
 
     def apply[A](fa: Future[A]) = FromFuture.summon[F].apply(fa)
+  }
+
+
+  implicit val futureFromFuture: FromFuture[Future] = new FromFuture[Future] {
+    def apply[A](future: => Future[A]) = future
   }
 
 
