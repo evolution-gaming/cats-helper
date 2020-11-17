@@ -26,6 +26,12 @@ object ToTry {
   }
 
 
+  /**
+    * Please think twice before using this, ideally you should not have toTry in your `pure` code base!
+    *
+    * @param timeout used only for computation after first seen async boundary, covering all computations onwards
+    *                in case there is no async boundary found, timeout is not used
+    */
   def ioToTry(timeout: FiniteDuration): ToTry[IO] = new ToTry[IO] {
 
     def apply[A](fa: IO[A]) = {
