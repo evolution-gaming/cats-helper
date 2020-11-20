@@ -6,7 +6,7 @@ object Dependencies {
   val machinist   = "org.typelevel"     %% "machinist" % "0.6.8"
   val `slf4j-api` = "org.slf4j"          % "slf4j-api" % "1.7.30"
 
-  val cpKindProjector = "org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full
+  val cpKindProjector = "org.typelevel" % "kind-projector" % "0.11.1" cross CrossVersion.full
 
   object Cats {
     private val version = "2.2.0"
