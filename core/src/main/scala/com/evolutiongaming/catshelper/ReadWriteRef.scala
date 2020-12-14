@@ -189,7 +189,7 @@ object ReadWriteRef {
                   val s1 = s0.copy(pending = init :+ w1)
                   (s1, r1)
 
-                case Queue() =>
+                case _ =>
                   val r1 = Pending.Read(s0.v, trigger = FUnit, active = 1, await = FUnit)
                   val s1 = s0.copy(pending = Queue(r1), v = s0.v + 1)
                   (s1, r1)
