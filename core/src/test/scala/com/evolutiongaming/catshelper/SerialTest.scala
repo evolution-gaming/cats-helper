@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.{Concurrent, IO}
 import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.{Concurrent, IO, Sync}
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
@@ -17,6 +17,10 @@ class SerialTest extends AsyncFunSuite with Matchers {
 
   test("error") {
     error[IO].run()
+  }
+
+  test("asyncBoundary (nice to have)") {
+    asyncBoundary[IO].run()
   }
 
 
@@ -36,6 +40,20 @@ class SerialTest extends AsyncFunSuite with Matchers {
     } yield {}
   }
 
+  private def asyncBoundary[F[_]: Concurrent] = {
+    val threadId = Sync[F].delay { Thread.currentThread().getId }
+    for {
+      serial <- Serial.of[F]
+      d      <- Deferred[F, Unit]
+      _      <- serial { d.get }
+      a      <- serial { threadId }
+      b      <- serial { threadId }
+      _      <- d.complete(())
+      a      <- a
+      b      <- b
+      _       = a shouldEqual b
+    } yield {}
+  }
 
   private def error[F[_]: Concurrent] = {
     val error: Throwable = new RuntimeException with NoStackTrace
