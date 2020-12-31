@@ -1,6 +1,5 @@
 package com.evolutiongaming.catshelper
 
-import cats.data.{NonEmptyList => Nel}
 import cats.effect.Concurrent
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
