@@ -1,6 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
+import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.implicits._
 import cats.effect.{Clock, Concurrent, Resource, Timer}
 import cats.implicits._
@@ -20,7 +21,7 @@ object GroupWithin {
   final case class Settings(delay: FiniteDuration, size: Int)
 
 
-  def empty[F[_] : Applicative]: GroupWithin[F] = new GroupWithin[F] {
+  def empty[F[_]: Applicative]: GroupWithin[F] = new GroupWithin[F] {
 
     def apply[A](settings: Settings)(f: Nel[A] => F[Unit]) = {
       val enqueue = new Enqueue[F, A] {
@@ -31,82 +32,78 @@ object GroupWithin {
   }
 
 
-  def apply[F[_] : Concurrent : Timer]: GroupWithin[F] = {
+  def apply[F[_]: Concurrent: Timer]: GroupWithin[F] = {
 
     new GroupWithin[F] {
 
       def apply[A](settings: Settings)(f: Nel[A] => F[Unit]) = {
 
-        case class State(as: Nel[A], timestamp: Long, cancel: F[Unit])
+        val void = ().pure[F]
+
+        sealed trait S
+
+        object S {
+          def empty: S = Empty
+          def stopped: S = Stopped
+          def full(as: Nel[A], timestamp: Long): S = Full(as, timestamp)
+
+          final case object Empty extends S
+          final case object Stopped extends S
+          final case class Full(as: Nel[A], timestamp: Long) extends S
+        }
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
-          val enqueue = new Enqueue[F, A] {
-            def apply(a: A) = f(Nel.of(a))
-          }
+          val enqueue: Enqueue[F, A] = a => f(Nel.of(a))
           Resource.liftF(enqueue.pure[F])
         } else {
-
           val result = for {
-            state <- SerialRef[F].of(none[State])
+            semaphore <- Semaphore.uncancelable[F](1)
+            ref       <- Ref[F].of(S.empty)
           } yield {
 
-            def consume(as: Nel[A]) = for {
-              _ <- f(as.reverse)
-            } yield {
-              none[State]
-            }
+            def consume(as: Nel[A]) = semaphore.withPermit { f(as.reverse) }
 
-            def consumeAndCancel(as: Nel[A], cancel: F[Unit]) = for {
-              _ <- cancel
-              a <- consume(as)
-            } yield a
-
-            def timer(timestamp: Long) = {
-              for {
+            def startTimer(timestamp: Long) = {
+              val result = for {
                 _ <- Timer[F].sleep(settings.delay)
-                _ <- state.update {
-                  case None        => none[State].pure[F]
-                  case Some(state) =>
-                    if (state.timestamp == timestamp) consume(state.as)
-                    else state.some.pure[F]
+                a <- ref.modify {
+                  case s: S.Full if s.timestamp == timestamp => (S.empty, consume(s.as))
+                  case s                                     => (s, void)
                 }
-              } yield {}
-            }
-
-            def enqueue1(a: A, state: State) = {
-              val as = a :: state.as
-              if (as.size >= settings.size) {
-                consumeAndCancel(as, state.cancel)
-              } else {
-                state.copy(as = as).some.pure[F]
-              }
-            }
-
-            def enqueue2(a: A) = {
-              for {
-                timestamp <- Clock[F].nanos
-                fiber     <- timer(timestamp).start
-              } yield {
-                val as = Nel.of(a)
-                val cancel = fiber.cancel
-                State(as, timestamp, cancel).some
-              }
+                a <- a
+              } yield a
+              result
+                .start
+                .void
             }
 
             val enqueue = new Enqueue[F, A] {
 
               def apply(a: A) = {
-                state.update {
-                  case Some(state) => enqueue1(a, state)
-                  case None        => enqueue2(a)
+                Concurrent[F].uncancelable {
+                  for {
+                    t <- Clock[F].nanos
+                    a <- ref
+                      .modify {
+                        case s: S.Full =>
+                          val as = a :: s.as
+                          if (as.size >= settings.size) (S.empty, consume(as))
+                          else (s.copy(as = as), void)
+                        case S.Empty   => (S.full(Nel.of(a), t), startTimer(t))
+                        case S.Stopped => (S.stopped, void)
+                      }
+                    a <- a
+                  } yield a
                 }
               }
             }
 
-            val release = state.update {
-              case Some(state) => consumeAndCancel(state.as, state.cancel)
-              case None        => none[State].pure[F]
-            }
+            val release = ref
+              .modify {
+                case s: S.Full => (S.stopped, consume(s.as))
+                case _         => (S.stopped, void)
+              }
+              .flatten
 
             (enqueue, release)
           }
@@ -125,19 +122,15 @@ object GroupWithin {
 
   object Enqueue {
 
-    def empty[F[_] : Applicative, A]: Enqueue[F, A] = const[F, A](().pure[F])
+    def empty[F[_]: Applicative, A]: Enqueue[F, A] = const[F, A](().pure[F])
 
 
-    def const[F[_], A](value: F[Unit]): Enqueue[F, A] = new Enqueue[F, A] {
-      def apply(a: A) = value
-    }
+    def const[F[_], A](value: F[Unit]): Enqueue[F, A] = _ => value
 
 
     implicit class EnqueueOps[F[_], A](val self: Enqueue[F, A]) extends AnyVal {
 
-      def mapK[G[_]](f: F ~> G): Enqueue[G, A] = new Enqueue[G, A] {
-        def apply(a: A) = f(self(a))
-      }
+      def mapK[G[_]](f: F ~> G): Enqueue[G, A] = (a: A) => f(self(a))
     }
   }
 }
