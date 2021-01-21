@@ -19,6 +19,10 @@ import scala.annotation.tailrec
   *
   * It also means that enqueued one after another keyfull tasks with different keys will be run in parallel
   *
+  * In short, this queue enforces:
+  * * order per unique key for keyfull tasks
+  * * global order for keyless tasks
+  *
   * Example:
   *   enqueued operations of
   *     (a.some, 0), (none, 1), (a.some, 2), (b.some, 3), (c.some, 4), (none, 5)
@@ -26,8 +30,6 @@ import scala.annotation.tailrec
   *                                 (a.some, 2)
   *     (a.some, 0) => (none, 1) => (b.some, 3) =>  (none, 5)
   *                                 (c.some, 4)
-  *
-  * In real life it is used to parallelize side effects of players per player in scope of GameTable aggregate root
   */
 trait SerParQueue[F[_], -K] {
 
