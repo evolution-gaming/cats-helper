@@ -10,17 +10,17 @@ import scala.annotation.tailrec
 
 /**
   * The idea behind this queue is to parallelize some parts of otherwise serial queue
-  * There are two types of tasks: one which has key `defined` - Some(key) (keyfull) and those that have `None` (keyless)
+  * There are two types of tasks: one which has key `defined` - Some(key) (keyful) and those that have `None` (keyless)
   * In case of enqueueing keyless task it will be run after all tasks enqueued before.
   * Also tasks enqueued after will wait until `keyless` task is completed.
   *
-  * In case of enqueueing keyfull task it will be run after all keyless or same key tasks enqueued before
-  * Also keyless tasks or the one with matching key enqueued after will wait until `keyless` task is completed.
+  * In case of enqueueing keyful task it will be run after all keyless or same key tasks enqueued before
+  * Also keyful tasks or the one with matching key enqueued after will wait until `keyless` task is completed.
   *
-  * It also means that enqueued one after another keyfull tasks with different keys will be run in parallel
+  * It also means that enqueued one after another keyful tasks with different keys will be run in parallel
   *
   * In short, this queue enforces:
-  * * order per unique key for keyfull tasks
+  * * order per unique key for keyful tasks
   * * global order for keyless tasks
   *
   * Example:
