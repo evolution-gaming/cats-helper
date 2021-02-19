@@ -34,15 +34,17 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
 
   test("cancellable") {
     val result = for {
-      deferred <- Deferred[IO, Unit]
+      started  <- Deferred[IO, Unit]
+      released <- Deferred[IO, Unit]
       resource  = for {
-        _ <- Resource.release { deferred.complete(()) }
+        _ <- Resource.release { released.complete(()) }
+        _ <- Resource.liftF { started.complete(()) }
         _ <- Resource.liftF { IO.never.as(()) }
       } yield {}
       fiber    <- resource.breakFlatMapChain.use { _ => ().pure[IO] }.start
-      _        <- IO.sleep(1.second)
+      _        <- started.get
       _        <- fiber.cancel
-      _        <- deferred.get
+      _        <- released.get
     } yield {}
     result.run()
   }

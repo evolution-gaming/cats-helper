@@ -110,7 +110,7 @@ object CatsHelper {
   implicit class ResourceObjOpsCatsHelper(val self: Resource.type) extends AnyVal {
 
     def release[F[_]: Applicative](release: F[Unit]): Resource[F, Unit] = {
-      Resource.make(().pure[F])(_ => release)
+      Resource(((), release).pure[F])
     }
   }
 
