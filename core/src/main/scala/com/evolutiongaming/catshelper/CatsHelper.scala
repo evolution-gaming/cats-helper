@@ -97,7 +97,13 @@ object CatsHelper {
     /**
       * Helps to decrease chance of getting StackOverflowError described in https://github.com/typelevel/cats-effect/issues/469
       */
-    def breakFlatMapChain(implicit F: BracketThrowable[F]): Resource[F, A] = Resource(self.allocated)
+    def breakFlatMapChain(implicit F: BracketThrowable[F]): Resource[F, A] = {
+      Resource.suspend {
+        self
+          .allocated
+          .map { a => Resource(a.pure[F]) }
+      }
+    }
   }
 
 

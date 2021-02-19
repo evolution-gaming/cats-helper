@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.effect.concurrent.Deferred
 import cats.effect.{IO, Resource}
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
@@ -29,6 +30,21 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
       .attempt
       .flatMap { a => IO { a should matchPattern { case Right(()) => } } }
       .run()
+  }
+
+  test("cancellable") {
+    val result = for {
+      deferred <- Deferred[IO, Unit]
+      resource  = for {
+        _ <- Resource.release { deferred.complete(()) }
+        _ <- Resource.liftF { IO.never.as(()) }
+      } yield {}
+      fiber    <- resource.breakFlatMapChain.use { _ => ().pure[IO] }.start
+      _        <- IO.sleep(1.second)
+      _        <- fiber.cancel
+      _        <- deferred.get
+    } yield {}
+    result.run()
   }
 
   test("breakFlatMapChain") {
