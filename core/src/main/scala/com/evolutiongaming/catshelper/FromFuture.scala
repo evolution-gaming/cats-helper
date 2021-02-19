@@ -33,8 +33,8 @@ object FromFuture {
               }
             }
           } {
-            case Success(a) => a.pure[F]
-            case Failure(a) => a.raiseError[F, A]
+            case Success(a) => Async[F].pure(a)
+            case Failure(a) => Async[F].raiseError[A](a)
           }
         } yield result
       }

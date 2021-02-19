@@ -1,9 +1,8 @@
 package com.evolutiongaming.catshelper
 
-import cats.data.{NonEmptyList => Nel}
-import cats.effect.Concurrent
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
+import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 
 trait Serial[F[_]] {
@@ -18,6 +17,8 @@ object Serial {
 
   def of[F[_]: Concurrent]: F[Serial[F]] = {
 
+    val void = ().pure[F]
+
     Ref[F]
       .of(none[List[F[Unit]]])
       .map { ref =>
@@ -26,19 +27,19 @@ object Serial {
 
           def apply[A](fa: F[A]) = {
 
-            def start(f: F[Unit]): F[Unit] = {
-              Nel
-                .of(f)
-                .tailRecM[F, Unit] { fs =>
-                  fs
-                    .reverse
-                    .foldMapM(identity)
-                    .productR {
-                      ref.modify {
-                        case Some(f :: fs) => (List.empty[F[Unit]].some, Nel(f, fs).asLeft[Unit])
-                        case _             => (none[List[F[Unit]]], ().asRight[Nel[F[Unit]]])
-                      }
+            def start(task: F[Unit]): F[Unit] = {
+              task
+                .tailRecM[F, Unit] { task =>
+                  for {
+                    _ <- task
+                    a <- ref.modify {
+                      case Some(tasks) if tasks.nonEmpty =>
+                        val task = Sync[F].suspend { tasks.reverse.sequence_ }
+                        (List.empty[F[Unit]].some, task.asLeft[Unit])
+                      case _                             =>
+                        (none[List[F[Unit]]], ().asRight[F[Unit]])
                     }
+                  } yield a
                 }
                 .start
                 .void
@@ -49,7 +50,7 @@ object Serial {
                 d <- Deferred.uncancelable[F, Either[Throwable, A]]
                 f  = fa.attempt.flatMap { a => d.complete(a) }
                 r <- ref.modify {
-                  case Some(fs) => ((f :: fs).some, ().pure[F])
+                  case Some(fs) => ((f :: fs).some, void)
                   case None     => (List.empty[F[Unit]].some, start(f))
                 }
                 _ <- r

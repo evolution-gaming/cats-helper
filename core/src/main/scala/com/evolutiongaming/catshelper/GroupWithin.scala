@@ -83,15 +83,14 @@ object GroupWithin {
                 Concurrent[F].uncancelable {
                   for {
                     t <- Clock[F].nanos
-                    a <- ref
-                      .modify {
-                        case s: S.Full =>
-                          val as = a :: s.as
-                          if (as.size >= settings.size) (S.empty, consume(as))
-                          else (s.copy(as = as), void)
-                        case S.Empty   => (S.full(Nel.of(a), t), startTimer(t))
-                        case S.Stopped => (S.stopped, void)
-                      }
+                    a <- ref.modify {
+                      case s: S.Full =>
+                        val as = a :: s.as
+                        if (as.size >= settings.size) (S.empty, consume(as))
+                        else (s.copy(as = as), void)
+                      case S.Empty   => (S.full(Nel.of(a), t), startTimer(t))
+                      case S.Stopped => (S.stopped, void)
+                    }
                     a <- a
                   } yield a
                 }
