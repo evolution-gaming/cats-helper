@@ -9,6 +9,6 @@ object NelHelper {
   @deprecated("use DataHelper instead", "1.2.0")
   class NelOpsNelHelper[A](val self: Nel[A]) extends AnyVal {
 
-    def grouped(n: Int): Nel[Nel[A]] = self.grouped(n)
+    def groupedNel(n: Int): Nel[Nel[A]] = self.groupedNel(n)
   }
 }

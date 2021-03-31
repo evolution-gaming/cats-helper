@@ -68,7 +68,7 @@ object DataHelper {
 
   implicit class NelOpsDataHelper[A](val self: Nel[A]) extends AnyVal {
 
-    def grouped(n: Int): Nel[Nel[A]] = {
+    def groupedNel(n: Int): Nel[Nel[A]] = {
       if (n <= 0) Nel.of(self)
       else {
         val groups = self

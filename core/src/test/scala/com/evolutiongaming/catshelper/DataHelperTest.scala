@@ -23,7 +23,7 @@ class DataHelperTest extends AnyFunSuite with Matchers {
   test("Nel.grouped") {
     val actual = Nel
       .of(0, 1, 2, 3, 4)
-      .grouped(2)
+      .groupedNel(2)
     val expected = Nel.of(
       Nel.of(0, 1),
       Nel.of(2, 3),

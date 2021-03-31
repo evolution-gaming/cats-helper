@@ -19,14 +19,13 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
     val result = executor[IO](5).use { executor =>
       implicit val contextShiftIO = IO.contextShift(executor)
       implicit val concurrentIO = IO.ioConcurrentEffect
-      implicit val timerIO = IO.timer(executor)
       implicit val parallel = IO.ioParallel
       testF[IO](5)
     }
     result.run()
   }
 
-  private def testF[F[_] : Sync : ThreadLocalOf : Parallel : Clock : ContextShift](n: Int): F[Unit] = {
+  private def testF[F[_] : Sync : ThreadLocalOf : Parallel : ContextShift](n: Int): F[Unit] = {
 
     def test(ref: ThreadLocalRef[F, String], executor: ExecutionContext) = {
 

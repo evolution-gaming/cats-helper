@@ -76,7 +76,7 @@ object CatsHelper {
     def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
 
 
-    def toResource(implicit F: Applicative[F]): Resource[F, A] = Resource.liftF(self)
+    def toResource(implicit F: Applicative[F]): Resource[F, A] = Resource.eval(self)
   }
 
 
@@ -91,7 +91,7 @@ object CatsHelper {
     def fenced(implicit F: Concurrent[F]): Resource[F, A] = ResourceFenced(self)
 
     def semiflatMap[B, G[x] >: F[x]](f: A => G[B])(implicit F: Applicative[G]): Resource[G, B] = {
-      self.flatMap { a => Resource.liftF(f(a)) }
+      self.flatMap { a => Resource.eval(f(a)) }
     }
 
     /**

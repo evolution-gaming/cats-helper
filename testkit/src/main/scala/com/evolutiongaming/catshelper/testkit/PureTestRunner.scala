@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.laws.util.TestContext
-import cats.effect.{Async, ContextShift, Effect, IO, LiftIO, Sync, Timer}
+import cats.effect.{Async, ContextShift, Effect, IO, Sync, Timer}
 import cats.effect.implicits._
 import cats.implicits._
 
@@ -53,7 +53,7 @@ private[testkit] object PureTestRunner {
     config.testFrameworkApi.completeWith(outcome, env.testContext.state)
   }
 
-  private class EnvImpl[F[_] : Async : LiftIO] extends PureTest.Env[F] {
+  private class EnvImpl[F[_] : Async] extends PureTest.Env[F] {
     val testContext: TestContext = TestContext()
 
     implicit def ec: ExecutionContext = testContext

@@ -2,7 +2,6 @@ package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
 import cats.effect.laws.util.TestContext
-import cats.implicits._
 import org.scalatest.exceptions.{TestCanceledException, TestFailedException}
 
 /**
@@ -50,7 +49,7 @@ object TestFrameworkApi {
  */
 object NoFrameworkApi extends TestFrameworkApi {
   def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A] = {
-    IO.fromEither(outcome.toRight(new IllegalStateException(s"Not completed. State: $tcState")).flatten)
+    IO.fromEither(outcome.toRight(new IllegalStateException(s"Not completed. State: $tcState")).flatMap(identity))
   }
 }
 
