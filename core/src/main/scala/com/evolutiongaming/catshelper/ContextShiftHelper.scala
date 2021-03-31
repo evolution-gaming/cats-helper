@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper
 
 import cats.Applicative
-import cats.effect.ContextShift
 import cats.implicits._
 
 import scala.concurrent.ExecutionContext

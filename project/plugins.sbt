@@ -9,3 +9,5 @@ addSbtPlugin("org.scoverage" % "sbt-coveralls" % "1.2.7")
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
 
 addSbtPlugin("com.evolutiongaming" % "sbt-scalac-opts-plugin" % "0.0.6")
+
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.27")

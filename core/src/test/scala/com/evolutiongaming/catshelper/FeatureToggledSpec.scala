@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.{MVar, Ref}
-import cats.effect.{ContextShift, IO, Resource, Timer}
+import cats.effect.concurrent.MVar
+import cats.effect.{IO, Resource}
 import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import com.evolutiongaming.catshelper.testkit.{PureTest, TestRuntime}
@@ -12,6 +12,7 @@ import org.scalatest.matchers.should.Matchers._
 import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import cats.effect.{ Ref, Temporal }
 
 class FeatureToggledSpec extends AnyFreeSpec {
   "end-to-end polling" in scope { s =>
@@ -132,7 +133,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
   }
 
   "race-conditions" - {
-    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Timer[IO])
+    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Temporal[IO])
     val env = cats.effect.Resource {
       IO {
         val tp = java.util.concurrent.Executors.newFixedThreadPool(32)

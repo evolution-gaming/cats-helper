@@ -1,13 +1,13 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Resource
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
 import com.evolutiongaming.catshelper.CatsHelper._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import cats.effect.{ Deferred, Ref }
 
 
 class ResourceFencedTest extends AsyncFunSuite with Matchers {

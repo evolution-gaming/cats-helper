@@ -14,8 +14,8 @@ object Dependencies {
     val kernel = "org.typelevel" %% "cats-kernel" % version
     val macros = "org.typelevel" %% "cats-macros" % version
 
-    private val effectVersion = "2.4.1"
-    val effect     = "org.typelevel" %% "cats-effect"      % effectVersion
-    val effectLaws = "org.typelevel" %% "cats-effect-laws" % effectVersion
+    private val effectVersion = "3.0.1"
+    val effect     = "org.typelevel" %% "cats-effect"        % effectVersion
+    val effectLaws = "org.typelevel" %% "cats-effect-testkit" % effectVersion
   }
 }

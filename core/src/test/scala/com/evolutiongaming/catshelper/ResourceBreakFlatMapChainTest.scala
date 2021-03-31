@@ -1,6 +1,5 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.Deferred
 import cats.effect.{IO, Resource}
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
@@ -9,6 +8,7 @@ import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
+import cats.effect.Deferred
 
 
 class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {

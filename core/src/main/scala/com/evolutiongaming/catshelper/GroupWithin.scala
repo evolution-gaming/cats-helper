@@ -1,14 +1,15 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
-import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.implicits._
-import cats.effect.{Clock, Concurrent, Resource, Timer}
+import cats.effect.{Clock, Concurrent, Resource}
 import cats.implicits._
 import cats.{Applicative, ~>}
 import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration._
+import cats.effect.{ Ref, Temporal }
+import cats.effect.std.Semaphore
 
 trait GroupWithin[F[_]] {
   import GroupWithin._
@@ -32,7 +33,7 @@ object GroupWithin {
   }
 
 
-  def apply[F[_]: Concurrent: Timer]: GroupWithin[F] = {
+  def apply[F[_]: Concurrent: Temporal]: GroupWithin[F] = {
 
     new GroupWithin[F] {
 
@@ -65,7 +66,7 @@ object GroupWithin {
 
             def startTimer(timestamp: Long) = {
               val result = for {
-                _ <- Timer[F].sleep(settings.delay)
+                _ <- Temporal[F].sleep(settings.delay)
                 a <- ref.modify {
                   case s: S.Full if s.timestamp == timestamp => (S.empty, consume(s.as))
                   case s                                     => (s, void)
@@ -80,7 +81,7 @@ object GroupWithin {
             val enqueue = new Enqueue[F, A] {
 
               def apply(a: A) = {
-                Concurrent[F].uncancelable {
+                Concurrent[F].uncancelable _ => {
                   for {
                     t <- Clock[F].nanos
                     a <- ref.modify {

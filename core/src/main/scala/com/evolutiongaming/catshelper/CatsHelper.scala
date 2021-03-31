@@ -1,6 +1,5 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.effect.{Concurrent, Fiber, Resource}
 import cats.implicits._
@@ -9,6 +8,7 @@ import cats.{Applicative, ApplicativeError, MonadError}
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 import scala.util.{Either, Try}
+import cats.effect.Deferred
 
 object CatsHelper {
 

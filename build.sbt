@@ -17,6 +17,8 @@ inThisBuild(Seq(
   resolvers += Resolver.bintrayRepo("evolutiongaming", "maven"),
 
   addCompilerPlugin(cpKindProjector),
+
+  scalacOptions += "-P:semanticdb:synthetics:on"
 ))
 
 // Settings that can't be defined on a higher level go here.
