@@ -1,11 +1,11 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.implicits._
-import cats.effect.{Async, Concurrent, Resource}
-import cats.implicits._
+import cats.effect.{Concurrent, Resource, Spawn}
+import cats.effect.{Deferred, Ref, Temporal}
+import cats.syntax.all._
 
 import scala.concurrent.duration._
-import cats.effect.{ Deferred, Ref, Temporal }
 
 /**
  * Given a `Resource[F, A]` produces `Resource[F, Resource[F, Option[A]]]` which,
@@ -32,7 +32,7 @@ object FeatureToggled {
    * @param pollInterval an interval between consecutive polls
    * @param gracePeriod $gracePeriod
    */
-  def polling[F[_]: Concurrent: Temporal, A](
+  def polling[F[_]: Temporal, A](
     ra: Resource[F, A],
     enabled: F[Boolean],
     pollInterval: FiniteDuration,
@@ -40,7 +40,7 @@ object FeatureToggled {
   ): Resource[F, Resource[F, Option[A]]] = {
 
     of(ra, gracePeriod) { toggle =>
-      Schedule(Duration.Zero, pollInterval)(enabled.flatMap(toggle)).use(_ => Async[F].never)
+      Schedule(Duration.Zero, pollInterval)(enabled.flatMap(toggle)).use(_ => Spawn[F].never)
     }
   }
 
@@ -54,7 +54,7 @@ object FeatureToggled {
    *        push the toggle state. `toggleControl` will be cancelled when the outer resource
    *        gets released.
    */
-  def of[F[_]: Concurrent: Temporal, A](
+  def of[F[_]: Temporal, A](
     ra: Resource[F, A],
     gracePeriod: FiniteDuration = Duration.Zero,
   )(
@@ -75,7 +75,7 @@ object FeatureToggled {
 
       featureToggledResource = {
         val toggle = (v: Boolean) => toggleStateOf(v).flatMap { ts =>
-          flagRef.getAndSet(ts).flatMap(_.next.complete(ts)).uncancelable
+          flagRef.getAndSet(ts).flatMap(_.next.complete(ts)).uncancelable.void
         }
 
         val waitFor = (v: Boolean) => flagRef.get.tailRecM { get =>

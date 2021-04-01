@@ -30,7 +30,7 @@ object SerialRef { self =>
         val get = r.get
 
         def modify[B](f: A => F[(A, B)]) = {
-          s.withPermit {
+          s.permit.surround {
             for {
               a      <- r.get
               ab     <- f(a)
@@ -55,7 +55,7 @@ object SerialRef { self =>
 
 
   class Apply[F[_]](val F: Concurrent[F]) extends AnyVal {
-    
+
     def of[A](value: A): F[SerialRef[F, A]] = self.of[F, A](value)(F)
   }
 

@@ -3,6 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.Id
 import cats.arrow.FunctionK
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
@@ -32,7 +33,7 @@ object ToTry {
     * @param timeout used only for computation after first seen async boundary, covering all computations onwards
     *                in case there is no async boundary found, timeout is not used
     */
-  def ioToTry(timeout: FiniteDuration): ToTry[IO] = new ToTry[IO] {
+  def ioToTry(timeout: FiniteDuration)(implicit runtime: IORuntime): ToTry[IO] = new ToTry[IO] {
 
     def apply[A](fa: IO[A]) = {
 
@@ -46,7 +47,8 @@ object ToTry {
   }
 
 
-  implicit val ioToTry: ToTry[IO] = ioToTry(1.minute)
+  implicit def ioToTry(implicit runtime: IORuntime): ToTry[IO] =
+    ioToTry(1.minute)
 
 
   implicit val idToTry: ToTry[Id] = new ToTry[Id] {

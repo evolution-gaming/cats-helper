@@ -43,7 +43,7 @@ object EffectHelper {
   @deprecated("use ConcurrentOpsEffectHelper instead", "1.0.0")
   class EffectHelperConcurrentOps[F[_]](val self: Concurrent[F]) extends AnyVal {
 
-    def startEnsure[A](fa: F[A]): F[Fiber[F, A]] = {
+    def startEnsure[A](fa: F[A]): F[Fiber[F, Throwable, A]] = {
       implicit val F = self
 
       def faOf(started: Deferred[F, Unit]) = {
@@ -64,7 +64,7 @@ object EffectHelper {
 
   implicit class ConcurrentOpsEffectHelper[F[_]](val self: Concurrent[F]) extends AnyVal {
 
-    def startEnsure[A](fa: F[A]): F[Fiber[F, A]] = {
+    def startEnsure[A](fa: F[A]): F[Fiber[F, Throwable, A]] = {
       implicit val F = self
 
       def faOf(started: Deferred[F, Unit]) = {
@@ -95,7 +95,7 @@ object EffectHelper {
     }
 
 
-    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)
+    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
 
 
     def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
@@ -116,7 +116,7 @@ object EffectHelper {
     }
 
 
-    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)
+    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
 
 
     def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)

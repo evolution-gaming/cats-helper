@@ -1,8 +1,8 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.MVar
 import cats.effect.{IO, Resource}
-import cats.implicits._
+import cats.effect.std
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import com.evolutiongaming.catshelper.testkit.{PureTest, TestRuntime}
 import org.scalactic.source.Position
@@ -10,9 +10,10 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
 
 import scala.collection.immutable.Queue
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import cats.effect.{ Ref, Temporal }
+import cats.effect.Ref
+import cats.effect.unsafe.IORuntime
+import cats.effect.unsafe.IORuntimeConfig
 
 class FeatureToggledSpec extends AnyFreeSpec {
   "end-to-end polling" in scope { s =>
@@ -71,14 +72,15 @@ class FeatureToggledSpec extends AnyFreeSpec {
     type LocalScope = (Scope, Resource[IO, Option[Int]], Boolean => IO[Unit])
 
     def localScope(f: LocalScope => IO[Unit]): Unit = scope { s =>
-      import s._, env._
+      import s._
 
       for {
-        toggle <- MVar[IO].of(true)
+        toggle <- std.Queue.bounded[IO, Boolean](1)
+        _ <- toggle.offer(true)
         ftr     = FeatureToggled.of(baseResource, gracePeriod)(toggle.take.flatMap(_).foreverM)
 
         _ <- ftr.use { access =>
-          IO.sleep(1.nano) *> f((s, access, toggle.put(_)))
+          IO.sleep(1.nano) *> f((s, access, toggle.offer(_)))
         }
       } yield ()
     }
@@ -133,39 +135,31 @@ class FeatureToggledSpec extends AnyFreeSpec {
   }
 
   "race-conditions" - {
-    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Temporal[IO])
-    val env = cats.effect.Resource {
-      IO {
-        val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
-        val ec = scala.concurrent.ExecutionContext.fromExecutor(tp)
-        val env = new Env()(ec, IO.contextShift(ec), IO.timer(ec))
-        env -> IO { tp.shutdown() }
-      }
+    implicit val runtime = {
+      val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
+      val ec = scala.concurrent.ExecutionContext.fromExecutor(tp)
+      val (scheduler, shutdown) = IORuntime.createDefaultScheduler()
+      IORuntime(ec, ec, scheduler, () => { shutdown(); tp.shutdown() }, IORuntimeConfig())
     }
 
     "don't get stuck after multiple concurrent uses" in {
-      env
-        .use { env =>
-          import env._
-
-          for {
-            seed <- Ref[IO].of(1)
-            flag <- Ref[IO].of(true)
-            r <- FeatureToggled.polling(Resource.eval(seed.get), flag.get, 1.milli).allocated.map(_._1)
-            _ <- {
-              val one = r.use(_ => IO.shift)
-              val loop = List.fill(1000)(one).sequence_
-              List.fill(8)(loop).parSequence_
-            }
-            _ <- flag.set(false)
-            _ <- IO.sleep(100.millis)
-            _ <- seed.set(2)
-            _ <- flag.set(true)
-            _ <- IO.sleep(10.millis)
-            _ <- r.use(i => IO { i shouldBe Some(2) })
-          } yield ()
+      val program = for {
+        seed <- Ref[IO].of(1)
+        flag <- Ref[IO].of(true)
+        r <- FeatureToggled.polling(Resource.eval(seed.get), flag.get, 1.milli).allocated.map(_._1)
+        _ <- {
+          val one = r.use(_ => IO.cede)
+          val loop = List.fill(1000)(one).sequence_
+          List.fill(8)(loop).parSequence_
         }
-        .unsafeRunTimed(10.seconds)
+        _ <- flag.set(false)
+        _ <- IO.sleep(100.millis)
+        _ <- seed.set(2)
+        _ <- flag.set(true)
+        _ <- IO.sleep(10.millis)
+        _ <- r.use(i => IO { i shouldBe Some(2) })
+      } yield ()
+      program.unsafeRunTimed(10.seconds)
     }
   }
 
@@ -177,7 +171,6 @@ class FeatureToggledSpec extends AnyFreeSpec {
 
   private def scope(body: Scope => IO[Unit]): Unit = {
     ioTest { env =>
-      import env._
       for {
         counter <- Ref[IO].of(0)
         events  <- Ref[IO].of(Queue.empty[Int])

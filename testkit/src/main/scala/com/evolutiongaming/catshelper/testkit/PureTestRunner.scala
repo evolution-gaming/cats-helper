@@ -1,9 +1,10 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.laws.util.TestContext
-import cats.effect.{Async, Effect, IO, Sync}
 import cats.effect.implicits._
-import cats.implicits._
+import cats.effect.testkit.TestContext
+import cats.effect.unsafe.implicits.global
+import cats.effect.{Async, IO, Sync}
+import cats.syntax.all._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -12,7 +13,7 @@ import cats.effect.Temporal
 private[testkit] object PureTestRunner {
   type TestBody[F[A], A] = PureTest.Env[F] => F[A]
 
-  def doRunTest[F[_] : Effect, A](body: TestBody[F, A], config: PureTest.Config) = {
+  def doRunTest[F[_] : Async : UnliftIO, A](body: TestBody[F, A], config: PureTest.Config) = {
     val singleRun = wrap(body, config)
 
     val fullTestIO = config.flakinessCheckIterations match {
@@ -23,26 +24,27 @@ private[testkit] object PureTestRunner {
     fullTestIO.unsafeRunSync()
   }
 
-  private def wrap[F[_] : Effect, A](body: TestBody[F, A], config: PureTest.Config): IO[A] = IO.defer {
+  private def wrap[F[_] : Async : UnliftIO, A](body: TestBody[F, A], config: PureTest.Config): IO[A] = IO.defer {
     val env = new EnvImpl[F]
 
-    val testIo = (env.cs.shift *> body(env)).toIO
-
     @volatile var outcome: Option[Either[Throwable, A]] = None
-    val cancel = testIo.unsafeRunCancelable { r => outcome = Some(r) }
+    val testIo = UnliftIO[F].unliftIO(body(env).evalOn(env.testContext)).attempt map { r =>
+      IO.delay { outcome = Some(r) }
+    }
+    val cancel = testIo.start.unsafeRunSync().cancel
 
     val testThread = Thread.currentThread()
 
-    val stopHotLoop = IO.defer {
+    val stopHotLoop = IO.delay {
       val err = new IllegalStateException("Still running")
       err.setStackTrace(testThread.getStackTrace)
       outcome = Some(Left(err))
-      cancel
-    }
+    } *> cancel
 
-    val hotLoopGuard = IO.timer(config.backgroundEc).sleep(config.hotLoopTimeout)
+    val hotLoopGuard = IO.sleep(config.hotLoopTimeout)
 
-    val timeoutCancel = (hotLoopGuard *> stopHotLoop).unsafeRunCancelable(_ => ())
+    val timeoutCancel = (hotLoopGuard *> stopHotLoop).start
+      .evalOn(config.backgroundEc).unsafeRunSync().cancel
 
     while (outcome.isEmpty && env.testContext.state.tasks.nonEmpty) {
       val step = env.testContext.state.tasks.iterator.map(_.runsAt).min
@@ -58,8 +60,6 @@ private[testkit] object PureTestRunner {
     val testContext: TestContext = TestContext()
 
     implicit def ec: ExecutionContext = testContext
-    implicit val cs: ContextShift[F] = testContext.contextShift[F]
-    implicit val timer: Temporal[F] = testContext.timer[F]
 
     implicit val testRuntime: TestRuntime[F] = new TestRuntime[F] {
 
@@ -67,7 +67,7 @@ private[testkit] object PureTestRunner {
       def getTimeSinceStart: F[FiniteDuration] = Sync[F].delay(testContext.state.clock)
 
       def sleepUntil(dt: FiniteDuration): F[Unit] =
-        getTimeSinceStart.flatMap(t => timer.sleep(dt - t).whenA(dt > t))
+        getTimeSinceStart.flatMap(t => Temporal[F].sleep(dt - t).whenA(dt > t))
     }
   }
 }

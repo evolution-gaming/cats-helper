@@ -1,10 +1,10 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.{Effect, IO}
+import cats.effect.IO
+import cats.effect.kernel.Async
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import cats.effect.Temporal
 
 /**
  * Provides a boilerplate for writing "pure FP" tests (usually using `IO` and for-comprehensions).
@@ -36,8 +36,6 @@ object PureTest extends PureTest {
   /** An environment that is injected into every test. */
   trait Env[F[_]] {
     implicit def ec: ExecutionContext
-    implicit def cs: ContextShift[F]
-    implicit def timer: Temporal[F]
     implicit def testRuntime: TestRuntime[F]
   }
 
@@ -67,7 +65,7 @@ sealed trait PureTest { self =>
   /**
    * A follow-up to [[apply `PureTest[F]`]].
    */
-  final class PartialApply[F[_]: Effect] {
+  final class PartialApply[F[_]: Async: UnliftIO] {
     /**
      * Builds and runs the test with previously defined settings.
      */
@@ -79,7 +77,7 @@ sealed trait PureTest { self =>
    *
    * @see [[ioTest `ioTest`]] – a shortcut for `IO`-based tests.
    */
-  final def apply[F[_]: Effect]: PartialApply[F] = new PartialApply[F]
+  final def apply[F[_]: Async: UnliftIO]: PartialApply[F] = new PartialApply[F]
 
   /**
    * A shorter version of [[PartialApply.of `PureTest[IO].of`]].

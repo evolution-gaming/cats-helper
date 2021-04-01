@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
-import cats.effect.laws.util.TestContext
+import cats.effect.kernel.testkit.TestContext
 import org.scalatest.exceptions.{TestCanceledException, TestFailedException}
 
 /**

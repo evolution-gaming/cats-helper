@@ -33,7 +33,7 @@ object GroupWithin {
   }
 
 
-  def apply[F[_]: Concurrent: Temporal]: GroupWithin[F] = {
+  def apply[F[_]: Temporal]: GroupWithin[F] = {
 
     new GroupWithin[F] {
 
@@ -58,11 +58,11 @@ object GroupWithin {
           Resource.eval(enqueue.pure[F])
         } else {
           val result = for {
-            semaphore <- Semaphore.uncancelable[F](1)
+            semaphore <- Semaphore(1)
             ref       <- Ref[F].of(S.empty)
           } yield {
 
-            def consume(as: Nel[A]) = semaphore.withPermit { f(as.reverse) }
+            def consume(as: Nel[A]) = semaphore.permit.surround { f(as.reverse) }
 
             def startTimer(timestamp: Long) = {
               val result = for {
@@ -81,7 +81,7 @@ object GroupWithin {
             val enqueue = new Enqueue[F, A] {
 
               def apply(a: A) = {
-                Concurrent[F].uncancelable _ => {
+                Concurrent[F].uncancelable { _ =>
                   for {
                     t <- Clock[F].nanos
                     a <- ref.modify {

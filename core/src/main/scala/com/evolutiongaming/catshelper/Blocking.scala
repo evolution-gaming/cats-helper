@@ -4,6 +4,7 @@ import cats.arrow.FunctionK
 import cats.~>
 
 import scala.concurrent.ExecutionContext
+import cats.effect.kernel.Async
 
 trait Blocking[F[_]] {
 
@@ -19,16 +20,9 @@ object Blocking {
     def apply[A](fa: F[A]) = fa
   }
 
-
-  def fromBlocker[F[_]: ContextShift]: Blocking[F] = new Blocking[F] {
-    def apply[A](fa: F[A]) = blocker.blockOn(fa)
+  def fromExecutionContext[F[_]: Async](executor: ExecutionContext): Blocking[F] = new Blocking[F] {
+    def apply[A](fa: F[A]) = Async[F].evalOn(fa, executor)
   }
-
-
-  def fromExecutionContext[F[_]: ContextShift](executor: ExecutionContext): Blocking[F] = new Blocking[F] {
-    def apply[A](fa: F[A]) = ContextShift[F].evalOn(executor)(fa)
-  }
-
 
   object implicits {
 

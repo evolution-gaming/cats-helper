@@ -12,8 +12,7 @@ import cats.effect.Ref
 
 class SerialRefSpec extends AnyFreeSpec {
 
-  "modify serially" in ioTest { env =>
-    import env._
+  "modify serially" in ioTest { _ =>
 
     for {
       ref0     <- SerialRef[IO].of(0)

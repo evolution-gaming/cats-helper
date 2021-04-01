@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.implicits._
 import cats.effect.{IO, Sync}
+import cats.effect.unsafe.IORuntime
 import cats.~>
 import CatsHelper._
 
@@ -84,7 +85,7 @@ object ThreadLocalOf {
 
   def summon[F[_]](implicit F: ThreadLocalOf[F]): ThreadLocalOf[F] = F
 
-  val ioThreadLocalOf: ThreadLocalOf[IO] = threadLocalOf
+  def ioThreadLocalOf(implicit runtime: IORuntime): ThreadLocalOf[IO] = threadLocalOf
 
   implicit def threadLocalOf[F[_] : Sync : ToTry]: ThreadLocalOf[F] = new ThreadLocalOf[F] {
 

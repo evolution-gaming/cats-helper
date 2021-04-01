@@ -1,22 +1,17 @@
 package com.evolutiongaming.catshelper
 
-import cats.Parallel
-import cats.effect.{Concurrent, IO}
+import cats.effect.IO
 import org.scalatest.Succeeded
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import cats.effect.Temporal
+
+import cats.effect.unsafe.implicits.global
 
 object IOSuite {
   val Timeout: FiniteDuration = 5.seconds
 
   implicit val executor: ExecutionContextExecutor = ExecutionContext.global
-
-  implicit val contextShiftIO: ContextShift[IO] = IO.contextShift(executor)
-  implicit val concurrentIO: Concurrent[IO] = IO.ioConcurrentEffect
-  implicit val timerIO: Temporal[IO] = IO.timer(executor)
-  implicit val parallel: Parallel[IO] = IO.ioParallel
 
   def runIO[A](io: IO[A], timeout: FiniteDuration = Timeout): Future[Succeeded.type] = {
     io.timeout(timeout).as(Succeeded).unsafeToFuture()

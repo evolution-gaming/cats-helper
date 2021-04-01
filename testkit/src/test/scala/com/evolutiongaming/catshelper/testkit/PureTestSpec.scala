@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
-import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.freespec.AnyFreeSpec
@@ -48,8 +47,7 @@ class PureTestSpec extends AnyFreeSpec {
     }
   }
 
-  "is unaffected by infinite background loops" in ioTest { env =>
-    import env._
+  "is unaffected by infinite background loops" in ioTest { _ =>
     val main = IO.sleep(1.milli)
     val loop = IO.sleep(1.nano).foreverM
     loop.start *> main

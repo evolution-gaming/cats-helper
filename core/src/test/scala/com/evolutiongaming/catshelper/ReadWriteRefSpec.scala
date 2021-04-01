@@ -1,14 +1,15 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
-import cats.implicits._
+import cats.effect.unsafe.IORuntime
+import cats.effect.unsafe.IORuntimeConfig
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.testkit.PureTest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import cats.effect.Temporal
+
 
 class ReadWriteRefSpec extends AnyFreeSpec {
   "basic read/write" in scope { s =>
@@ -17,7 +18,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
   }
 
   "enforce fair execution" in scope { s =>
-    import s._, env._
+    import s._
     // We're going to start a bunch of reads and writes so that
     //  - they all get "scheduled" before any of them completes;
     //  - they all have a short delay to have a predictable scheduling order.
@@ -51,7 +52,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
   }
 
   "can cancel blocked read" in scope { s =>
-    import s._, env._
+    import s._
 
     val lateReadWithTimeout = IO.sleep(1.second) *> IO.race(read, IO.sleep(1.second) *> getTime)
 
@@ -59,7 +60,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
   }
 
   "can cancel blocked write" in scope { s =>
-    import s._, env._
+    import s._
 
     val lateIncWithTimeout = IO.sleep(1.second) *> IO.race(inc, IO.sleep(1.second) *> getTime)
 
@@ -82,7 +83,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
 
   // This is a scary cases we might want to improve later.
   "read within write BLOCKS INDEFINITELY" in scope { s =>
-    import s._, env._
+    import s._
 
     val writeInRead = rw.read.use(_ => inc)
     IO.race(writeInRead, IO.sleep(1.minute)).map(_ shouldBe ().asRight)
@@ -90,7 +91,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
 
   // This is a scary cases we might want to improve later.
   "read within read when write is pending BLOCKS INDEFINITELY" in scope { s =>
-    import s._, env._
+    import s._
 
     val readInRead = rw.read.use(_ => inc.start *> IO.sleep(1.nano) *> read)
     IO.race(readInRead, IO.sleep(1.minute)).map(_ shouldBe ().asRight)
@@ -101,32 +102,24 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     // go undetected, since IO run loop may execute a cancellable batch as a single fused runnable.
     // Hence here we resort to actual multi-threaded executors for actual concurrency.
 
-    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Temporal[IO])
-    val env = cats.effect.Resource {
-      IO {
-        val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
-        val ec = scala.concurrent.ExecutionContext.fromExecutor(tp)
-        val env = new Env()(ec, IO.contextShift(ec), IO.timer(ec))
-        env -> IO { tp.shutdown() }
-      }
+    implicit val runtime = {
+      val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
+      val ec = scala.concurrent.ExecutionContext.fromExecutor(tp)
+      val (scheduler, shutdown) = IORuntime.createDefaultScheduler()
+      IORuntime(ec, ec, scheduler, () => { shutdown(); tp.shutdown() }, IORuntimeConfig())
     }
 
     "read cancellation does not break things" in {
-      env
-        .use { env =>
-          import env._
-
-          for {
-            rw <- ReadWriteRef[IO].of(1)
-            _  <- {
-              val tryReadAndCancel = rw.read.use(_ => IO.unit).start.flatMap(_.cancel) *> IO.shift
-              val repeated = List.fill(1000)(tryReadAndCancel).sequence_
-              List.fill(16)(repeated).parSequence_
-            }
-            _  <- rw.write.use(_ => IO.unit).timeout(100.millis)
-          } yield ()
+      val program = for {
+        rw <- ReadWriteRef[IO].of(1)
+        _  <- {
+          val tryReadAndCancel = rw.read.use(_ => IO.unit).start.flatMap(_.cancel) *> IO.cede
+          val repeated = List.fill(1000)(tryReadAndCancel).sequence_
+          List.fill(16)(repeated).parSequence_
         }
-        .unsafeRunTimed(10.seconds)
+        _  <- rw.write.use(_ => IO.unit).timeout(100.millis)
+      } yield ()
+      program.unsafeRunTimed(10.seconds)
     }
   }
 
@@ -145,7 +138,6 @@ class ReadWriteRefSpec extends AnyFreeSpec {
   }
 
   private def scope[A](body: Scope => IO[A]): A = PureTest.ioTest { env =>
-    import env._
     for {
       rw <- ReadWriteRef[IO].of(0)
       a  <- body(Scope(env, rw))

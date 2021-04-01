@@ -4,28 +4,30 @@ import java.util.concurrent.Executors
 
 import cats.Parallel
 import cats.arrow.FunctionK
+import cats.effect.Ref
 import cats.effect._
+import cats.effect.unsafe.IORuntime
+import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
-import cats.effect.Ref
+
 
 class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 
   test("thread local stored per thread") {
     val result = executor[IO](5).use { executor =>
-      implicit val contextShiftIO = IO.contextShift(executor)
-      implicit val concurrentIO = IO.ioConcurrentEffect
-      implicit val parallel = IO.ioParallel
+      val (scheduler, shutdown) = IORuntime.createDefaultScheduler()
+      implicit val runtime = IORuntime(executor, executor, scheduler, () => { shutdown(); executor.shutdown() }, IORuntimeConfig())
       testF[IO](5)
     }
     result.run()
   }
 
-  private def testF[F[_] : Sync : ThreadLocalOf : Parallel : ContextShift](n: Int): F[Unit] = {
+  private def testF[F[_] : Async : ThreadLocalOf : Parallel](n: Int): F[Unit] = {
 
     def test(ref: ThreadLocalRef[F, String], executor: ExecutionContext) = {
 
@@ -41,7 +43,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 
       for {
         a  <- check
-        a1 <- ContextShift[F].evalOn(executor)(get)
+        a1 <- Async[F].evalOn(get, executor)
         _   = a should not equal a1
         _  <- ref.set(a + "|")
         _  <- check

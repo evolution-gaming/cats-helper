@@ -1,7 +1,8 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
+import cats.effect.unsafe.implicits.global
 import com.evolutiongaming.catshelper.CatsHelper._
 
 import scala.util.control.NoStackTrace

@@ -1,14 +1,15 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
-import cats.implicits._
-import com.evolutiongaming.catshelper.IOSuite._
+import cats.syntax.all._
+import cats.effect.unsafe.implicits.global
 import com.evolutiongaming.catshelper.CatsHelper._
 
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+
 
 class ToTrySpec extends AnyFunSuite with Matchers {
 

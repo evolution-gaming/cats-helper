@@ -1,13 +1,15 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.{IO, Resource}
-import cats.implicits._
+import cats.effect.Ref
+import cats.effect.syntax.all._
+import cats.effect.unsafe.implicits.global
+import cats.syntax.all._
 import com.evolutiongaming.catshelper.CatsHelper._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import scala.util.{Failure, Try}
-import cats.effect.Ref
 
 class CatsHelperSpec extends AnyFunSuite with Matchers {
 
