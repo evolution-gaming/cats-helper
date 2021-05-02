@@ -4,17 +4,16 @@ inThisBuild(Seq(
   homepage := Some(new URL("http://github.com/evolution-gaming/cats-helper")),
 
   organization := "com.evolutiongaming",
-  organizationName := "Evolution Gaming",
-  organizationHomepage := Some(url("http://evolutiongaming.com")),
-  bintrayOrganization := Some("evolutiongaming"),
+  organizationName := "Evolution",
+  organizationHomepage := Some(url("http://evolution.com")),
 
   startYear := Some(2019),
   licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.4", "2.12.12"),
+  crossScalaVersions := Seq("2.13.5", "2.12.13"),
   scalaVersion := crossScalaVersions.value.head,
 
-  resolvers += Resolver.bintrayRepo("evolutiongaming", "maven"),
+  publishTo := Some(Resolver.evolutionReleases),
 
   addCompilerPlugin(cpKindProjector),
 ))
@@ -23,6 +22,7 @@ inThisBuild(Seq(
 // Usually such settings have defaults defined by some plugin in its `projectSettings`.
 lazy val commonSettings = Seq(
   releaseCrossBuild := true,
+  scalacOptsFailOnWarn := Some(false),
 )
 
 lazy val root = project
