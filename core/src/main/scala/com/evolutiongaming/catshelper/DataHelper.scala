@@ -9,7 +9,7 @@ object DataHelper {
 
   implicit class SortedMapOpsDataHelper[K, V](val self: SortedMap[K, V]) extends AnyVal {
 
-    @deprecated("no longer required by cats" , since = "2.1.1")
+    @deprecated("no longer required by cats", since = "2.1.1")
     def toNem(implicit order: Order[K]): Option[Nem[K, V]] = Nem.fromMap(self)
 
     def toNem(): Option[Nem[K, V]] = Nem.fromMap(self)
@@ -79,6 +79,12 @@ object DataHelper {
         Nel(groups.head, groups.tail)
       }
     }
+
+    /**
+     * Alias for [[grouped()]] to avoid name clashing with
+     * [[cats.data.NonEmptyList.grouped]].
+     */
+    def groupedNel(n: Int): Nel[Nel[A]] = grouped(n)
   }
 
 
