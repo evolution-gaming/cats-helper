@@ -4,7 +4,7 @@ object Dependencies {
 
   val scalatest   = "org.scalatest"     %% "scalatest" % "3.2.3"
   val machinist   = "org.typelevel"     %% "machinist" % "0.6.8"
-  val `slf4j-api` = "org.slf4j"          % "slf4j-api" % "1.7.30"
+  val `slf4j-api` = "org.slf4j"          % "slf4j-api" % "1.7.32"
 
   val cpKindProjector = "org.typelevel" % "kind-projector" % "0.13.0" cross CrossVersion.full
 
