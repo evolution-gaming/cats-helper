@@ -38,8 +38,8 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
       released <- Deferred[IO, Unit]
       resource  = for {
         _ <- Resource.release { released.complete(()) }
-        _ <- Resource.liftF { started.complete(()) }
-        _ <- Resource.liftF { IO.never.as(()) }
+        _ <- Resource.eval { started.complete(()) }
+        _ <- Resource.eval { IO.never.as(()) }
       } yield {}
       fiber    <- resource.breakFlatMapChain.use { _ => ().pure[IO] }.start
       _        <- started.get
