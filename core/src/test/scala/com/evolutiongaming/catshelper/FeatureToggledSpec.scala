@@ -150,7 +150,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
           for {
             seed <- Ref[IO].of(1)
             flag <- Ref[IO].of(true)
-            r <- FeatureToggled.polling(Resource.liftF(seed.get), flag.get, 1.milli).allocated.map(_._1)
+            r <- FeatureToggled.polling(Resource.eval(seed.get), flag.get, 1.milli).allocated.map(_._1)
             _ <- {
               val one = r.use(_ => IO.shift)
               val loop = List.fill(1000)(one).sequence_
