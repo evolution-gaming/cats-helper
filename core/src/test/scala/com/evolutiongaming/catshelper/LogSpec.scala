@@ -63,42 +63,42 @@ object LogSpec {
   val log: Log[StateT] = {
     val log = new Log[StateT] {
 
-      def debug(msg: => String) = {
+      def debug(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Debug(msg)
           (state.add(action), ())
         }
       }
 
-      def info(msg: => String) = {
+      def info(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Info(msg)
           (state.add(action), ())
         }
       }
 
-      def warn(msg: => String) = {
+      def warn(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Warn0(msg)
           (state.add(action), ())
         }
       }
 
-      def warn(msg: => String, cause: Throwable) = {
+      def warn(msg: => String, cause: Throwable, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Warn1(msg, cause)
           (state.add(action), ())
         }
       }
 
-      def error(msg: => String) = {
+      def error(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Error0(msg)
           (state.add(action), ())
         }
       }
 
-      def error(msg: => String, cause: Throwable) = {
+      def error(msg: => String, cause: Throwable, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Error1(msg, cause)
           (state.add(action), ())
