@@ -35,6 +35,33 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Debug("> debug"),
       Action.OfStr("source")))
   }
+
+  test("debug, info, warn, error with MDC") {
+
+    val mdc = "label" -> "value"
+
+    val stateT = for {
+      log0 <- logOf("source")
+      log   = log0.prefixed(">").mapK(FunctionK.id)
+      _    <- log.debug("debug", Log.Mdc(mdc))
+      _    <- log.info("info", Log.Mdc(mdc))
+      _    <- log.warn("warn", Log.Mdc(mdc))
+      _    <- log.warn("warn", Error, Log.Mdc(mdc))
+      _    <- log.error("error", Log.Mdc(mdc))
+      _    <- log.error("error", Error, Log.Mdc(mdc))
+    } yield {}
+
+
+    val (state, _) = stateT.run(State(Nil))
+    state shouldEqual State(List(
+      Action.Error1("> error", Error, Log.Mdc(mdc)),
+      Action.Error0("> error", Log.Mdc(mdc)),
+      Action.Warn1("> warn", Error, Log.Mdc(mdc)),
+      Action.Warn0("> warn", Log.Mdc(mdc)),
+      Action.Info("> info", Log.Mdc(mdc)),
+      Action.Debug("> debug", Log.Mdc(mdc)),
+      Action.OfStr("source")))
+  }
 }
 
 object LogSpec {
@@ -65,42 +92,42 @@ object LogSpec {
 
       def debug(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
-          val action = Action.Debug(msg)
+          val action = Action.Debug(msg, mdc)
           (state.add(action), ())
         }
       }
 
       def info(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
-          val action = Action.Info(msg)
+          val action = Action.Info(msg, mdc)
           (state.add(action), ())
         }
       }
 
       def warn(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
-          val action = Action.Warn0(msg)
+          val action = Action.Warn0(msg, mdc)
           (state.add(action), ())
         }
       }
 
       def warn(msg: => String, cause: Throwable, mdc: Log.Mdc) = {
         StateT { state =>
-          val action = Action.Warn1(msg, cause)
+          val action = Action.Warn1(msg, cause, mdc)
           (state.add(action), ())
         }
       }
 
       def error(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
-          val action = Action.Error0(msg)
+          val action = Action.Error0(msg, mdc)
           (state.add(action), ())
         }
       }
 
       def error(msg: => String, cause: Throwable, mdc: Log.Mdc) = {
         StateT { state =>
-          val action = Action.Error1(msg, cause)
+          val action = Action.Error1(msg, cause, mdc)
           (state.add(action), ())
         }
       }
@@ -128,12 +155,12 @@ object LogSpec {
   object Action {
     final case class OfStr(source: String) extends Action
     final case class OfClass(source: Class[_]) extends Action
-    final case class Debug(msg: String) extends Action
-    final case class Info(msg: String) extends Action
-    final case class Warn0(msg: String) extends Action
-    final case class Warn1(msg: String, throwable: Throwable) extends Action
-    final case class Error0(msg: String) extends Action
-    final case class Error1(msg: String, throwable: Throwable) extends Action
+    final case class Debug(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
+    final case class Info(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
+    final case class Warn0(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
+    final case class Warn1(msg: String, throwable: Throwable, mdc: Log.Mdc = Log.Mdc.empty) extends Action
+    final case class Error0(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
+    final case class Error1(msg: String, throwable: Throwable, mdc: Log.Mdc = Log.Mdc.empty) extends Action
   }
 
   case object Error extends RuntimeException with NoStackTrace
