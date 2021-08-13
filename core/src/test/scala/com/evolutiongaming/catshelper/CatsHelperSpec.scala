@@ -35,4 +35,24 @@ class CatsHelperSpec extends AnyFunSuite with Matchers {
     } yield a
     result.toTry.get shouldEqual true
   }
+
+  test("trueOr") {
+    false.trueOr("left") shouldEqual "left".asLeft
+    true.trueOr("left") shouldEqual ().asRight
+  }
+
+  test("falseOr") {
+    true.falseOr("left") shouldEqual "left".asLeft
+    false.falseOr("left") shouldEqual ().asRight
+  }
+
+  test("trueOrF") {
+    false.trueOrF[Option]("left") shouldEqual "left".asLeft.toEitherT[Option]
+    true.trueOrF[Option]("left") shouldEqual ().asRight.toEitherT[Option]
+  }
+
+  test("falseOrF") {
+    true.falseOrF[Option]("left") shouldEqual "left".asLeft.toEitherT[Option]
+    false.falseOrF[Option]("left") shouldEqual ().asRight.toEitherT[Option]
+  }
 }

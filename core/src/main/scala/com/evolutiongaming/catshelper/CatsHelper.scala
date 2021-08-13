@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.data.EitherT
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
 import cats.effect.{Concurrent, Fiber, Resource}
@@ -123,6 +124,26 @@ object CatsHelper {
 
     def falseOr[A](a: => A): Either[A, Unit] = {
       if (self) a.asLeft else ().asRight
+    }
+
+    def trueOrF[F[_]]: BooleanOpsTrueOrFApply[F] = {
+      new BooleanOpsTrueOrFApply[F](self)
+    }
+
+    def falseOrF[F[_]]: BooleanOpsFalseOrFApply[F] = {
+      new BooleanOpsFalseOrFApply[F](self)
+    }
+  }
+
+  private[CatsHelper] class BooleanOpsTrueOrFApply[F[_]](val b: Boolean) extends AnyVal {
+    def apply[A](left: => A)(implicit F: Applicative[F]): EitherT[F, A, Unit] = {
+      EitherT.cond[F](b, (), left)
+    }
+  }
+
+  private[CatsHelper] class BooleanOpsFalseOrFApply[F[_]](val b: Boolean) extends AnyVal {
+    def apply[A](left: => A)(implicit F: Applicative[F]): EitherT[F, A, Unit] = {
+      EitherT.cond[F](!b, (), left)
     }
   }
 }
