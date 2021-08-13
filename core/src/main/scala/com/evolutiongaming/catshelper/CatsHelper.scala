@@ -137,13 +137,15 @@ object CatsHelper {
 
   private[CatsHelper] class BooleanOpsTrueOrFApply[F[_]](val b: Boolean) extends AnyVal {
     def apply[A](left: => A)(implicit F: Applicative[F]): EitherT[F, A, Unit] = {
-      EitherT.cond[F](b, (), left)
+      val either = if (b) Right(()) else Left(left)
+      EitherT(either.pure[F])
     }
   }
 
   private[CatsHelper] class BooleanOpsFalseOrFApply[F[_]](val b: Boolean) extends AnyVal {
     def apply[A](left: => A)(implicit F: Applicative[F]): EitherT[F, A, Unit] = {
-      EitherT.cond[F](!b, (), left)
+      val either = if (b) Left(left) else Right(())
+      EitherT(either.pure[F])
     }
   }
 }
