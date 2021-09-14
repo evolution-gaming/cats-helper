@@ -10,7 +10,7 @@ inThisBuild(Seq(
   startYear := Some(2019),
   licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.5", "2.12.13"),
+  crossScalaVersions := Seq("2.13.5", "2.12.15"),
   scalaVersion := crossScalaVersions.value.head,
 
   publishTo := Some(Resolver.evolutionReleases),
