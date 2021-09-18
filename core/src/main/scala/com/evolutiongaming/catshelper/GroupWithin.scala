@@ -27,7 +27,7 @@ object GroupWithin {
       val enqueue = new Enqueue[F, A] {
         def apply(a: A) = f(Nel.of(a))
       }
-      Resource.liftF(enqueue.pure[F])
+      Resource.eval(enqueue.pure[F])
     }
   }
 
@@ -54,7 +54,7 @@ object GroupWithin {
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
           val enqueue: Enqueue[F, A] = a => f(Nel.of(a))
-          Resource.liftF(enqueue.pure[F])
+          Resource.eval(enqueue.pure[F])
         } else {
           val result = for {
             semaphore <- Semaphore.uncancelable[F](1)
