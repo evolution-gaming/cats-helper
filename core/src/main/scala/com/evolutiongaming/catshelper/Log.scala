@@ -7,6 +7,8 @@ import org.slf4j.{Logger, MDC}
 
 trait Log[F[_]] {
 
+  @inline def trace(msg: => String): F[Unit] = trace(msg, mdc = Log.Mdc.empty)
+
   @inline def debug(msg: => String): F[Unit] = debug(msg, mdc = Log.Mdc.empty)
 
   @inline def info(msg: => String): F[Unit] = info(msg, mdc = Log.Mdc.empty)
@@ -18,6 +20,8 @@ trait Log[F[_]] {
   @inline def error(msg: => String): F[Unit] = error(msg, mdc = Log.Mdc.empty)
 
   @inline def error(msg: => String, cause: Throwable): F[Unit] = error(msg, cause, mdc = Log.Mdc.empty)
+
+  def trace(msg: => String, mdc: Log.Mdc): F[Unit]
 
   def debug(msg: => String, mdc: Log.Mdc): F[Unit]
 
@@ -73,6 +77,12 @@ object Log {
       }
     }
 
+    def trace(msg: => String, mdc: Log.Mdc) = {
+      Sync[F].delay {
+        if (logger.isTraceEnabled) withMDC(mdc) { logger.trace(msg) }
+      }
+    }
+
     def debug(msg: => String, mdc: Log.Mdc) = {
       Sync[F].delay {
         if (logger.isDebugEnabled) withMDC(mdc) { logger.debug(msg) }
@@ -112,6 +122,8 @@ object Log {
 
   def const[F[_]](unit: F[Unit]): Log[F] = new Log[F] {
 
+    def trace(msg: => String, mdc: Log.Mdc) = unit
+
     def debug(msg: => String, mdc: Log.Mdc) = unit
 
     def info(msg: => String, mdc: Log.Mdc) = unit
@@ -131,6 +143,8 @@ object Log {
 
     def mapK[G[_]](f: F ~> G): Log[G] = new Log[G] {
 
+      def trace(msg: => String, mdc: Log.Mdc) = f(self.trace(msg, mdc))
+
       def debug(msg: => String, mdc: Log.Mdc) = f(self.debug(msg, mdc))
 
       def info(msg: => String, mdc: Log.Mdc) = f(self.info(msg, mdc))
@@ -145,6 +159,8 @@ object Log {
     }
 
     def mapMsg(f: String => String): Log[F] = new Log[F] {
+
+      def trace(msg: => String, mdc: Log.Mdc) = self.trace(f(msg), mdc)
 
       def debug(msg: => String, mdc: Log.Mdc) = self.debug(f(msg), mdc)
 
