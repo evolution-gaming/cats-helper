@@ -11,11 +11,12 @@ class LogSpec extends AnyFunSuite with Matchers {
 
   import LogSpec._
 
-  test("debug, info, warn, error") {
+  test("trace, debug, info, warn, error") {
 
     val stateT = for {
       log0 <- logOf("source")
       log   = log0.prefixed(">").mapK(FunctionK.id)
+      _    <- log.trace("trace")
       _    <- log.debug("debug")
       _    <- log.info("info")
       _    <- log.warn("warn")
@@ -33,16 +34,18 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Warn0("> warn"),
       Action.Info("> info"),
       Action.Debug("> debug"),
+      Action.Trace("> trace"),
       Action.OfStr("source")))
   }
 
-  test("debug, info, warn, error with MDC") {
+  test("trace, debug, info, warn, error with MDC") {
 
     val mdc = "label" -> "value"
 
     val stateT = for {
       log0 <- logOf("source")
       log   = log0.prefixed(">").mapK(FunctionK.id)
+      _    <- log.trace("trace", Log.Mdc(mdc))
       _    <- log.debug("debug", Log.Mdc(mdc))
       _    <- log.info("info", Log.Mdc(mdc))
       _    <- log.warn("warn", Log.Mdc(mdc))
@@ -60,6 +63,7 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Warn0("> warn", Log.Mdc(mdc)),
       Action.Info("> info", Log.Mdc(mdc)),
       Action.Debug("> debug", Log.Mdc(mdc)),
+      Action.Trace("> trace", Log.Mdc(mdc)),
       Action.OfStr("source")))
   }
 }
@@ -89,6 +93,13 @@ object LogSpec {
 
   val log: Log[StateT] = {
     val log = new Log[StateT] {
+
+      def trace(msg: => String, mdc: Log.Mdc) = {
+        StateT { state =>
+          val action = Action.Trace(msg, mdc)
+          (state.add(action), ())
+        }
+      }
 
       def debug(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
@@ -155,6 +166,7 @@ object LogSpec {
   object Action {
     final case class OfStr(source: String) extends Action
     final case class OfClass(source: Class[_]) extends Action
+    final case class Trace(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
     final case class Debug(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
     final case class Info(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
     final case class Warn0(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
