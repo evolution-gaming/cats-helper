@@ -9,7 +9,7 @@ object Dependencies {
   val cpKindProjector = "org.typelevel" % "kind-projector" % "0.13.0" cross CrossVersion.full
 
   object Cats {
-    private val version = "2.4.2"
+    private val version = "2.6.1"
     val core   = "org.typelevel" %% "cats-core"   % version
     val kernel = "org.typelevel" %% "cats-kernel" % version
     val macros = "org.typelevel" %% "cats-macros" % version
