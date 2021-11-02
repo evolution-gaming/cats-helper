@@ -2,8 +2,10 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.Sync
 import cats.data.NonEmptyMap
-import cats.{Applicative, ~>}
+import cats.{Applicative, Semigroup, ~>}
 import org.slf4j.{Logger, MDC}
+
+import scala.collection.immutable.SortedMap
 
 trait Log[F[_]] {
 
@@ -50,11 +52,25 @@ object Log {
 
     def apply(head: (String, String), tail: (String, String)*): Mdc = Context(NonEmptyMap.of(head, tail: _*))
 
+    implicit final val mdcSemigroup: Semigroup[Mdc] = Semigroup.instance {
+      case (Empty, right) => right
+      case (left, Empty) => left
+      case (Context(v1), Context(v2)) => Context(v1 ++ v2)
+    }
+
     implicit final class MdcOps(val mdc: Mdc) extends AnyVal {
+
+      import cats.implicits._
+
       def context: Option[NonEmptyMap[String, String]] = mdc match {
         case Empty => None
         case Context(values) => Some(values)
       }
+      def ++ (values: Map[String, String]): Mdc =
+        NonEmptyMap.fromMap(SortedMap(values.toList: _*)) match {
+          case None => mdc
+          case Some(nem) => mdc |+| Context(nem)
+        }
     }
   }
 
