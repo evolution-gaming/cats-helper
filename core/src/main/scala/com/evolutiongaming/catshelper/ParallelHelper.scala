@@ -20,16 +20,14 @@ object ParallelHelper {
       parFoldMap(tfa)(Predef.identity)
     }
 
-    def parFoldMapIterable[F[_]: Parallel, A, B: Monoid](ta: IterableOnce[A])(f: A => F[B]): F[B] = {
+    def parFoldMapTraversable[F[_]: Parallel, A, B: Monoid](ta: TraversableOnce[A])(f: A => F[B]): F[B] = {
       val P = Parallel[F]
       val M = Monoid[B]
       val A = P.applicative
       val zero = A.pure(M.empty)
-      val fb = ta
-        .iterator
-        .foldLeft(zero) { case (b, a) =>
-          A.map2(b, P.parallel(f(a)))(M.combine)
-        }
+      val fb = ta.foldLeft(zero) { case (b, a) =>
+        A.map2(b, P.parallel(f(a)))(M.combine)
+      }
       P.sequential(fb)
     }
   }
@@ -50,9 +48,9 @@ object ParallelHelper {
     }
   }
 
-  implicit class IterableOnce_ParallelHelper[A](val self: IterableOnce[A]) extends AnyVal {
-    def parFoldMapIterable[F[_]: Parallel, B: Monoid](f: A => F[B]): F[B] = {
-      Parallel.parFoldMapIterable(self)(f)
+  implicit class IterableOnce_ParallelHelper[A](val self: TraversableOnce[A]) extends AnyVal {
+    def parFoldMapTraversable[F[_]: Parallel, B: Monoid](f: A => F[B]): F[B] = {
+      Parallel.parFoldMapTraversable(self)(f)
     }
   }
 }
