@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
+import cats.effect.{ Deferred, Ref }
 
 
 /**

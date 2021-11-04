@@ -1,10 +1,10 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Concurrent
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.implicits._
 import cats.{Applicative, Hash, Parallel}
+import cats.effect.{ Deferred, Ref }
 
 trait SerialKey[F[_], -K] {
 
@@ -63,7 +63,7 @@ object SerialKey {
         new SerialKey[F, K] {
           def apply[A](key: K)(task0: F[A]) = {
 
-            Concurrent[F].uncancelable {
+            Concurrent[F].uncancelable _ => {
               for {
                 d <- Deferred.uncancelable[F, Either[Throwable, A]]
                 task = for {

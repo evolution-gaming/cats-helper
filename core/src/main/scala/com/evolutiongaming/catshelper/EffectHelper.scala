@@ -1,18 +1,18 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.Deferred
-import cats.effect.{Bracket, Concurrent, Fiber}
+import cats.effect.{Concurrent, Fiber}
 import cats.implicits._
 import cats.effect.implicits._
 
 import scala.concurrent.Future
 import scala.util.Try
+import cats.effect.{ Deferred, MonadCancel }
 
 @deprecated("use CatsHelper instead", "1.0.1")
 object EffectHelper {
 
   @deprecated("use BracketOpsEffectHelper", "1.0.0")
-  class EffectHelperBracketOps[F[_], E](val self: Bracket[F, E]) extends AnyVal {
+  class EffectHelperBracketOps[F[_], E](val self: MonadCancel[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, map: A => B): F[B] = {
       val fb = self.map(fa)(map)
@@ -26,7 +26,7 @@ object EffectHelper {
   }
 
 
-  implicit class BracketOpsEffectHelper[F[_], E](val self: Bracket[F, E]) extends AnyVal {
+  implicit class BracketOpsEffectHelper[F[_], E](val self: MonadCancel[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, map: A => B): F[B] = {
       val fb = self.map(fa)(map)
@@ -86,11 +86,11 @@ object EffectHelper {
   @deprecated("use FOpsEffectHelper instead", "1.0.0")
   class EffectHelperFOps[F[_], A](val self: F[A]) extends AnyVal {
 
-    def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: Bracket[F, E]): F[B] = {
+    def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: MonadCancel[F, E]): F[B] = {
       bracket.redeem(self)(recover, map)
     }
 
-    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: Bracket[F, E]): F[B] = {
+    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: MonadCancel[F, E]): F[B] = {
       bracket.redeemWith(self)(recover, flatMap)
     }
 
@@ -107,11 +107,11 @@ object EffectHelper {
 
   implicit class FOpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
 
-    def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: Bracket[F, E]): F[B] = {
+    def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: MonadCancel[F, E]): F[B] = {
       bracket.redeem(self)(recover, map)
     }
 
-    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: Bracket[F, E]): F[B] = {
+    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: MonadCancel[F, E]): F[B] = {
       bracket.redeemWith(self)(recover, flatMap)
     }
 
