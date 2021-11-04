@@ -1,20 +1,36 @@
 package com.evolutiongaming.catshelper
 
-import cats.{Applicative, Foldable, Monoid, Parallel}
+import cats.{Foldable, Monoid, Parallel}
 
 object ParallelHelper {
 
   implicit class ParallelObjOps_ParallelHelper(val self: Parallel.type) extends AnyVal {
 
-    def parFoldMap[T[_] : Foldable, F[_], A, B: Monoid](ta: T[A])(f: A => F[B])(implicit P: Parallel[F]): F[B] = {
-      val applicative = P.applicative
-      implicit val monoid = Applicative.monoid[P.F, B](applicative, Monoid[B])
-      val fb = Foldable[T].foldMap(ta)(f.andThen(P.parallel.apply(_)))
-      P.sequential(fb)
+    def parFoldMap[T[_]: Foldable, F[_], A, B: Monoid](ta: T[A])(f: A => F[B])(implicit P: Parallel[F]): F[B] = {
+      val M = Monoid[B]
+      val A = P.applicative
+      val zero = A.pure(M.empty)
+      val fa = Foldable[T].foldLeft(ta, zero) { case (b, a) =>
+        A.map2(b, P.parallel(f(a)))(M.combine)
+      }
+      P.sequential(fa)
     }
 
-    def parFold[T[_] : Foldable, F[_], A: Monoid](tfa: T[F[A]])(implicit P: Parallel[F]): F[A] = {
+    def parFold[T[_]: Foldable, F[_], A: Monoid](tfa: T[F[A]])(implicit P: Parallel[F]): F[A] = {
       parFoldMap(tfa)(Predef.identity)
+    }
+
+    def parFoldMapIterable[F[_]: Parallel, A, B: Monoid](ta: IterableOnce[A])(f: A => F[B]): F[B] = {
+      val P = Parallel[F]
+      val M = Monoid[B]
+      val A = P.applicative
+      val zero = A.pure(M.empty)
+      val fb = ta
+        .iterator
+        .foldLeft(zero) { case (b, a) =>
+          A.map2(b, P.parallel(f(a)))(M.combine)
+        }
+      P.sequential(fb)
     }
   }
 
@@ -31,6 +47,12 @@ object ParallelHelper {
 
     def parFold(implicit M: Monoid[A], F: Foldable[T], P: Parallel[F]): F[A] = {
       Parallel.parFold(self)
+    }
+  }
+
+  implicit class IterableOnce_ParallelHelper[A](val self: IterableOnce[A]) extends AnyVal {
+    def parFoldMapIterable[F[_]: Parallel, B: Monoid](f: A => F[B]): F[B] = {
+      Parallel.parFoldMapIterable(self)(f)
     }
   }
 }

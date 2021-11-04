@@ -32,7 +32,7 @@ object SerialKey {
     }
   }
 
-  private def of1[F[_]: Concurrent: Parallel, K]: F[SerialKey[F, K]] = {
+  private def of1[F[_]: Concurrent, K]: F[SerialKey[F, K]] = {
 
     val void = ().pure[F]
 
