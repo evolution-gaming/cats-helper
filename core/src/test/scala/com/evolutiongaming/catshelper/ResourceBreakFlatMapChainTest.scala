@@ -26,7 +26,7 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
 
     FromFuture[IO]
       .apply { result.toFuture }
-      .timeout(1.second)
+      .timeout(3.seconds)
       .attempt
       .flatMap { a => IO { a should matchPattern { case Right(()) => } } }
       .run()
@@ -38,8 +38,8 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
       released <- Deferred[IO, Unit]
       resource  = for {
         _ <- Resource.release { released.complete(()) }
-        _ <- Resource.liftF { started.complete(()) }
-        _ <- Resource.liftF { IO.never.as(()) }
+        _ <- started.complete(()).toResource
+        _ <- IO.never.as(()).toResource
       } yield {}
       fiber    <- resource.breakFlatMapChain.use { _ => ().pure[IO] }.start
       _        <- started.get

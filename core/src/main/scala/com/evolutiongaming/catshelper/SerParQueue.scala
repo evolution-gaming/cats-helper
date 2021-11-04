@@ -118,7 +118,7 @@ object SerParQueue {
         }
       }
 
-      Sync[F].suspend { loop(in, Task.empty) }
+      Sync[F].defer { loop(in, Task.empty) }
     }
 
     Ref[F]
@@ -188,7 +188,7 @@ object SerParQueue {
 
               case S.Ser(In.Par(head, In.Empty), Task.empty) =>
                 val state = S.Par(out = head.map { case (k, _) => k -> Task.empty })
-                val effect = Sync[F].suspend {
+                val effect = Sync[F].defer {
                   head
                     .foldLeft(void) { case (result, (key, task)) => result *> start0(key, task) }
                     .as(stop)

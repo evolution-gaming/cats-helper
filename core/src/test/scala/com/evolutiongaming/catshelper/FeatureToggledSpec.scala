@@ -3,6 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.effect.concurrent.{MVar, Ref}
 import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats.implicits._
+import com.evolutiongaming.catshelper.CatsHelper.OpsCatsHelper
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import com.evolutiongaming.catshelper.testkit.{PureTest, TestRuntime}
 import org.scalactic.source.Position
@@ -150,7 +151,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
           for {
             seed <- Ref[IO].of(1)
             flag <- Ref[IO].of(true)
-            r <- FeatureToggled.polling(Resource.liftF(seed.get), flag.get, 1.milli).allocated.map(_._1)
+            r <- FeatureToggled.polling(seed.get.toResource, flag.get, 1.milli).allocated.map(_._1)
             _ <- {
               val one = r.use(_ => IO.shift)
               val loop = List.fill(1000)(one).sequence_

@@ -34,7 +34,7 @@ object Serial {
                     _ <- task
                     a <- ref.modify {
                       case Some(tasks) if tasks.nonEmpty =>
-                        val task = Sync[F].suspend { tasks.reverse.sequence_ }
+                        val task = Sync[F].defer { tasks.reverse.sequence_ }
                         (List.empty[F[Unit]].some, task.asLeft[Unit])
                       case _                             =>
                         (none[List[F[Unit]]], ().asRight[F[Unit]])
