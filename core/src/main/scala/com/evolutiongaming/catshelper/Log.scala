@@ -87,7 +87,7 @@ object Log {
           MDC.clear()
           mdc.toSortedMap foreach { case (k, v) => MDC.put(k, v) }
           log
-          if (backup != null && !backup.isEmpty) MDC.setContextMap(backup)
+          MDC.setContextMap(backup)
       }
     }
 
