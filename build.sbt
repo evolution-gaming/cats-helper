@@ -52,6 +52,7 @@ lazy val core = project
       machinist,
       `slf4j-api`,
       scalatest % Test,
+      logback % Test,
     ),
   )
   .dependsOn(
