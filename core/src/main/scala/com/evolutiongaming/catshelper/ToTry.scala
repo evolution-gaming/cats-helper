@@ -7,6 +7,7 @@ import cats.effect.IO
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+import cats.effect.unsafe.IORuntime
 
 trait ToTry[F[_]] {
 
@@ -32,21 +33,28 @@ object ToTry {
     * @param timeout used only for computation after first seen async boundary, covering all computations onwards
     *                in case there is no async boundary found, timeout is not used
     */
-  def ioToTry(timeout: FiniteDuration): ToTry[IO] = new ToTry[IO] {
+  def ioToTry(timeout: FiniteDuration)(implicit runtime: IORuntime): ToTry[IO] = new ToTry[IO] {
 
     def apply[A](fa: IO[A]) = {
 
       def error: Try[A] = Failure[A](new TimeoutException(timeout.toString()))
 
       for {
-        a <- Try { fa.unsafeRunTimed(timeout) }
+        a <- Try {
+          fa.syncStep.unsafeRunSync() match {
+            case Left(computation) =>
+              computation.unsafeRunTimed(timeout)
+            case Right(value) =>
+              Some(value)
+          }
+        }
         a <- a.fold(error) { a => Success(a) }
       } yield a
     }
   }
 
 
-  implicit val ioToTry: ToTry[IO] = ioToTry(1.minute)
+  implicit def ioToTry(implicit ioRuntime: IORuntime): ToTry[IO] = ioToTry(1.minute)
 
 
   implicit val idToTry: ToTry[Id] = new ToTry[Id] {

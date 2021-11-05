@@ -2,10 +2,9 @@ package com.evolutiongaming.catshelper
 
 import cats.Applicative
 import cats.effect.{Concurrent, Resource}
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.implicits._
-import com.evolutiongaming.catshelper.CatsHelper._
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Queue

@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.EitherT
-import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
-import cats.effect.{Concurrent, Fiber, Resource}
+import cats.effect.kernel.{Deferred, Fiber}
+import cats.effect.{Concurrent, Resource}
 import cats.implicits._
 import cats.{Applicative, ApplicativeError, MonadError}
 
@@ -33,7 +33,7 @@ object CatsHelper {
 
   implicit class ConcurrentOpsCatsHelper[F[_]](val self: Concurrent[F]) extends AnyVal {
 
-    def startEnsure[A](fa: F[A]): F[Fiber[F, A]] = {
+    def startEnsure[A](fa: F[A]): F[Fiber[F, Throwable, A]] = {
       implicit val F = self
 
       def faOf(started: Deferred[F, Unit]) = {
@@ -68,16 +68,13 @@ object CatsHelper {
 
   implicit class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
 
-    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, A]] = F.startEnsure(self)
+    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
 
 
     def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
 
 
     def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
-
-
-    def toResource(implicit F: Applicative[F]): Resource[F, A] = Resource.eval(self)
   }
 
 
@@ -91,7 +88,7 @@ object CatsHelper {
 
     def fenced(implicit F: Concurrent[F]): Resource[F, A] = ResourceFenced(self)
 
-    def semiflatMap[B, G[x] >: F[x]](f: A => G[B])(implicit F: Applicative[G]): Resource[G, B] = {
+    def semiflatMap[B](f: A => F[B]): Resource[F, B] = {
       self.flatMap { a => f(a).toResource }
     }
 

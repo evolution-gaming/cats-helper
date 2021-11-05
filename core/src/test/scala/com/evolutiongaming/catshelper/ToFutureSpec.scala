@@ -1,14 +1,18 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
-
-import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
+
 class ToFutureSpec extends AsyncFunSuite with Matchers {
+  implicit val ioRuntime: IORuntime = IORuntime.global
 
   for {
     (name, value, expected) <- List(
@@ -24,6 +28,8 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
       }
 
       val future = either.toFuture
+
+      Await.ready(future, 10.seconds)
 
       future.value.isDefined shouldEqual true
 

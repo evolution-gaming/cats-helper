@@ -1,6 +1,6 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.laws.util.TestContext
+import cats.effect.testkit.TestContext
 
 import scala.util.control.NoStackTrace
 

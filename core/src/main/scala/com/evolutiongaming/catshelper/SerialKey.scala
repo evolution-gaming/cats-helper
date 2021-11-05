@@ -1,10 +1,10 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Concurrent
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.implicits._
-import cats.{Applicative, Hash, Parallel}
+import cats.{Applicative, Hash}
 
 trait SerialKey[F[_], -K] {
 
@@ -17,7 +17,7 @@ object SerialKey {
     def apply[A](key: K)(task: F[A]) = task.map { _.pure[F] }
   }
 
-  def of[F[_]: Concurrent: Parallel: Runtime, K: Hash]: F[SerialKey[F, K]] = {
+  def of[F[_]: Concurrent: Runtime, K: Hash]: F[SerialKey[F, K]] = {
     for {
       cores      <- Runtime[F].availableCores
       partitions <- Partitions.of[F, K, SerialKey[F, K]](cores, _ => of1)
@@ -63,9 +63,9 @@ object SerialKey {
         new SerialKey[F, K] {
           def apply[A](key: K)(task0: F[A]) = {
 
-            Concurrent[F].uncancelable {
+            Concurrent[F].uncancelable { _ =>
               for {
-                d <- Deferred.uncancelable[F, Either[Throwable, A]]
+                d <- Deferred.apply[F, Either[Throwable, A]]
                 task = for {
                   a <- task0.attempt
                   _ <- d.complete(a)

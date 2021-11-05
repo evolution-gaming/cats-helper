@@ -1,21 +1,21 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
-import cats.effect.laws.util.TestContext
-import cats.syntax.all._
+import cats.implicits._
+import cats.effect.testkit.TestContext
 import org.scalatest.exceptions.{TestCanceledException, TestFailedException}
 
 /**
  * EXPERIMENTAL. Abstracts interactions with a test framework.
  */
-trait TestFrameworkApi {
+trait TestFrameworkApi[F[_]] {
   /**
    * Signals a completion of a test.
    *
    * @param outcome an outcome which can be non-termination, failure, or success.
    * @param tcState `TestContext` state at the moment of completion.
    */
-  def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A]
+  def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): F[A]
 }
 
 object TestFrameworkApi {
@@ -23,32 +23,32 @@ object TestFrameworkApi {
    * Returns either a default API (ScalaTest as of now) if it's available on the classpath.
    * Uses [[NoFrameworkApi]] as a fallback.
    */
-  def resolveDefault(implicit l: Lookup): TestFrameworkApi = l.instance
+  def resolveDefault[F[_]](implicit l: Lookup[F]): TestFrameworkApi[F] = l.instance
+}
 
-  private[testkit] trait Lookup {
-    def instance: TestFrameworkApi
+  private[testkit] trait Lookup[F[_]] {
+    def instance: TestFrameworkApi[F]
   }
 
   private[testkit] object Lookup extends LookupLowPriority {
-    implicit def scalaTestIsDefault(implicit ev: TestFailedException =:= TestFailedException): Lookup = {
+    implicit def scalaTestIsDefault(implicit ev: TestFailedException =:= TestFailedException): Lookup[IO] = {
       if (ev == null) () else ()  // A kludge to avoid "unused" warning :(
-      new Lookup {
-        def instance: TestFrameworkApi = ScalaTestApi
+      new Lookup[IO] {
+        def instance: TestFrameworkApi[IO] = ScalaTestApi
       }
     }
   }
 
   private[testkit] sealed trait LookupLowPriority {
-    implicit def fallbackToNoFramework: Lookup = new Lookup {
-      def instance: TestFrameworkApi = NoFrameworkApi
+    implicit def fallbackToNoFramework: Lookup[IO] = new Lookup[IO] {
+      def instance: TestFrameworkApi[IO] = NoFrameworkApi
     }
   }
-}
 
 /**
  * A stub implementation to use when no test framework is available.
  */
-object NoFrameworkApi extends TestFrameworkApi {
+object NoFrameworkApi extends TestFrameworkApi[IO] {
   def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A] = {
     IO.fromEither(outcome.toRight(new IllegalStateException(s"Not completed. State: $tcState")).flatten)
   }
@@ -57,7 +57,7 @@ object NoFrameworkApi extends TestFrameworkApi {
 /**
  * ScalaTest integration.
  */
-private[testkit] object ScalaTestApi extends TestFrameworkApi {
+private[testkit] object ScalaTestApi extends TestFrameworkApi[IO] {
   def completeWith[A](outcome: Option[Either[Throwable, A]], tcState: TestContext.State): IO[A] = IO {
     def boo(cause: Either[Throwable, String]): Nothing = {
       val err = cause match {

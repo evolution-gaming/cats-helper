@@ -27,7 +27,7 @@ object FromFuture {
         for {
           future <- Sync[F].delay(future)
           result <- future.value.fold {
-            Async[F].async[A] { callback =>
+            Async[F].async_[A] { callback =>
               future.onComplete { a =>
                 callback(a.toEither)
               }

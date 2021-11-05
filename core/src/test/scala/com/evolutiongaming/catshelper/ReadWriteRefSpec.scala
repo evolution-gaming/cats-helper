@@ -1,6 +1,8 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
+import cats.effect.kernel.Outcome.Succeeded
+import cats.effect.unsafe.IORuntime
 import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest
 import org.scalatest.freespec.AnyFreeSpec
@@ -10,6 +12,8 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class ReadWriteRefSpec extends AnyFreeSpec {
+  implicit val ioRuntime: IORuntime = IORuntime.global
+
   "basic read/write" in scope { s =>
     import s._
     (read, inc, read, inc, read).tupled.map(_ shouldBe ((0, (), 1, (), 2)))
@@ -37,6 +41,10 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     List(r, r, w, r, w, w, r, r)
       .traverse(op => op.start <* IO.sleep(ds))
       .flatMap(_.traverse(_.join))
+      .flatMap(_.traverse {
+        case Succeeded(fa) => fa
+        case x => fail(s"Outcome $x was expected to be Succeeded")
+      })
       .map(_ shouldBe List(
         (0, 0.nanos),
         (0, ds), // here we have our scheduling delay
@@ -50,7 +58,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
   }
 
   "can cancel blocked read" in scope { s =>
-    import s._, env._
+    import s._
 
     val lateReadWithTimeout = IO.sleep(1.second) *> IO.race(read, IO.sleep(1.second) *> getTime)
 
@@ -58,7 +66,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
   }
 
   "can cancel blocked write" in scope { s =>
-    import s._, env._
+    import s._
 
     val lateIncWithTimeout = IO.sleep(1.second) *> IO.race(inc, IO.sleep(1.second) *> getTime)
 
@@ -100,12 +108,12 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     // go undetected, since IO run loop may execute a cancellable batch as a single fused runnable.
     // Hence here we resort to actual multi-threaded executors for actual concurrency.
 
-    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Timer[IO])
+    final class Env(implicit val ec: ExecutionContext)
     val env = cats.effect.Resource {
       IO {
         val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
         val ec = scala.concurrent.ExecutionContext.fromExecutor(tp)
-        val env = new Env()(ec, IO.contextShift(ec), IO.timer(ec))
+        val env = new Env()(ec)
         env -> IO { tp.shutdown() }
       }
     }
@@ -115,15 +123,15 @@ class ReadWriteRefSpec extends AnyFreeSpec {
         .use { env =>
           import env._
 
-          for {
+          (for {
             rw <- ReadWriteRef[IO].of(1)
             _  <- {
-              val tryReadAndCancel = rw.read.use(_ => IO.unit).start.flatMap(_.cancel) *> IO.shift
+              val tryReadAndCancel = rw.read.use(_ => IO.unit).start.flatMap(_.cancel) *> IO.cede
               val repeated = List.fill(1000)(tryReadAndCancel).sequence_
               List.fill(16)(repeated).parSequence_
             }
             _  <- rw.write.use(_ => IO.unit).timeout(100.millis)
-          } yield ()
+          } yield ()).evalOn(ec)
         }
         .unsafeRunTimed(10.seconds)
     }

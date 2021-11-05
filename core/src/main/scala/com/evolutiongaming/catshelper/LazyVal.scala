@@ -3,7 +3,7 @@ package com.evolutiongaming.catshelper
 
 import cats.{Functor, ~>}
 import cats.effect.Concurrent
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.implicits._
 
