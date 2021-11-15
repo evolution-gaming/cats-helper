@@ -86,7 +86,7 @@ class LogSpec extends AnyFunSuite with Matchers {
       _ <- log.info("hello from logback", Log.Mdc("k" -> "test value for K"))
     } yield ()
 
-    io.unsafeRunSync() shouldEqual ()
+    io.unsafeRunSync()
   }
 }
 
