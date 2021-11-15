@@ -139,7 +139,7 @@ object Log {
     import ch.qos.logback.classic.Level
     import ch.qos.logback.classic.spi.LoggingEvent
 
-    import scala.jdk.CollectionConverters._
+    import scala.collection.JavaConverters._
 
     val FQCN = getClass.getName
 
