@@ -3,6 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.effect.Sync
 import cats.implicits._
 import cats.{Applicative, Functor, ~>}
+import ch.qos.logback.classic.util.ContextInitializer
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 trait LogOf[F[_]] {
@@ -42,6 +43,17 @@ object LogOf {
       apply(factory)
     }
   }
+
+  def logback[F[_] : Sync]: F[LogOf[F]] =
+    for {
+      context <- Sync[F].delay { new ch.qos.logback.classic.LoggerContext() }
+      _ = new ContextInitializer(context).autoConfig()
+    } yield new LogOf[F] {
+
+      def apply(source: String): F[Log[F]] = Sync[F].delay { Log(context.getLogger(source)) }
+
+      def apply(source: Class[_]): F[Log[F]] = apply(source.getName.stripSuffix("$"))
+    }
 
 
   def empty[F[_] : Applicative]: LogOf[F] = const(Log.empty[F].pure[F])

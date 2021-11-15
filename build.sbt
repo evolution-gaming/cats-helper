@@ -51,8 +51,8 @@ lazy val core = project
       Cats.effect,
       machinist,
       `slf4j-api`,
+      logback,
       scalatest % Test,
-      logback % Test,
     ),
   )
   .dependsOn(
