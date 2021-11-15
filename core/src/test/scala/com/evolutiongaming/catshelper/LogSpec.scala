@@ -78,6 +78,16 @@ class LogSpec extends AnyFunSuite with Matchers {
 
     io.unsafeRunSync() shouldEqual null
   }
+
+  test("logback implementation") {
+    val io = for {
+      logOf <- LogOf.logback[IO]
+      log <- logOf(getClass)
+      _ <- log.info("hello from logback", Log.Mdc("k" -> "test value for K"))
+    } yield ()
+
+    io.unsafeRunSync() shouldEqual ()
+  }
 }
 
 object LogSpec {
