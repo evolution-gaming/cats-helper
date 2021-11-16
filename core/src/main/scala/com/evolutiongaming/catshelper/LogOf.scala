@@ -6,6 +6,8 @@ import cats.{Applicative, Functor, ~>}
 import ch.qos.logback.classic.util.ContextInitializer
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
+import scala.reflect.ClassTag
+
 trait LogOf[F[_]] {
 
   def apply(source: String): F[Log[F]]
@@ -14,6 +16,25 @@ trait LogOf[F[_]] {
 }
 
 object LogOf {
+
+
+  trait Safe[F[_]] {
+    def apply(source: String): Log[F]
+
+    def apply[Source: ClassTag]: Log[F]
+  }
+
+  def slf4jSafe[F[_] : Sync]: F[LogOf.Safe[F]] = {
+    for {
+      factory <- Sync[F].delay {
+        LoggerFactory.getILoggerFactory
+      }
+    } yield new Safe[F] {
+      override def apply(source: String): Log[F] = Log.cached(source, factory)
+
+      override def apply[Source: ClassTag]: Log[F] = Log.cached(implicitly[ClassTag[Source]].runtimeClass.getName.stripSuffix("$"), factory)
+    }
+  }
 
   def apply[F[_]](implicit F: LogOf[F]): LogOf[F] = F
 
@@ -24,11 +45,14 @@ object LogOf {
 
     def apply(source: String) = {
       for {
-        log <- Sync[F].delay { factory.getLogger(source) }
+        log <- Sync[F].delay {
+          factory.getLogger(source)
+        }
       } yield {
         Log[F](log)
       }
     }
+
     def apply(source: Class[_]) = apply(source.getName.stripSuffix("$"))
   }
 
@@ -38,7 +62,9 @@ object LogOf {
 
   def slf4j[F[_] : Sync]: F[LogOf[F]] = {
     for {
-      factory <- Sync[F].delay { LoggerFactory.getILoggerFactory }
+      factory <- Sync[F].delay {
+        LoggerFactory.getILoggerFactory
+      }
     } yield {
       apply(factory)
     }
