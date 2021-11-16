@@ -23,7 +23,7 @@ object FromFuture {
    * }}} */
   def defer[F[_]]: FromFutureDeferPA[F] = new FromFutureDeferPA[F]()
 
-  class FromFutureDeferPA[F[_]](val __ : Boolean = true) extends AnyVal {
+  private[FromFuture] class FromFutureDeferPA[F[_]](val __ : Boolean = true) extends AnyVal {
     def apply[A](future: => Future[A])(implicit F: FromFuture[F]): F[A] = F(future)
   }
 
