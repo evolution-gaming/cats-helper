@@ -5,7 +5,7 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.effect.{Clock, Concurrent, IO, Sync, Timer}
 import cats.syntax.all._
-import cats.Hash
+import cats.{Hash, Parallel}
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -378,7 +378,7 @@ object SerialKeyTest {
 
   object Queue {
 
-    def of[F[_]: Concurrent, K: Hash, A]: F[Queue[F, K, A]] = {
+    def of[F[_]: Concurrent: Parallel, K: Hash, A]: F[Queue[F, K, A]] = {
       for {
         queue    <- SerialKey.of[F, K]
         records0 <- Records.of[F, K, A]
