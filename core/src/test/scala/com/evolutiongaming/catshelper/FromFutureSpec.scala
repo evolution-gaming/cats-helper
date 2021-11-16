@@ -29,7 +29,7 @@ class FromFutureSpec extends AsyncFunSuite with Matchers {
     future: () => Future[Unit],
     expected: Either[Throwable, Unit]
   ) = {
-    val fa = FromFuture.summon[F].apply(future())
+    val fa = FromFuture.defer[F](future())
     for {
       actual <- fa.attempt
     } yield {
