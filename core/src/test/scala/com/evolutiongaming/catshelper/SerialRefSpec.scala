@@ -2,13 +2,13 @@ package com.evolutiongaming.catshelper
 
 import cats.arrow.FunctionK
 import cats.effect.IO
-import cats.effect.concurrent.Ref
 import cats.implicits._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 
 import scala.concurrent.duration._
+import cats.effect.Ref
 
 class SerialRefSpec extends AnyFreeSpec {
 

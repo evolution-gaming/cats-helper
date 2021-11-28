@@ -1,6 +1,5 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Sync}
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
@@ -8,6 +7,7 @@ import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import scala.util.control.NoStackTrace
+import cats.effect.{ Deferred, Ref }
 
 class SerialTest extends AsyncFunSuite with Matchers {
 
