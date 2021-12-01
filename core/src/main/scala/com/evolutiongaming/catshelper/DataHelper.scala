@@ -5,7 +5,28 @@ import cats.data.{NonEmptyList => Nel, NonEmptyMap => Nem, NonEmptySet => Nes}
 
 import scala.collection.immutable.{Iterable, SortedMap, SortedSet}
 
-object DataHelper {
+object DataHelper extends DataSyntax
+
+trait DataSyntax {
+
+  import DataHelperOps._
+
+
+  implicit def toSortedMapOpsDataHelper[K, V](self: SortedMap[K, V]): SortedMapOpsDataHelper[K, V] = new SortedMapOpsDataHelper(self)
+
+  implicit def toIterableOpsDataHelper[K, V](self: Iterable[(K, V)]): IterableOpsDataHelper[K, V] = new IterableOpsDataHelper(self)
+
+  implicit def toIterableOps1DataHelper[A](self: Iterable[A]): IterableOps1DataHelper[A] = new IterableOps1DataHelper(self)
+
+  implicit def toNemOpsDataHelper[K, V](self: Nem[K, V]): NemOpsDataHelper[K, V] = new NemOpsDataHelper(self)
+
+  implicit def toNelOpsDataHelper[A](self: Nel[A]): NelOpsDataHelper[A] = new NelOpsDataHelper(self)
+
+  implicit def toNesOpsDataHelper[A](self: Nes[A]): NesOpsDataHelper[A] = new NesOpsDataHelper(self)
+
+}
+
+private[catshelper] object DataHelperOps {
 
   implicit class SortedMapOpsDataHelper[K, V](val self: SortedMap[K, V]) extends AnyVal {
 
@@ -19,7 +40,7 @@ object DataHelper {
   implicit class IterableOpsDataHelper[K, V](val self: Iterable[(K, V)]) extends AnyVal {
 
     def toSortedMap(implicit order: Order[K]): SortedMap[K, V] = {
-      implicit val ordering = order.toOrdering
+      implicit val ordering: Ordering[K] = order.toOrdering
       val builder = SortedMap.newBuilder[K, V]
       builder ++= self
       builder.result()
@@ -36,7 +57,7 @@ object DataHelper {
   implicit class IterableOps1DataHelper[A](val self: Iterable[A]) extends AnyVal {
 
     def toSortedSet(implicit order: Order[A]): SortedSet[A] = {
-      implicit val ordering = Order[A].toOrdering
+      implicit val ordering: Ordering[A] = Order[A].toOrdering
       val builder = SortedSet.newBuilder[A]
       builder ++= self
       builder.result()
@@ -47,7 +68,7 @@ object DataHelper {
   implicit class NemOpsDataHelper[K, V](val self: Nem[K, V]) extends AnyVal {
 
     def mapKV[A: Order, B](f: (K, V) => (A, B)): Nem[A, B] = {
-      implicit val ordering = Order[A].toOrdering
+      implicit val ordering: Ordering[A] = Order[A].toOrdering
       self
         .toSortedMap
         .map { case (k, v) => f(k, v) }
@@ -56,7 +77,7 @@ object DataHelper {
     }
 
     def mapK[A: Order](f: K => A): Nem[A, V] = {
-      implicit val ordering = Order[A].toOrdering
+      implicit val ordering: Ordering[A] = Order[A].toOrdering
       self
         .toSortedMap
         .map { case (k, v) => (f(k), v) }

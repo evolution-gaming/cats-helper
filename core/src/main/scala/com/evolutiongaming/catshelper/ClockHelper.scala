@@ -7,7 +7,20 @@ import cats.effect.Clock
 import cats.implicits._
 import cats.{Applicative, Functor}
 
-object ClockHelper {
+object ClockHelper extends ClockSyntax
+
+
+trait ClockSyntax {
+
+  import ClockSyntaxOps._
+
+  implicit def toClockOps[F[_]](self: Clock[F]): ClockOps[F] = new ClockOps[F](self)
+
+  implicit def toClockObjOps(self: Clock.type): ClockObjOps = new ClockObjOps(self)
+
+}
+
+private[catshelper] object ClockSyntaxOps {
 
   implicit class ClockOps[F[_]](val self: Clock[F]) extends AnyVal {
 
