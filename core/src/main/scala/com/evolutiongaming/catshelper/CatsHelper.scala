@@ -35,9 +35,9 @@ trait CatsSyntax {
 
   implicit def toBooleanOpsCatsHelper[F[_]](self: Boolean): BooleanOpsCatsHelper = new BooleanOpsCatsHelper(self)
 
-  implicit def toBooleanOpsTrueOrFApply[F[_]](self: Boolean): BooleanOpsTrueOrFApply[Nothing] = new BooleanOpsTrueOrFApply(self)
+  implicit def toBooleanOpsTrueOrFApply[F[_]](self: Boolean): BooleanOpsTrueOrFApply[F] = new BooleanOpsTrueOrFApply[F](self)
 
-  implicit def toBooleanOpsFalseOrFApply[F[_]](self: Boolean): BooleanOpsFalseOrFApply[Nothing] = new BooleanOpsFalseOrFApply(self)
+  implicit def toBooleanOpsFalseOrFApply[F[_]](self: Boolean): BooleanOpsFalseOrFApply[F] = new BooleanOpsFalseOrFApply[F](self)
 }
 
 private[catshelper] object CatsSyntaxOps {
