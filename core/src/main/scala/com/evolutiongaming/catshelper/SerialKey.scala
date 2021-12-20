@@ -61,28 +61,28 @@ object SerialKey {
         }
 
         new SerialKey[F, K] {
-          def apply[A](key: K)(task0: F[A]) = {
+          def apply[A](key: K)(task: F[A]) = {
 
-            Concurrent[F].uncancelable {
-              for {
-                d <- Deferred.uncancelable[F, Either[Throwable, A]]
-                task = for {
-                  a <- task0.attempt
-                  _ <- d.complete(a)
-                } yield {}
-                a <- ref.modify { map =>
-                  map.get(key) match {
-                    case None          => (map.updated(key, none), start(key, task))
-                    case Some(None)    => (map.updated(key, task.some), void)
-                    case Some(Some(a)) => (map.updated(key, a.productR(task).some), void)
-                  }
-                }
-                _ <- a
-              } yield for {
-                a <- d.get
-                a <- a.liftTo[F]
+            val result = for {
+              d <- Deferred[F, Either[Throwable, A]]
+              a  = for {
+                a <- task.attempt
+                a <- d.complete(a)
               } yield a
-            }
+              a <- ref.modify { map =>
+                map.get(key) match {
+                  case None          => (map.updated(key, none), start(key, a))
+                  case Some(None)    => (map.updated(key, a.some), void)
+                  case Some(Some(b)) => (map.updated(key, b.productR(a).some), void)
+                }
+              }
+              _ <- a
+            } yield for {
+              a <- d.get
+              a <- a.liftTo[F]
+            } yield a
+
+            result.uncancelable
           }
         }
       }
