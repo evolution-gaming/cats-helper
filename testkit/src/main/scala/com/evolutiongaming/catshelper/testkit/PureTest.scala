@@ -1,9 +1,10 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.effect.{Effect, IO}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import cats.effect.Temporal
 
 /**
  * Provides a boilerplate for writing "pure FP" tests (usually using `IO` and for-comprehensions).
@@ -36,7 +37,7 @@ object PureTest extends PureTest {
   trait Env[F[_]] {
     implicit def ec: ExecutionContext
     implicit def cs: ContextShift[F]
-    implicit def timer: Timer[F]
+    implicit def timer: Temporal[F]
     implicit def testRuntime: TestRuntime[F]
   }
 

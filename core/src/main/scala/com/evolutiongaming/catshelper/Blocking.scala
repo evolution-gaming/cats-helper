@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper
 
 import cats.arrow.FunctionK
-import cats.effect.{Blocker, ContextShift}
 import cats.~>
 
 import scala.concurrent.ExecutionContext
@@ -21,7 +20,7 @@ object Blocking {
   }
 
 
-  def fromBlocker[F[_]: ContextShift](blocker: Blocker): Blocking[F] = new Blocking[F] {
+  def fromBlocker[F[_]: ContextShift]: Blocking[F] = new Blocking[F] {
     def apply[A](fa: F[A]) = blocker.blockOn(fa)
   }
 

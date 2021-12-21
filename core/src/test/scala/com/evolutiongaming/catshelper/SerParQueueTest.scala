@@ -1,9 +1,8 @@
 package com.evolutiongaming.catshelper
 
 import cats.Parallel
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.syntax.all._
-import cats.effect.{Clock, Concurrent, IO, Sync, Timer}
+import cats.effect.{Clock, Concurrent, IO, Sync}
 import cats.syntax.all._
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
@@ -13,6 +12,7 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
+import cats.effect.{ Deferred, Ref, Temporal }
 
 class SerParQueueTest extends AsyncFunSuite with Matchers {
   import SerParQueueTest._
@@ -145,7 +145,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         .iterateForeverM { a =>
           for {
             _ <- q(none) { a.pure[IO] }
-            _ <- Timer[IO].sleep(100.millis)
+            _ <- Temporal[IO].sleep(100.millis)
           } yield a + 1
         }
         .background
@@ -1017,7 +1017,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
 
   private implicit class Ops[F[_], A](val self: F[A]) {
 
-    def unfinished(implicit concurrent: Concurrent[F], timer: Timer[F]): F[Unit] = {
+    def unfinished(implicit concurrent: Concurrent[F], timer: Temporal[F]): F[Unit] = {
       for {
         a <- self.timeout(10.millis).attempt
         _ <- Sync[F].delay { a should matchPattern { case Left(_: TimeoutException) => () } }
