@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -10,6 +9,7 @@ import com.evolutiongaming.catshelper.IOSuite._
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
+import cats.effect.{ Deferred, Ref }
 
 
 class MemoizeTest extends AsyncFunSuite with Matchers {
