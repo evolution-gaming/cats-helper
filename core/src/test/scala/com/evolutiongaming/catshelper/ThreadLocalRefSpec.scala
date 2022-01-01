@@ -5,13 +5,13 @@ import java.util.concurrent.Executors
 import cats.Parallel
 import cats.arrow.FunctionK
 import cats.effect._
-import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import cats.effect.Ref
 
 class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 

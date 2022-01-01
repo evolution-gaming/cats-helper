@@ -1,6 +1,6 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest
 import org.scalatest.freespec.AnyFreeSpec
@@ -8,6 +8,7 @@ import org.scalatest.matchers.should.Matchers._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import cats.effect.Temporal
 
 class ReadWriteRefSpec extends AnyFreeSpec {
   "basic read/write" in scope { s =>
@@ -100,7 +101,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     // go undetected, since IO run loop may execute a cancellable batch as a single fused runnable.
     // Hence here we resort to actual multi-threaded executors for actual concurrency.
 
-    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Timer[IO])
+    final class Env(implicit val ec: ExecutionContext, val cs: ContextShift[IO], val timer: Temporal[IO])
     val env = cats.effect.Resource {
       IO {
         val tp = java.util.concurrent.Executors.newFixedThreadPool(32)

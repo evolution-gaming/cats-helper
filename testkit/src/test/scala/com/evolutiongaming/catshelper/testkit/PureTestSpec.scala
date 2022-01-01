@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
-import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.exceptions.TestFailedException
@@ -9,6 +8,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
 
 import scala.concurrent.duration._
+import cats.effect.Ref
 
 class PureTestSpec extends AnyFreeSpec {
   "time flows as expected" in ioTest { env =>

@@ -1,10 +1,10 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Concurrent
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.implicits._
 import cats.{Applicative, Hash, Parallel}
+import cats.effect.{ Deferred, Ref }
 
 trait SerialKey[F[_], -K] {
 
