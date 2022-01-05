@@ -2,8 +2,8 @@ package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.laws.util.TestContext
 import cats.effect.{Async, ContextShift, Effect, IO, LiftIO, Sync, Timer}
-import cats.effect.implicits._
-import cats.implicits._
+import cats.effect.syntax.all._
+import cats.syntax.all._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -22,7 +22,7 @@ private[testkit] object PureTestRunner {
     fullTestIO.unsafeRunSync()
   }
 
-  private def wrap[F[_] : Effect, A](body: TestBody[F, A], config: PureTest.Config): IO[A] = IO.suspend {
+  private def wrap[F[_] : Effect, A](body: TestBody[F, A], config: PureTest.Config): IO[A] = IO.defer {
     val env = new EnvImpl[F]
 
     val testIo = (env.cs.shift *> body(env)).toIO
@@ -32,7 +32,7 @@ private[testkit] object PureTestRunner {
 
     val testThread = Thread.currentThread()
 
-    val stopHotLoop = IO.suspend {
+    val stopHotLoop = IO.defer {
       val err = new IllegalStateException("Still running")
       err.setStackTrace(testThread.getStackTrace)
       outcome = Some(Left(err))
