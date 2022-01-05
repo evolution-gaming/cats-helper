@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.laws.util.TestContext
-import cats.effect.{Async, Effect, IO, LiftIO, Sync}
-import cats.effect.implicits._
-import cats.implicits._
+import cats.effect.{Async, ContextShift, Effect, IO, LiftIO, Sync, Timer}
+import cats.effect.syntax.all._
+import cats.syntax.all._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
