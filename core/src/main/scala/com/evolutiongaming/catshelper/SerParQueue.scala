@@ -208,7 +208,7 @@ object SerParQueue {
 
             Concurrent[F].uncancelable {
               for {
-                d <- Deferred.uncancelable[F, Either[Throwable, A]]
+                d <- Deferred[F, Either[Throwable, A]]
                 task = for {
                   a <- task0.attempt
                   _ <- d.complete(a)
