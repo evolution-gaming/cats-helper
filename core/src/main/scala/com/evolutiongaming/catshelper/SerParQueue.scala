@@ -1,12 +1,12 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 import cats.{Applicative, Monad, Parallel}
 
 import scala.annotation.tailrec
+import cats.effect.{ Deferred, Ref }
 
 /**
   * The idea behind this queue is to parallelize some parts of otherwise serial queue
@@ -206,7 +206,7 @@ object SerParQueue {
                 (s, stop.pure[F]) // should not happen
             }
 
-            Concurrent[F].uncancelable {
+            Concurrent[F].uncancelable _ => {
               for {
                 d <- Deferred[F, Either[Throwable, A]]
                 task = for {

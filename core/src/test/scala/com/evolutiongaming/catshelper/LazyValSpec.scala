@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper
 
 import cats.arrow.FunctionK
-import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, IO, Sync}
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
@@ -10,6 +9,7 @@ import com.evolutiongaming.catshelper.IOSuite._
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import cats.effect.{ Deferred, Ref }
 
 class LazyValSpec extends AsyncFunSuite with Matchers {
 

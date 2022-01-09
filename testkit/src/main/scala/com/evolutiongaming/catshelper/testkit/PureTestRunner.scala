@@ -1,12 +1,13 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.laws.util.TestContext
-import cats.effect.{Async, ContextShift, Effect, IO, LiftIO, Sync, Timer}
+import cats.effect.{Async, Effect, IO, LiftIO, Sync}
 import cats.effect.syntax.all._
 import cats.syntax.all._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import cats.effect.Temporal
 
 private[testkit] object PureTestRunner {
   type TestBody[F[A], A] = PureTest.Env[F] => F[A]
@@ -58,7 +59,7 @@ private[testkit] object PureTestRunner {
 
     implicit def ec: ExecutionContext = testContext
     implicit val cs: ContextShift[F] = testContext.contextShift[F]
-    implicit val timer: Timer[F] = testContext.timer[F]
+    implicit val timer: Temporal[F] = testContext.timer[F]
 
     implicit val testRuntime: TestRuntime[F] = new TestRuntime[F] {
 
