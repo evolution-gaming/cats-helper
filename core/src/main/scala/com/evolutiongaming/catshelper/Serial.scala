@@ -1,9 +1,10 @@
 package com.evolutiongaming.catshelper
 
+import cats.Applicative
 import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.implicits._
-import cats.effect.{Concurrent, Sync}
-import cats.implicits._
+import cats.effect.syntax.all._
+import cats.effect.Concurrent
+import cats.syntax.all._
 
 trait Serial[F[_]] {
 
@@ -17,12 +18,17 @@ object Serial {
 
   def of[F[_]: Concurrent]: F[Serial[F]] = {
 
-    val void = ().pure[F]
+    sealed trait S
+
+    object S {
+      final case object Idle extends S
+      final case object Active extends S
+      final case class Active(task: F[Unit]) extends S
+    }
 
     Ref[F]
-      .of(none[List[F[Unit]]])
+      .of[S](S.Idle)
       .map { ref =>
-
         new Serial[F] {
 
           def apply[A](fa: F[A]) = {
@@ -33,11 +39,8 @@ object Serial {
                   for {
                     _ <- task
                     a <- ref.modify {
-                      case Some(tasks) if tasks.nonEmpty =>
-                        val task = Sync[F].defer { tasks.reverse.sequence_ }
-                        (List.empty[F[Unit]].some, task.asLeft[Unit])
-                      case _                             =>
-                        (none[List[F[Unit]]], ().asRight[F[Unit]])
+                      case S.Active(a) => (S.Active, a.asLeft[Unit])
+                      case _           => (S.Idle, ().asRight[F[Unit]])
                     }
                   } yield a
                 }
@@ -45,20 +48,20 @@ object Serial {
                 .void
             }
 
-            Concurrent[F].uncancelable {
-              for {
-                d <- Deferred[F, Either[Throwable, A]]
-                f  = fa.attempt.flatMap { a => d.complete(a) }
-                r <- ref.modify {
-                  case Some(fs) => ((f :: fs).some, void)
-                  case None     => (List.empty[F[Unit]].some, start(f))
-                }
-                _ <- r
-              } yield for {
-                a <- d.get
-                a <- a.liftTo[F]
-              } yield a
-            }
+            val result = for {
+              d <- Deferred[F, Either[Throwable, A]]
+              t  = fa.attempt.flatMap { a => d.complete(a).void }
+              r <- ref.modify {
+                case S.Idle       => (S.Active, start(t))
+                case S.Active     => (S.Active(t), Applicative[F].unit)
+                case S.Active(a)  => (S.Active(a.productR(t)), Applicative[F].unit)
+              }
+              _ <- r
+            } yield for {
+              a <- d.get
+              a <- a.liftTo[F]
+            } yield a
+            result.uncancelable
           }
         }
       }
