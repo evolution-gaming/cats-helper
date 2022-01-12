@@ -1,15 +1,14 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.kernel.{Deferred, Ref}
-import cats.effect.implicits._
-import cats.effect.{Concurrent, Sync}
-import cats.implicits._
+import cats.effect.syntax.all._
+import cats.syntax.all._
 import cats.effect.kernel.Async
 
 trait Serial[F[_]] {
 
   /**
-    * @return outer F[_] is about adding fa to queue, inner F[_] is about fa completed
+    * @return outer F[_] is about adding `fa` to the queue, inner F[_] is about `fa`` being completed
     */
   def apply[A](fa: F[A]): F[F[A]]
 }
