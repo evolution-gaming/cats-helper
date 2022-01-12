@@ -7,7 +7,18 @@ import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration.FiniteDuration
 
-object TimerHelper {
+trait TimerSyntax
+
+object TimerHelper extends TimerSyntax {
+
+  import TimerOps._
+
+  implicit def toTimerObjOpsTimerHelper(self: Timer.type): TimerObjOpsTimerHelper = new TimerObjOpsTimerHelper(self)
+
+}
+
+
+private[catshelper] object TimerOps {
 
   implicit class TimerObjOpsTimerHelper(val self: Timer.type) extends AnyVal {
 
