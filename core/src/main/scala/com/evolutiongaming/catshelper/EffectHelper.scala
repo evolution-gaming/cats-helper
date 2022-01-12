@@ -86,12 +86,12 @@ object EffectHelper {
   @deprecated("use FOpsEffectHelper instead", "1.0.0")
   class EffectHelperFOps[F[_], A](val self: F[A]) extends AnyVal {
 
-    def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: MonadCancel[F, E]): F[B] = {
-      bracket.redeem(self)(recover, map)
+    def redeem[B, E](recover: E => B, map: A => B)(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+      monadCancel.redeem(self)(recover, map)
     }
 
-    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: MonadCancel[F, E]): F[B] = {
-      bracket.redeemWith(self)(recover, flatMap)
+    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+      monadCancel.redeemWith(self)(recover, flatMap)
     }
 
 
@@ -107,12 +107,12 @@ object EffectHelper {
 
   implicit class FOpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
 
-    def redeem[B, E](recover: E => B, map: A => B)(implicit bracket: MonadCancel[F, E]): F[B] = {
-      bracket.redeem(self)(recover, map)
+    def redeem[B, E](recover: E => B, map: A => B)(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+      monadCancel.redeem(self)(recover, map)
     }
 
-    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit bracket: MonadCancel[F, E]): F[B] = {
-      bracket.redeemWith(self)(recover, flatMap)
+    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+      monadCancel.redeemWith(self)(recover, flatMap)
     }
 
 
