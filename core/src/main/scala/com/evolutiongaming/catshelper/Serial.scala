@@ -56,7 +56,7 @@ object Serial {
                 }
                 _ <- r
               } yield for {
-                a <- d.get.uncancelable
+                a <- d.get
                 a <- a.liftTo[F]
               } yield a
             }
