@@ -9,7 +9,7 @@ import cats.syntax.all._
 trait Serial[F[_]] {
 
   /**
-    * @return outer F[_] is about adding fa to queue, inner F[_] is about fa completed
+    * @return outer F[_] is about adding `fa` to the queue, inner F[_] is about `fa` being completed
     */
   def apply[A](fa: F[A]): F[F[A]]
 }
