@@ -7,6 +7,7 @@ import cats.effect.IO
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import com.evolutiongaming.catshelper.IOSuite._
 
 class LogSpec extends AnyFunSuite with Matchers {
 
