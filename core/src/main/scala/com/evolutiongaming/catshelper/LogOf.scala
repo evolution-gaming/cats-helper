@@ -21,7 +21,7 @@ object LogOf {
 
   def summon[F[_]](implicit F: LogOf[F]): LogOf[F] = F
 
-  def log[F[_]: LogOf, C: ClassTag]: F[Log[F]] = apply[F].apply(implicitly[ClassTag[C]].runtimeClass)
+  def log[F[_]: LogOf, C: ClassTag]: F[Log[F]] = apply[F].forClass[C]
 
   def log[F[_]: LogOf](name: String): F[Log[F]] = apply[F].apply(name)
 
@@ -92,5 +92,7 @@ object LogOf {
         }
       }
     }
+
+    def forClass[C](implicit C: ClassTag[C]): F[Log[F]] = self.apply(C.runtimeClass)
   }
 }
