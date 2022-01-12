@@ -7,7 +7,7 @@ import cats.effect.{Async, IO}
 import cats.implicits._
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 private[testkit] object PureTestRunner {
   type TestBody[A] = PureTest.Env[IO] => IO[A]
@@ -57,8 +57,6 @@ private[testkit] object PureTestRunner {
       val step = nextClock - currentClock
       env.testContext.tick(step)
     }
-
-    Await.ready(timeoutCancel(), 10.seconds) // cancel hot loop guard in case we finished successfully
 
     config.testFrameworkApi.completeWith(outcome, env.testContext.state)
   }

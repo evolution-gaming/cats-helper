@@ -7,8 +7,6 @@ import com.evolutiongaming.catshelper.CatsHelper._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
 class ToFutureSpec extends AsyncFunSuite with Matchers {
@@ -28,8 +26,6 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
       }
 
       val future = either.toFuture
-
-      Await.ready(future, 10.seconds)
 
       future.value.isDefined shouldEqual true
 
