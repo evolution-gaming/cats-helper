@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.Id
 import cats.arrow.FunctionK
+import cats.effect.IO
 
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
@@ -65,6 +66,27 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Debug("> debug", Log.Mdc(mdc)),
       Action.Trace("> trace", Log.Mdc(mdc)),
       Action.OfStr("source")))
+  }
+
+  test("MDC cleanup") {
+
+    val io = for {
+      logOf <- LogOf.slf4j[IO]
+      log <- logOf(getClass)
+      _ <- log.info("whatever", Log.Mdc("k" -> "v"))
+    } yield org.slf4j.MDC.getCopyOfContextMap
+
+    io.unsafeRunSync() shouldEqual null
+  }
+
+  test("logback implementation") {
+    val io = for {
+      logOf <- LogOf.logback[IO]
+      log <- logOf(getClass)
+      _ <- log.info("hello from logback", Log.Mdc("k" -> "test value for K"))
+    } yield ()
+
+    io.unsafeRunSync()
   }
 }
 

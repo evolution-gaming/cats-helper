@@ -61,7 +61,7 @@ object SerialKey {
         }
 
         new SerialKey[F, K] {
-          def apply[A](key: K)(task0: F[A]) = {
+          def apply[A](key: K)(task: F[A]) = {
 
             Concurrent[F].uncancelable { _ =>
               for {

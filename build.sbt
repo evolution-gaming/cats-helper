@@ -11,6 +11,9 @@ inThisBuild(Seq(
   licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
   crossScalaVersions := Seq("2.13.7", "2.12.15"),
+
+  versionScheme := Some("semver-spec"),
+
   scalaVersion := crossScalaVersions.value.head,
 
   publishTo := Some(Resolver.evolutionReleases),
@@ -51,6 +54,7 @@ lazy val core = project
       Cats.effect,
       machinist,
       `slf4j-api`,
+      logback,
       scalatest % Test,
     ),
   )

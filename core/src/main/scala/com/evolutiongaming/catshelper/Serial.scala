@@ -48,7 +48,7 @@ object Serial {
 
             Concurrent[F].uncancelable { _ =>
               for {
-                d <- Deferred.apply[F, Either[Throwable, A]]
+                d <- Deferred[F, Either[Throwable, A]]
                 f  = fa.attempt.flatMap { a => d.complete(a).void }
                 r <- ref.modify {
                   case Some(fs) => ((f :: fs).some, void)

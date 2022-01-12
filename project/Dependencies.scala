@@ -2,9 +2,10 @@ import sbt._
 
 object Dependencies {
 
-  val scalatest   = "org.scalatest"     %% "scalatest" % "3.2.10"
-  val machinist   = "org.typelevel"     %% "machinist" % "0.6.8"
-  val `slf4j-api` = "org.slf4j"          % "slf4j-api" % "1.7.32"
+  val scalatest   = "org.scalatest"     %% "scalatest"       % "3.2.10"
+  val machinist   = "org.typelevel"     %% "machinist"       % "0.6.8"
+  val `slf4j-api` = "org.slf4j"          % "slf4j-api"       % "1.7.32"
+  val logback     = "ch.qos.logback"     % "logback-classic" % "1.2.6"
 
   val cpKindProjector = "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full
 
