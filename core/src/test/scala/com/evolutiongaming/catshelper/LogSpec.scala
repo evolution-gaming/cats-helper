@@ -88,6 +88,16 @@ class LogSpec extends AnyFunSuite with Matchers {
 
     io.unsafeRunSync()
   }
+
+  test("LogOf.logger") {
+    implicit val instance = logOf
+
+    val (_, logByClass) = LogOf.logger[StateT, AnyRef].run(State(Nil))
+    val (_, logByName) = LogOf.logger[StateT]("some name").run(State(Nil))
+
+    logByClass should not be null
+    logByName should not be null
+  }
 }
 
 object LogSpec {

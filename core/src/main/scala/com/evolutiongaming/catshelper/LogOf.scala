@@ -6,6 +6,8 @@ import cats.{Applicative, Functor, ~>}
 import ch.qos.logback.classic.util.ContextInitializer
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
+import scala.reflect.ClassTag
+
 trait LogOf[F[_]] {
 
   def apply(source: String): F[Log[F]]
@@ -19,6 +21,9 @@ object LogOf {
 
   def summon[F[_]](implicit F: LogOf[F]): LogOf[F] = F
 
+  def logger[F[_]: LogOf, C: ClassTag]: F[Log[F]] = apply[F].apply(implicitly[ClassTag[C]].runtimeClass)
+
+  def logger[F[_]: LogOf](name: String): F[Log[F]] = apply[F].apply(name)
 
   def apply[F[_] : Sync](factory: ILoggerFactory): LogOf[F] = new LogOf[F] {
 
