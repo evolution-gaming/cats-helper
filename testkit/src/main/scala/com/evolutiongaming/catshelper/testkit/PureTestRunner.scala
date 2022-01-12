@@ -1,72 +1,80 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.laws.util.TestContext
-import cats.effect.{Async, ContextShift, Effect, IO, LiftIO, Sync, Timer}
-import cats.effect.syntax.all._
-import cats.syntax.all._
+import cats.effect.kernel.Outcome
+import cats.effect.testkit.{TestContext, TestInstances}
+import cats.effect.unsafe.IORuntime
+import cats.effect.{Async, IO}
+import cats.implicits._
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.concurrent.Future
 
 private[testkit] object PureTestRunner {
-  type TestBody[F[A], A] = PureTest.Env[F] => F[A]
+  type TestBody[A] = PureTest.Env[IO] => IO[A]
 
-  def doRunTest[F[_] : Effect, A](body: TestBody[F, A], config: PureTest.Config) = {
-    val singleRun = wrap(body, config)
+  def doRunTest[A](body: TestBody[A], config: PureTest.Config[IO], mainRuntime: IORuntime): IO[A] = {
+    val singleRun = wrap(body, config, mainRuntime)
 
     val fullTestIO = config.flakinessCheckIterations match {
       case n if n > 0 => singleRun.replicateA(n).map(_.head)
-      case _          => singleRun
+      case _ => singleRun
     }
 
-    fullTestIO.unsafeRunSync()
+    fullTestIO
   }
 
-  private def wrap[F[_] : Effect, A](body: TestBody[F, A], config: PureTest.Config): IO[A] = IO.defer {
-    val env = new EnvImpl[F]
-
-    val testIo = (env.cs.shift *> body(env)).toIO
-
+  private def wrap[A](body: TestBody[A], config: PureTest.Config[IO], mainRuntime: IORuntime): IO[A] = IO.defer {
+    val env = new EnvImpl[IO]
     @volatile var outcome: Option[Either[Throwable, A]] = None
-    val cancel = testIo.unsafeRunCancelable { r => outcome = Some(r) }
+
+    val testF = body(env).guaranteeCase {
+      case Outcome.Canceled() => IO.delay {
+        outcome = Some(Left(new IllegalStateException("Canceled")))
+      }
+      case Outcome.Errored(e) => IO.delay {
+        outcome = Some(Left(e))
+      }
+      case Outcome.Succeeded(value) => value.map { v => outcome = Some(Right(v)) }
+    }
+
+    // test should be run against IORuntime which was build with `TestContext`
+    val cancel: () => Future[Unit] = testF.unsafeRunCancelable()(env.ioRuntime)
 
     val testThread = Thread.currentThread()
-
     val stopHotLoop = IO.defer {
       val err = new IllegalStateException("Still running")
       err.setStackTrace(testThread.getStackTrace)
       outcome = Some(Left(err))
-      cancel
+      IO.fromFuture(IO.delay(cancel()))
     }
-
-    val hotLoopGuard = IO.timer(config.backgroundEc).sleep(config.hotLoopTimeout)
-
-    val timeoutCancel = (hotLoopGuard *> stopHotLoop).unsafeRunCancelable(_ => ())
+    val hotLoopGuard = IO.sleep(config.hotLoopTimeout)
+    val timeoutCancel: () => Future[Unit] = (hotLoopGuard *> stopHotLoop).unsafeRunCancelable()(mainRuntime)
 
     while (outcome.isEmpty && env.testContext.state.tasks.nonEmpty) {
-      val step = env.testContext.state.tasks.iterator.map(_.runsAt).min
+      // TestContext's clock now starts from a very negative value, so the next step should be a diff between current clock value and the next task
+      val currentClock = env.testContext.state.clock
+      val nextClock = env.testContext.state.tasks.iterator.map(_.runsAt).min
+      val step = nextClock - currentClock
       env.testContext.tick(step)
     }
-
-    timeoutCancel.unsafeRunSync()
 
     config.testFrameworkApi.completeWith(outcome, env.testContext.state)
   }
 
-  private class EnvImpl[F[_] : Async : LiftIO] extends PureTest.Env[F] {
+  private[testkit] class EnvImpl[F[_]](implicit val async: Async[F]) extends PureTest.Env[F] with TestInstances {
     val testContext: TestContext = TestContext()
 
-    implicit def ec: ExecutionContext = testContext
-    implicit val cs: ContextShift[F] = testContext.contextShift[F]
-    implicit val timer: Timer[F] = testContext.timer[F]
+    val ioRuntime: IORuntime = materializeRuntime(Ticker(testContext))
 
     implicit val testRuntime: TestRuntime[F] = new TestRuntime[F] {
 
-      /** NB: We exploit the fact that TestContext starts from 0. */
-      def getTimeSinceStart: F[FiniteDuration] = Sync[F].delay(testContext.state.clock)
+      // TestContext in CE3 starts from a very negative value
+      private val startClock = testContext.state.clock
+
+      def getTimeSinceStart: F[FiniteDuration] = async.delay(testContext.state.clock - startClock)
 
       def sleepUntil(dt: FiniteDuration): F[Unit] =
-        getTimeSinceStart.flatMap(t => timer.sleep(dt - t).whenA(dt > t))
+        getTimeSinceStart.flatMap(t => async.sleep(dt - t).whenA(dt > t))
     }
   }
 }

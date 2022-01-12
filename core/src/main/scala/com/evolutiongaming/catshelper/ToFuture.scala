@@ -3,8 +3,10 @@ package com.evolutiongaming.catshelper
 import cats.Id
 import cats.arrow.FunctionK
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
 
 trait ToFuture[F[_]] {
 
@@ -24,8 +26,17 @@ object ToFuture {
   }
 
 
-  implicit val ioToFuture: ToFuture[IO] = new ToFuture[IO] {
-    def apply[A](fa: IO[A]) = fa.unsafeToFuture()
+  implicit def ioToFuture(implicit runtime: IORuntime): ToFuture[IO] = new ToFuture[IO] {
+    def apply[A](fa: IO[A]) = {
+      Try(fa.syncStep.unsafeRunSync()) match {
+        case Success(Left(computation)) =>
+          computation.unsafeToFuture()
+        case Success(Right(value)) =>
+          Future.successful(value)
+        case Failure(error) =>
+          Future.failed(error)
+      }
+    }
   }
 
 

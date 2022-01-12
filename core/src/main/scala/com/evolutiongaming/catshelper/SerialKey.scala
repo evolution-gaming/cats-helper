@@ -1,10 +1,10 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Concurrent
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.implicits._
-import cats.{Applicative, Hash, Parallel}
+import cats.{Applicative, Hash}
 
 trait SerialKey[F[_], -K] {
 
@@ -17,7 +17,7 @@ object SerialKey {
     def apply[A](key: K)(task: F[A]) = task.map { _.pure[F] }
   }
 
-  def of[F[_]: Concurrent: Parallel: Runtime, K: Hash]: F[SerialKey[F, K]] = {
+  def of[F[_]: Concurrent: Runtime, K: Hash]: F[SerialKey[F, K]] = {
     for {
       cores      <- Runtime[F].availableCores
       partitions <- Partitions.of[F, K, SerialKey[F, K]](cores, _ => of1)
@@ -61,28 +61,28 @@ object SerialKey {
         }
 
         new SerialKey[F, K] {
-          def apply[A](key: K)(task: F[A]) = {
+          def apply[A](key: K)(task0: F[A]) = {
 
-            val result = for {
-              d <- Deferred[F, Either[Throwable, A]]
-              a  = for {
-                a <- task.attempt
-                a <- d.complete(a)
-              } yield a
-              a <- ref.modify { map =>
-                map.get(key) match {
-                  case None          => (map.updated(key, none), start(key, a))
-                  case Some(None)    => (map.updated(key, a.some), void)
-                  case Some(Some(b)) => (map.updated(key, b.productR(a).some), void)
+            Concurrent[F].uncancelable { _ =>
+              for {
+                d <- Deferred[F, Either[Throwable, A]]
+                task = for {
+                  a <- task0.attempt
+                  _ <- d.complete(a)
+                } yield {}
+                a <- ref.modify { map =>
+                  map.get(key) match {
+                    case None          => (map.updated(key, none), start(key, task))
+                    case Some(None)    => (map.updated(key, task.some), void)
+                    case Some(Some(a)) => (map.updated(key, a.productR(task).some), void)
+                  }
                 }
-              }
-              _ <- a
-            } yield for {
-              a <- d.get
-              a <- a.liftTo[F]
-            } yield a
-
-            result.uncancelable
+                _ <- a
+              } yield for {
+                a <- d.get
+                a <- a.liftTo[F]
+              } yield a
+            }
           }
         }
       }

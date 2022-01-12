@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Resource
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._

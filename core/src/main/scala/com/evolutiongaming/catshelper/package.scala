@@ -1,6 +1,6 @@
 package com.evolutiongaming
 
-import cats.effect.Bracket
+import cats.effect.MonadCancel
 import cats.{ApplicativeError, MonadError}
 
 package object catshelper {
@@ -25,7 +25,7 @@ package object catshelper {
   }
 
 
-  type BracketThrowable[F[_]] = Bracket[F, Throwable]
+  type BracketThrowable[F[_]] = MonadCancel[F, Throwable]
 
 
   object BracketThrowable {

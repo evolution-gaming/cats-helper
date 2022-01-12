@@ -1,14 +1,14 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.implicits._
-import cats.effect.{Concurrent, Resource, Timer}
+import cats.effect.{Resource, Temporal}
 import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
 
 object Schedule {
 
-  def apply[F[_]: Concurrent: Timer](
+  def apply[F[_]: Temporal](
     initial: FiniteDuration,
     interval: FiniteDuration)(
     fa: F[Unit]
@@ -16,11 +16,11 @@ object Schedule {
 
     val schedule = for {
       _ <- fa
-      _ <- Timer[F].sleep(interval)
+      _ <- Temporal[F].sleep(interval)
     } yield {}
 
     val daemon = for {
-      _ <- Timer[F].sleep(initial)
+      _ <- Temporal[F].sleep(initial)
       _ <- schedule.foreverM[Unit]
     } yield {}
 
