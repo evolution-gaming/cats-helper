@@ -21,9 +21,9 @@ object LogOf {
 
   def summon[F[_]](implicit F: LogOf[F]): LogOf[F] = F
 
-  def logger[F[_]: LogOf, C: ClassTag]: F[Log[F]] = apply[F].apply(implicitly[ClassTag[C]].runtimeClass)
+  def log[F[_]: LogOf, C: ClassTag]: F[Log[F]] = apply[F].apply(implicitly[ClassTag[C]].runtimeClass)
 
-  def logger[F[_]: LogOf](name: String): F[Log[F]] = apply[F].apply(name)
+  def log[F[_]: LogOf](name: String): F[Log[F]] = apply[F].apply(name)
 
   def apply[F[_] : Sync](factory: ILoggerFactory): LogOf[F] = new LogOf[F] {
 

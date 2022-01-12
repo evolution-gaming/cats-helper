@@ -89,11 +89,11 @@ class LogSpec extends AnyFunSuite with Matchers {
     io.unsafeRunSync()
   }
 
-  test("LogOf.logger") {
+  test("LogOf.log") {
     implicit val instance = logOf
 
-    val (_, logByClass) = LogOf.logger[StateT, AnyRef].run(State(Nil))
-    val (_, logByName) = LogOf.logger[StateT]("some name").run(State(Nil))
+    val (_, logByClass) = LogOf.log[StateT, AnyRef].run(State(Nil))
+    val (_, logByName) = LogOf.log[StateT]("some name").run(State(Nil))
 
     logByClass should not be null
     logByName should not be null
