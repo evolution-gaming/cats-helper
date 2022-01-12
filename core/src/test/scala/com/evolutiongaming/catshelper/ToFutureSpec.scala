@@ -1,14 +1,16 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
-
-import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import scala.util.control.NoStackTrace
+
 class ToFutureSpec extends AsyncFunSuite with Matchers {
+  implicit val ioRuntime: IORuntime = IORuntime.global
 
   for {
     (name, value, expected) <- List(

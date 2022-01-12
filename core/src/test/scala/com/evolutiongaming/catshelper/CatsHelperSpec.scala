@@ -1,5 +1,8 @@
 package com.evolutiongaming.catshelper
 
+import cats.effect.implicits._
+import cats.effect.kernel.Ref
+import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
@@ -9,7 +12,10 @@ import org.scalatest.matchers.should.Matchers
 import scala.util.{Failure, Try}
 import cats.effect.Ref
 
+
 class CatsHelperSpec extends AnyFunSuite with Matchers {
+
+  implicit val ioRuntime: IORuntime = IORuntime.global
 
   test("castM") {
     val a: Any = ""

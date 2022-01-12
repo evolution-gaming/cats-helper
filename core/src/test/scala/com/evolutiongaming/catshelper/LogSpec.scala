@@ -7,6 +7,7 @@ import cats.effect.IO
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import com.evolutiongaming.catshelper.IOSuite._
 
 class LogSpec extends AnyFunSuite with Matchers {
 
@@ -87,6 +88,16 @@ class LogSpec extends AnyFunSuite with Matchers {
     } yield ()
 
     io.unsafeRunSync()
+  }
+
+  test("LogOf.log") {
+    implicit val instance = logOf
+
+    val (_, logByClass) = LogOf.log[StateT, AnyRef].run(State(Nil))
+    val (_, logByName) = LogOf.log[StateT]("some name").run(State(Nil))
+
+    logByClass should not be null
+    logByName should not be null
   }
 }
 

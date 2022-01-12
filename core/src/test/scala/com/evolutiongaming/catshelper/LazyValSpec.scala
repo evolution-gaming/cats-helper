@@ -1,7 +1,8 @@
 package com.evolutiongaming.catshelper
 
 import cats.arrow.FunctionK
-import cats.effect.{Concurrent, IO, Sync}
+import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.{IO, Sync}
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
 import com.evolutiongaming.catshelper.IOSuite._
@@ -9,7 +10,7 @@ import com.evolutiongaming.catshelper.IOSuite._
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
-import cats.effect.{ Deferred, Ref }
+import cats.effect.kernel.Async
 
 class LazyValSpec extends AsyncFunSuite with Matchers {
 
@@ -25,7 +26,7 @@ class LazyValSpec extends AsyncFunSuite with Matchers {
     getLoaded[IO].run()
   }
 
-  private def get[F[_] : Concurrent]: F[Unit] = {
+  private def get[F[_] : Async]: F[Unit] = {
     for {
       ref      <- Ref[F].of(0)
       deferred <- Deferred[F, Unit]
@@ -48,7 +49,7 @@ class LazyValSpec extends AsyncFunSuite with Matchers {
     } yield {}
   }
 
-  private def getError[F[_] : Concurrent]: F[Unit] = {
+  private def getError[F[_] : Async]: F[Unit] = {
 
     case object Error extends RuntimeException with NoStackTrace
 
@@ -70,7 +71,7 @@ class LazyValSpec extends AsyncFunSuite with Matchers {
     } yield {}
   }
 
-  private def getLoaded[F[_] : Concurrent] = {
+  private def getLoaded[F[_] : Async] = {
     for {
       ref     <- Ref[F].of(0)
       load     = ref.update(_ + 1)

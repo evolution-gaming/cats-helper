@@ -2,15 +2,18 @@ package com.evolutiongaming.catshelper
 
 import cats.arrow.FunctionK
 import cats.effect.IO
+import cats.effect.kernel.Ref
+import cats.effect.unsafe.IORuntime
 import cats.implicits._
+import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
-import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 
 import scala.concurrent.duration._
 import cats.effect.Ref
 
 class SerialRefSpec extends AnyFreeSpec {
+  implicit val ioRuntime: IORuntime = IORuntime.global
 
   "modify serially" in ioTest { env =>
     import env._

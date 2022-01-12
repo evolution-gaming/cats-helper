@@ -1,5 +1,6 @@
 package com.evolutiongaming
 
+import cats.effect.MonadCancel
 import cats.{ApplicativeError, MonadError}
 import cats.effect.MonadCancel
 

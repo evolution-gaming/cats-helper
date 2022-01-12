@@ -1,19 +1,19 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.syntax.all._
-import cats.effect.{Clock, Concurrent, IO, Sync}
+import cats.effect.{Clock, Concurrent, IO, Sync, Temporal}
 import cats.syntax.all._
-import cats.{Hash, Parallel}
+import cats.Hash
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import java.util.concurrent.TimeUnit
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
-import cats.effect.{ Deferred, Ref, Temporal }
+import cats.effect.kernel.Async
 
 class SerialKeyTest extends AsyncFunSuite with Matchers {
   import SerialKeyTest._
@@ -61,12 +61,12 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
     val keys  = 10
 
     val duration = {
-      val ms = Clock[IO].monotonic(TimeUnit.MILLISECONDS)
+      val ms = Clock[IO].monotonic.map(_.toMillis)
       ms.map { a => ms.map { b => (b - a).millis } }
     }
 
     val result = for {
-      logOf <- LogOf.slf4j
+      logOf <- LogOf.slf4j[IO]
       log   <- logOf(SerParQueueTest.getClass)
       q     <- SerParQueue.of[IO, Int]
       d     <- duration
@@ -312,7 +312,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
 
   private implicit class Ops[F[_], A](val self: F[A]) {
 
-    def unfinished(implicit concurrent: Concurrent[F], timer: Temporal[F]): F[Unit] = {
+    def unfinished(implicit sync: Async[F]): F[Unit] = {
       for {
         a <- self.timeout(10.millis).attempt
         _ <- Sync[F].delay { a should matchPattern { case Left(_: TimeoutException) => () } }
@@ -378,7 +378,7 @@ object SerialKeyTest {
 
   object Queue {
 
-    def of[F[_]: Concurrent: Parallel, K: Hash, A]: F[Queue[F, K, A]] = {
+    def of[F[_]: Async, K: Hash, A]: F[Queue[F, K, A]] = {
       for {
         queue    <- SerialKey.of[F, K]
         records0 <- Records.of[F, K, A]

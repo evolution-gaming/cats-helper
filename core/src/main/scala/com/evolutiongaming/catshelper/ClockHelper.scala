@@ -1,21 +1,22 @@
 package com.evolutiongaming.catshelper
 
-import java.time.Instant
-import java.util.concurrent.TimeUnit
-
 import cats.effect.Clock
 import cats.implicits._
 import cats.{Applicative, Functor}
+
+import java.time.Instant
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 
 object ClockHelper {
 
   implicit class ClockOps[F[_]](val self: Clock[F]) extends AnyVal {
 
-    def millis: F[Long] = self.realTime(TimeUnit.MILLISECONDS)
+    def millis(implicit F: Functor[F]): F[Long] = self.realTime.map(_.toMillis)
 
-    def nanos: F[Long] = self.monotonic(TimeUnit.NANOSECONDS)
+    def nanos(implicit F: Functor[F]): F[Long] = self.monotonic.map(_.toNanos)
 
-    def micros: F[Long] = self.monotonic(TimeUnit.MICROSECONDS)
+    def micros(implicit F: Functor[F]): F[Long] = self.monotonic.map(_.toMicros)
 
     def instant(implicit F: Functor[F]): F[Instant] = {
       for {
@@ -31,9 +32,11 @@ object ClockHelper {
 
     def const[F[_] : Applicative](nanos: Long, millis: Long): Clock[F] = new Clock[F] {
 
-      def realTime(unit: TimeUnit) = unit.convert(millis, TimeUnit.MILLISECONDS).pure[F]
+      def applicative: Applicative[F] = Applicative[F]
 
-      def monotonic(unit: TimeUnit) = unit.convert(nanos, TimeUnit.NANOSECONDS).pure[F]
+      def realTime: F[FiniteDuration] = FiniteDuration(millis, TimeUnit.MILLISECONDS).pure[F]
+
+      def monotonic: F[FiniteDuration] = FiniteDuration(nanos, TimeUnit.NANOSECONDS).pure[F]
     }
 
     def empty[F[_] : Applicative]: Clock[F] = const(nanos = 0, millis = 0)

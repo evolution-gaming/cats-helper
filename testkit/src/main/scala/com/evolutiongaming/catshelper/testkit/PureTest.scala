@@ -1,6 +1,7 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.{Effect, IO}
+import cats.effect.IO
+import cats.effect.kernel.Async
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -32,82 +33,72 @@ import cats.effect.Temporal
  *   }
  * }}}
  */
-object PureTest extends PureTest {
+object PureTest extends PureTest[IO] {
   /** An environment that is injected into every test. */
   trait Env[F[_]] {
-    implicit def ec: ExecutionContext
-    implicit def cs: ContextShift[F]
-    implicit def timer: Temporal[F]
+    implicit def async: Async[F]
     implicit def testRuntime: TestRuntime[F]
   }
 
-  private val default: PureTest = Impl(Config())
+  private val default: PureTest[IO] = Impl(Config())
 
   protected def config = default.config
-  protected def withConfigMod(f: Config => Config) = default.withConfigMod(f)
+  protected def withConfigMod(f: Config[IO] => Config[IO]) = default.withConfigMod(f)
 
-  private case class Impl(config: Config) extends PureTest {
-    protected def withConfigMod(f: Config => Config) = copy(f(config))
+  private case class Impl(config: Config[IO]) extends PureTest[IO] {
+    protected def withConfigMod(f: Config[IO] => Config[IO]) = copy(f(config))
   }
 
-  private[testkit] case class Config(
-    testFrameworkApi: TestFrameworkApi = TestFrameworkApi.resolveDefault,
+  private[testkit] case class Config[F[_]](
+    testFrameworkApi: TestFrameworkApi[F] = TestFrameworkApi.resolveDefault,
     backgroundEc: ExecutionContext = ExecutionContext.global,
     hotLoopTimeout: FiniteDuration = 10.seconds,
     flakinessCheckIterations: Int = 1,
   )
+
+  implicit class Ops(val T: PureTest[IO]) extends AnyVal {
+    final def ioTest[A](body: Env[IO] => IO[A]): A = PureTest.ioTest(body, T.config)
+  }
+
+  final def ioTest[A](body: Env[IO] => IO[A]): A = {
+    ioTest(body, config)
+  }
+
+  private def ioTest[A](body: Env[IO] => IO[A], testConfig: PureTest.Config[IO]): A = {
+    val ioRuntime = cats.effect.unsafe.implicits.global
+
+    PureTestRunner.doRunTest(body, testConfig, ioRuntime).unsafeRunSync()(ioRuntime)
+  }
 }
 
 /**
  * Holds a test configuration. May be configured further or used to build and run a test.
  */
-sealed trait PureTest { self =>
+sealed trait PureTest[F[_]] { self =>
   import PureTest._
 
-  /**
-   * A follow-up to [[apply `PureTest[F]`]].
-   */
-  final class PartialApply[F[_]: Effect] {
-    /**
-     * Builds and runs the test with previously defined settings.
-     */
-    def of[A](body: Env[F] => F[A]): A = PureTestRunner.doRunTest(body, config)
-  }
+  protected def config: Config[F]
 
-  /**
-   * A first half of [[PartialApply.of `PureTest[F].of`]].
-   *
-   * @see [[ioTest `ioTest`]] – a shortcut for `IO`-based tests.
-   */
-  final def apply[F[_]: Effect]: PartialApply[F] = new PartialApply[F]
-
-  /**
-   * A shorter version of [[PartialApply.of `PureTest[IO].of`]].
-   */
-  final def ioTest[A](body: Env[IO] => IO[A]): A = PureTestRunner.doRunTest(body, config)
-
-  protected def config: Config
-
-  protected def withConfigMod(f: Config => Config): PureTest
+  protected def withConfigMod(f: Config[F] => Config[F]): PureTest[F]
 
   /**
    * Sets a test-framework integration layer. Currently defaults to ScalaTest.
    */
-  final def testFrameworkApi(v: TestFrameworkApi): PureTest = withConfigMod(_.copy(testFrameworkApi = v))
+  final def testFrameworkApi(v: TestFrameworkApi[F]): PureTest[F] = withConfigMod(_.copy(testFrameworkApi = v))
 
   /**
    * Sets hot-loop detection timeout. Use it CPU-bound part of your SUT or test requires longer time.
    */
-  final def hotLoopTimeout(v: FiniteDuration): PureTest = withConfigMod(_.copy(hotLoopTimeout = v))
+  final def hotLoopTimeout(v: FiniteDuration): PureTest[F] = withConfigMod(_.copy(hotLoopTimeout = v))
 
   /**
    * Sets an `ExecutionContext` used for background tasks, such as hot loop detection.
    * Defaults to `ExecutionContext.global`.
    */
-  final def backgroundEc(v: ExecutionContext): PureTest = withConfigMod(_.copy(backgroundEc = v))
+  final def backgroundEc(v: ExecutionContext): PureTest[F] = withConfigMod(_.copy(backgroundEc = v))
 
   /**
    * Sets a number of times to run a test to make sure it's not flaky. Defaults to `1`.
    */
-  final def flakinessCheckIterations(v: Int): PureTest = withConfigMod(_.copy(flakinessCheckIterations = v))
+  final def flakinessCheckIterations(v: Int): PureTest[F] = withConfigMod(_.copy(flakinessCheckIterations = v))
 }

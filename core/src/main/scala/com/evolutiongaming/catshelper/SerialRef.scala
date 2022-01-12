@@ -1,6 +1,8 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect._
+import cats.effect.kernel.Ref
+import cats.effect.std.Semaphore
 import cats.implicits._
 import cats.~>
 import cats.effect.Ref
@@ -30,7 +32,7 @@ object SerialRef { self =>
         val get = r.get
 
         def modify[B](f: A => F[(A, B)]) = {
-          s.withPermit {
+          s.permit.use { _ =>
             for {
               a      <- r.get
               ab     <- f(a)

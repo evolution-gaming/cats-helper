@@ -2,7 +2,9 @@ package com.evolutiongaming.catshelper
 
 import cats.arrow.FunctionK
 import cats.data.{NonEmptyList => Nel}
-import cats.effect.{Concurrent, IO}
+import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Temporal}
 import cats.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.freespec.AnyFreeSpec
@@ -12,6 +14,8 @@ import scala.concurrent.duration._
 import cats.effect.{ Deferred, Ref, Temporal }
 
 class GroupWithinSpec extends AnyFreeSpec with Matchers {
+
+  implicit val ioRuntime: IORuntime = IORuntime.global
 
   "support settings = 0" in ioTest { env =>
     import env._
@@ -33,7 +37,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     `consume on release`[IO]
   }
 
-  private def `support settings = 0`[F[_] : Concurrent : Temporal] = {
+  private def `support settings = 0`[F[_]: Temporal] = {
     val settings = GroupWithin.Settings(delay = 1.minute, size = 0)
     for {
       ref         <- Ref[F].of(List.empty[Nel[Int]])
@@ -51,7 +55,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     }
   }
 
-  private def `collect until size reached`[F[_] : Concurrent : Temporal] = {
+  private def `collect until size reached`[F[_] : Temporal] = {
     val settings = GroupWithin.Settings(delay = 1.minute, size = 2)
     for {
       ref         <- Ref[F].of(List.empty[Nel[Int]])
@@ -70,7 +74,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     }
   }
 
-  private def `collect until deadline reached`[F[_] : Concurrent : Temporal] = {
+  private def `collect until deadline reached`[F[_] : Temporal] = {
     val delay = 1.minute
     val settings = GroupWithin.Settings(delay = delay, size = 100)
     for {
@@ -94,11 +98,11 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     }
   }
 
-  private def `consume on release`[F[_] : Concurrent : Temporal] = {
+  private def `consume on release`[F[_] : Temporal] = {
     val settings = GroupWithin.Settings(delay = 1.minute, size = 100)
     for {
       deferred    <- Deferred[F, Nel[Int]]
-      groupWithin  = GroupWithin[F].apply[Int](settings) { a => deferred.complete(a) }
+      groupWithin  = GroupWithin[F].apply[Int](settings) { a => deferred.complete(a).void }
       _           <- groupWithin.use { enqueue =>
         for {
           _ <- enqueue(1)

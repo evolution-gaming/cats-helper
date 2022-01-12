@@ -1,8 +1,10 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
+import cats.effect.kernel.Ref
+import cats.effect.std.Semaphore
 import cats.effect.implicits._
-import cats.effect.{Clock, Concurrent, Resource}
+import cats.effect.{Clock, Concurrent, Resource, Temporal}
 import cats.implicits._
 import cats.{Applicative, ~>}
 import com.evolutiongaming.catshelper.ClockHelper._
@@ -22,18 +24,18 @@ object GroupWithin {
   final case class Settings(delay: FiniteDuration, size: Int)
 
 
-  def empty[F[_]: Applicative]: GroupWithin[F] = new GroupWithin[F] {
+  def empty[F[_]]: GroupWithin[F] = new GroupWithin[F] {
 
     def apply[A](settings: Settings)(f: Nel[A] => F[Unit]) = {
       val enqueue = new Enqueue[F, A] {
         def apply(a: A) = f(Nel.of(a))
       }
-      Resource.pure(enqueue)(Applicative[F])
+      Resource.pure(enqueue)
     }
   }
 
 
-  def apply[F[_]: Concurrent: Temporal]: GroupWithin[F] = {
+  def apply[F[_]: Temporal]: GroupWithin[F] = {
 
     new GroupWithin[F] {
 
@@ -55,14 +57,14 @@ object GroupWithin {
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
           val enqueue: Enqueue[F, A] = a => f(Nel.of(a))
-          Resource.pure(enqueue)(Applicative[F])
+          Resource.pure(enqueue)
         } else {
           val result = for {
-            semaphore <- Semaphore.uncancelable[F](1)
+            semaphore <- Semaphore[F](1)
             ref       <- Ref[F].of(S.empty)
           } yield {
 
-            def consume(as: Nel[A]) = semaphore.withPermit { f(as.reverse) }
+            def consume(as: Nel[A]) = semaphore.permit.use { _ => f(as.reverse) }
 
             def startTimer(timestamp: Long) = {
               val result = for {
@@ -81,7 +83,7 @@ object GroupWithin {
             val enqueue = new Enqueue[F, A] {
 
               def apply(a: A) = {
-                Concurrent[F].uncancelable _ => {
+                Concurrent[F].uncancelable { _ =>
                   for {
                     t <- Clock[F].nanos
                     a <- ref.modify {

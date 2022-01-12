@@ -69,6 +69,8 @@ lazy val testkit = project
     name := "cats-helper-testkit",
 
     libraryDependencies ++= Seq(
+      Cats.effectStd,
+      Cats.effectTestkit,
       Cats.effectLaws,
       scalatest % Optional,
     ),
