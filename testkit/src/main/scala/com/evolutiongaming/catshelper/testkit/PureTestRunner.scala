@@ -6,8 +6,8 @@ import cats.effect.unsafe.IORuntime
 import cats.effect.{Async, IO}
 import cats.implicits._
 
-import scala.concurrent.duration._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 private[testkit] object PureTestRunner {
   type TestBody[A] = PureTest.Env[IO] => IO[A]
@@ -51,11 +51,13 @@ private[testkit] object PureTestRunner {
     val timeoutCancel: () => Future[Unit] = (hotLoopGuard *> stopHotLoop).unsafeRunCancelable()(mainRuntime)
 
     while (outcome.isEmpty && env.testContext.state.tasks.nonEmpty) {
-      // TestContext's clock now starts from a very negative value, so the next step should be a diff between current clock value and the next task
-      val currentClock = env.testContext.state.clock
-      val nextClock = env.testContext.state.tasks.iterator.map(_.runsAt).min
-      val step = nextClock - currentClock
-      env.testContext.tick(step)
+      val nextInterval = env.testContext.nextInterval()
+      if (nextInterval > Duration.Zero) {
+        env.testContext.tick()
+        env.testContext.advanceAndTick(nextInterval)
+      } else {
+        env.testContext.tick()
+      }
     }
 
     config.testFrameworkApi.completeWith(outcome, env.testContext.state)
