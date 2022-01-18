@@ -6,7 +6,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 
-class ResourceManagerSpec extends AnyFreeSpec with Matchers {
+class ResourceRegistrySpec extends AnyFreeSpec with Matchers {
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
@@ -15,7 +15,7 @@ class ResourceManagerSpec extends AnyFreeSpec with Matchers {
       allocated <- Ref[IO].of(0)
       released  <- Ref[IO].of(0)
       resource  = Resource.make(allocated.update(_ + 1))(_ => released.update(_ + 1))
-      allocated <- ResourceManager[IO].use { manager =>
+      allocated <- ResourceRegistry[IO].use { manager =>
         for {
           _         <- manager.register(resource)
           _         <- manager.register(resource)
@@ -37,7 +37,7 @@ class ResourceManagerSpec extends AnyFreeSpec with Matchers {
       released  <- Ref[IO].of(0)
       resource  = Resource.make(allocated.update(_ + 1))(_ => released.update(_ + 1))
       failed    = Resource.make(IO.raiseError(new Exception))(_ => released.update(_ + 1))
-      allocated <- ResourceManager[IO].use { manager =>
+      allocated <- ResourceRegistry[IO].use { manager =>
         for {
           _         <- manager.register(resource)
           _         <- manager.register(failed).attempt
@@ -59,7 +59,7 @@ class ResourceManagerSpec extends AnyFreeSpec with Matchers {
       released  <- Ref[IO].of(0)
       resource  = Resource.make(allocated.update(_ + 1))(_ => released.update(_ + 1))
       failed    = Resource.make(allocated.update(_ + 1))(_ => IO.raiseError(new Exception))
-      allocated <- ResourceManager[IO].use { manager =>
+      allocated <- ResourceRegistry[IO].use { manager =>
         for {
           _         <- manager.register(resource)
           _         <- manager.register(failed)
@@ -76,8 +76,8 @@ class ResourceManagerSpec extends AnyFreeSpec with Matchers {
   }
 
   "raise exception on using ResourceManager out of it's Resource scope" in {
-    assertThrows[ResourceManager.ResourceManagerAlreadyReleasedException.type] {
-      ResourceManager[IO]
+    assertThrows[ResourceRegistry.AlreadyReleasedException.type] {
+      ResourceRegistry[IO]
         .use(m => IO.pure(m))
         .flatMap(_.register(Resource.pure(42)))
         .unsafeRunSync()

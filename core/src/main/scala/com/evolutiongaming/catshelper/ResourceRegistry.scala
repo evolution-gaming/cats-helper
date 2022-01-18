@@ -6,35 +6,37 @@ import cats.effect.{Ref, Resource, Sync}
 import scala.util.control.NoStackTrace
 
 /**
- * ResourceManager abstracts dynamically allocating resources in scope of one [[Resource]]
+ * ResourceRegistry abstracts dynamically allocating resources in scope of one [[Resource]]
  *
  * Example:
  * {{{
- *   def local(): Resource[IO, Unit] = ???
+ *   trait Service
  *
- *   val global = ResourceManager[IO]
+ *   def make(): Resource[IO, Service] = ???
  *
- *   val io = global.use { manager =>
+ *   val global = ResourceRegistry[IO]
+ *
+ *   val io = global.use { registry =>
  *      for {
- *        l1 <- local()
- *        l2 <- local()
- *        l3 <- local()
- *        // use allocated instances l1, l2, l3
+ *        s1 <- registry.register(make())
+ *        s2 <- registry.register(make())
+ *        s3 <- registry.register(make())
+ *        // use allocated instances s1, s2, s3
  *      } yield ()
  *   }
- *   // release l1, l2, l3
+ *   // release s1, s2, s3
  * }}}
  */
-sealed trait ResourceManager[F[_]] {
+trait ResourceRegistry[F[_]] {
 
   def register[A](resource: Resource[F, A]): F[A]
 
 }
 
-object ResourceManager {
+object ResourceRegistry {
 
-  /** Raised if [[ResourceManager]] used outside of it's Resource scope */
-  final case object ResourceManagerAlreadyReleasedException extends RuntimeException with NoStackTrace
+  /** Raised if [[ResourceRegistry]] used outside of it's Resource scope */
+  final case object AlreadyReleasedException extends RuntimeException with NoStackTrace
 
   private type Release[F[_]] = F[Unit]
 
@@ -47,7 +49,7 @@ object ResourceManager {
     }
   }
 
-  def apply[F[_]: Sync]: Resource[F, ResourceManager[F]] = {
+  def apply[F[_]: Sync]: Resource[F, ResourceRegistry[F]] = {
     val allocate = Ref[F].of(State.empty[F])
     Resource
       .make(allocate) { state =>
@@ -59,10 +61,10 @@ object ResourceManager {
           }
       }
       .map { state =>
-        new ResourceManager[F] {
+        new ResourceRegistry[F] {
 
           /**
-           * Allocate [[resource]] and remember it's release effect if [[ResourceManager]] still in running state,
+           * Allocate [[resource]] and remember it's release effect if [[ResourceRegistry]] still in running state,
            * otherwise release the [[resource]] immediately and raise exception
            */
           def register[A](resource: Resource[F, A]): F[A] = {
@@ -73,7 +75,7 @@ object ResourceManager {
                   case _                         => State.Released[F]() -> false
                 } flatMap {
                   case true  => allocation.pure[F]
-                  case false => release.attempt *> ResourceManagerAlreadyReleasedException.raiseError
+                  case false => release.attempt *> AlreadyReleasedException.raiseError
                 }
             }
           }
