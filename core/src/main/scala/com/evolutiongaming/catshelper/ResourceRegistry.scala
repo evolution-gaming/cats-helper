@@ -40,24 +40,15 @@ object ResourceRegistry {
 
   private type Release[F[_]] = F[Unit]
 
-  private sealed trait State[F[_]]
-  private object State {
-    def empty[F[_]]: State[F] = State.Running[F](List.empty)
-    final case class Released[F[_]]() extends State[F]
-    final case class Running[F[_]](cache: List[Release[F]]) extends State[F] {
-      def + (release: Release[F]): Running[F] = copy(cache :+ release)
-    }
-  }
-
   def apply[F[_]: Sync]: Resource[F, ResourceRegistry[F]] = {
-    val allocate = Ref[F].of(State.empty[F])
+    val allocate = Ref[F].of[Option[Release[F]]](().pure[F].some)
     Resource
       .make(allocate) { state =>
         state
-          .getAndSet(State.Released[F]())
+          .getAndSet(none)
           .flatMap {
-            case running: State.Running[F] => running.cache.reverse.traverse_(_.attempt)
-            case _                         => ().pure[F]
+            case Some(release) => release
+            case _             => ().pure[F]
           }
       }
       .map { state =>
@@ -71,8 +62,8 @@ object ResourceRegistry {
             resource.allocated.flatMap {
               case (allocation, release) =>
                 state.modify {
-                  case running: State.Running[F] => running + release -> true
-                  case _                         => State.Released[F]() -> false
+                  case Some(stack) => Some(stack >> release.attempt.void) -> true
+                  case _           => none -> false
                 } flatMap {
                   case true  => allocation.pure[F]
                   case false => release.attempt *> AlreadyReleasedException.raiseError
