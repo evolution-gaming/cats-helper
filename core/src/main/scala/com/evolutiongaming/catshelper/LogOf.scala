@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.Sync
+import cats.effect.{Ref, Sync}
 import cats.implicits._
 import cats.{Applicative, Functor, ~>}
-import ch.qos.logback.classic.util.ContextInitializer
+import ch.qos.logback.classic.util.{ContextInitializer, ContextSelectorStaticBinder}
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 import scala.reflect.ClassTag
@@ -50,14 +50,15 @@ object LogOf {
   }
 
   def logback[F[_] : Sync]: F[LogOf[F]] =
-    for {
-      context <- Sync[F].delay { new ch.qos.logback.classic.LoggerContext() }
-      _ = new ContextInitializer(context).autoConfig()
-    } yield new LogOf[F] {
+    Sync[F].delay {
+      val context = new ch.qos.logback.classic.LoggerContext()
+      new ContextInitializer(context).autoConfig()
+      new LogOf[F] {
 
-      def apply(source: String): F[Log[F]] = Sync[F].delay { Log(context.getLogger(source)) }
+        def apply(source: String): F[Log[F]] = Sync[F].delay { Log(context.getLogger(source)) }
 
-      def apply(source: Class[_]): F[Log[F]] = apply(source.getName.stripSuffix("$"))
+        def apply(source: Class[_]): F[Log[F]] = apply(source.getName.stripSuffix("$"))
+      }
     }
 
 
