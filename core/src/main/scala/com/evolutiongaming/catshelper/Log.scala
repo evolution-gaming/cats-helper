@@ -144,11 +144,13 @@ object Log {
     val FQCN = getClass.getName
 
     def append(msg: => String, mdc: Mdc, level: Level, throwable: Throwable = null): F[Unit] = Sync[F].delay {
-      val event = new LoggingEvent(FQCN, logger, level, msg, throwable, null)
-      mdc.context.map(_.toSortedMap) foreach { mdc =>
-        event.setMDCPropertyMap(mdc.asJava)
+      if (logger.isEnabledFor(level)) {
+        val event = new LoggingEvent(FQCN, logger, level, msg, throwable, null)
+        mdc.context.map(_.toSortedMap) foreach { mdc =>
+          event.setMDCPropertyMap(mdc.asJava)
+        }
+        logger.callAppenders(event)
       }
-      logger.callAppenders(event)
     }
 
     def trace(msg: => String, mdc: Mdc): F[Unit] = append(msg, mdc, Level.TRACE)
