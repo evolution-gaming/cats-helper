@@ -50,14 +50,15 @@ object LogOf {
   }
 
   def logback[F[_] : Sync]: F[LogOf[F]] =
-    for {
-      context <- Sync[F].delay { new ch.qos.logback.classic.LoggerContext() }
-      _ = new ContextInitializer(context).autoConfig()
-    } yield new LogOf[F] {
+    Sync[F].delay {
+      val context = new ch.qos.logback.classic.LoggerContext()
+      new ContextInitializer(context).autoConfig()
+      new LogOf[F] {
 
-      def apply(source: String): F[Log[F]] = Sync[F].delay { Log(context.getLogger(source)) }
+        def apply(source: String): F[Log[F]] = Sync[F].delay { Log(context.getLogger(source)) }
 
-      def apply(source: Class[_]): F[Log[F]] = apply(source.getName.stripSuffix("$"))
+        def apply(source: Class[_]): F[Log[F]] = apply(source.getName.stripSuffix("$"))
+      }
     }
 
 
