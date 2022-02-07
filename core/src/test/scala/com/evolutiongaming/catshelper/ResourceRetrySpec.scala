@@ -15,7 +15,7 @@ import scala.concurrent.duration._
 class ResourceRetrySpec extends AsyncFunSuite with Matchers {
 
   val error  = new Exception(s"text exception")
-  val config = ResourceRetry.Config("test", 5, 10.millis, 100.millis)
+  val config = ResourceRetry.Config("test", 5, 100.millis, 10.millis)
 
   implicit val log   = Log.empty[IO]
   implicit val retry = ResourceRetry.of[IO](config)

@@ -6,19 +6,25 @@ import cats.effect.{Ref, Resource, Temporal}
 
 import scala.concurrent.duration.FiniteDuration
 
-// format: off
+/**
+  * Type class that aims to provide retry mechanic for [[Resource]].
+  * Retrying [[Resource]] means releasing already allocated resources and further reallocation.
+  *
+  * @tparam F the effect type
+  */
 trait ResourceRetry[F[_]] {
 
   def useRetry[A, B](src: Resource[F, A])(use: A => F[B]): F[B]
 
 }
 
+// format: off
 object ResourceRetry {
 
   final case class Config(label: String,
                           attempts: Int,
-                          retryAfter: FiniteDuration,
-                          resetAfter: FiniteDuration)
+                          resetAfter: FiniteDuration,
+                          retryAfter: FiniteDuration)
 
   object implicits {
 
@@ -33,6 +39,17 @@ object ResourceRetry {
 
   def apply[F[_]: ResourceRetry]: ResourceRetry[F] = implicitly
 
+  /**
+    * Create [[ResourceRetry]] with configured parameters that include:
+    * [[Config.label]] - used in debug logs
+    * [[Config.attempts]] - maximum amount of retry attempts before giving up
+    * [[Config.resetAfter]] - delay after which used attempts will be set to [[Config.attempts]]
+    * [[Config.retryAfter]] - delay before resource reallocation after failure
+    *
+    * @param config resource retry configuration of type [[Config]]
+    * @tparam F the effect type
+    * @return [[ResourceRetry]] instance
+    */
   def of[F[_]: Temporal: Log](config: Config): ResourceRetry[F] =
     new ResourceRetry[F] {
 
