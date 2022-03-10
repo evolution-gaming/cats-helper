@@ -1,6 +1,5 @@
 package com.evolutiongaming.catshelper.testkit
 
-import cats.effect.kernel.Outcome
 import cats.effect.testkit.{TestContext, TestInstances}
 import cats.effect.unsafe.IORuntime
 import cats.effect.{Async, IO}
@@ -25,42 +24,33 @@ private[testkit] object PureTestRunner {
 
   private def wrap[A](body: TestBody[A], config: PureTest.Config[IO], mainRuntime: IORuntime): IO[A] = IO.defer {
     val env = new EnvImpl[IO]
-    @volatile var outcome: Option[Either[Throwable, A]] = None
 
-    val testF = body(env).guaranteeCase {
-      case Outcome.Canceled() => IO.delay {
-        outcome = Some(Left(new IllegalStateException("Canceled")))
-      }
-      case Outcome.Errored(e) => IO.delay {
-        outcome = Some(Left(e))
-      }
-      case Outcome.Succeeded(value) => value.map { v => outcome = Some(Right(v)) }
+    // Test should be run against IORuntime which was build with `TestContext`
+    // which we control below.
+    val (testResult: Future[A], testCancel: (() => Future[Unit])) =
+      body(env).unsafeToFutureCancelable()(env.ioRuntime)
+
+    // In the background we schedule a cancellation task to avoid stalling the test
+    // if the test IO goes into an infinite flatMap chain.
+    val timeoutCancel: () => Future[Unit] = {
+      val stopHotLoop = IO.fromFuture(IO.delay(testCancel())).delayBy(config.hotLoopTimeout)
+      stopHotLoop.unsafeRunCancelable()(mainRuntime)
     }
 
-    // test should be run against IORuntime which was build with `TestContext`
-    val cancel: () => Future[Unit] = testF.unsafeRunCancelable()(env.ioRuntime)
-
-    val testThread = Thread.currentThread()
-    val stopHotLoop = IO.defer {
-      val err = new IllegalStateException("Still running")
-      err.setStackTrace(testThread.getStackTrace)
-      outcome = Some(Left(err))
-      IO.fromFuture(IO.delay(cancel()))
-    }
-    val hotLoopGuard = IO.sleep(config.hotLoopTimeout)
-    val timeoutCancel: () => Future[Unit] = (hotLoopGuard *> stopHotLoop).unsafeRunCancelable()(mainRuntime)
-
-    while (outcome.isEmpty && env.testContext.state.tasks.nonEmpty) {
+    while (!testResult.isCompleted && env.testContext.state.tasks.nonEmpty) {
       val nextInterval = env.testContext.nextInterval()
       if (nextInterval > Duration.Zero) {
-        env.testContext.tick()
         env.testContext.advanceAndTick(nextInterval)
       } else {
         env.testContext.tick()
       }
     }
 
-    config.testFrameworkApi.completeWith(outcome, env.testContext.state)
+    // Cancel the background cancellation task if it's still pending.
+    timeoutCancel()
+
+    val result = testResult.value.map(_.toEither)
+    config.testFrameworkApi.completeWith(result, env.testContext.state)
   }
 
   private[testkit] class EnvImpl[F[_]](implicit val async: Async[F]) extends PureTest.Env[F] with TestInstances {

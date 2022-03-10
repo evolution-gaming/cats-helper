@@ -48,8 +48,14 @@ class PureTestSpec extends AnyFreeSpec {
    }
 
   "is unaffected by infinite background loops" in ioTest { _ =>
-    val main = IO.sleep(1.milli)
-    val loop = IO.sleep(1.nano).foreverM
+    // "Unaffected" in this test case means that an infinite background loop does not
+    // prevent PureTest from seeing the result of the main IO and completing the test.
+    // However keep in mind that PureTest still has to "tick" the logical clock for the
+    // background loop, which takes some wall-clock time. So, if the main IO emulates a
+    // log delay while the background loop does millions of tiny increments, ticking
+    // them all might take longer than `hotLoopTimeout`, failing the test as a result.
+    val main = IO.sleep(1.second)
+    val loop = IO.sleep(1.milli).foreverM
     loop.start *> main
   }
 }
