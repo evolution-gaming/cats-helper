@@ -32,18 +32,19 @@ object FromFuture {
   def summon[F[_]](implicit F: FromFuture[F]): FromFuture[F] = F
 
 
-  implicit def lift[F[_] : Async](implicit executor: ExecutionContext): FromFuture[F] = {
+  implicit def lift[F[_] : Async]: FromFuture[F] = {
 
     new FromFuture[F] {
 
       def apply[A](future: => Future[A]) = {
         for {
-          future <- Sync[F].delay(future)
-          result <- future.value.fold {
+          executor <- Async[F].executionContext
+          future   <- Sync[F].delay(future)
+          result   <- future.value.fold {
             Async[F].async_[A] { callback =>
               future.onComplete { a =>
                 callback(a.toEither)
-              }
+              }(executor)
             }
           } {
             case Success(a) => Async[F].pure(a)
