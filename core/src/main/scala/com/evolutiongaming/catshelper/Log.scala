@@ -40,7 +40,9 @@ trait Log[F[_]] {
 
 object Log {
 
-  sealed trait Mdc
+  sealed trait Mdc {
+    def combineWith(other: Mdc): Mdc = Semigroup[Mdc].combine(this, other)
+  }
   object Mdc {
 
     private object Empty extends Mdc
