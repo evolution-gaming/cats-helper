@@ -10,15 +10,13 @@ inThisBuild(Seq(
   startYear := Some(2019),
   licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.8", "2.12.15"),
+  crossScalaVersions := Seq("2.13.8", "3.2.0", "2.12.15"),
 
   versionScheme := Some("semver-spec"),
 
   scalaVersion := crossScalaVersions.value.head,
 
   publishTo := Some(Resolver.evolutionReleases),
-
-  addCompilerPlugin(cpKindProjector),
 ))
 
 // Settings that can't be defined on a higher level go here.
@@ -52,7 +50,6 @@ lazy val core = project
       Cats.core,
       Cats.kernel,
       Cats.effect,
-      machinist,
       `slf4j-api`,
       logback,
       scalatest % Test,
