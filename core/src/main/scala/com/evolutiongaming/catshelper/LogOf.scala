@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.{Ref, Sync}
+import cats.effect.Sync
 import cats.implicits._
 import cats.{Applicative, Functor, ~>}
-import ch.qos.logback.classic.util.{ContextInitializer, ContextSelectorStaticBinder}
+import ch.qos.logback.classic.util.ContextInitializer
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 import scala.reflect.ClassTag

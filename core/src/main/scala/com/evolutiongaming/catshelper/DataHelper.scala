@@ -36,7 +36,7 @@ object DataHelper {
   implicit class IterableOps1DataHelper[A](val self: Iterable[A]) extends AnyVal {
 
     def toSortedSet(implicit order: Order[A]): SortedSet[A] = {
-      implicit val ordering = Order[A].toOrdering
+      implicit val ordering: Ordering[A] = Order[A].toOrdering
       val builder = SortedSet.newBuilder[A]
       builder ++= self
       builder.result()
@@ -47,7 +47,7 @@ object DataHelper {
   implicit class NemOpsDataHelper[K, V](val self: Nem[K, V]) extends AnyVal {
 
     def mapKV[A: Order, B](f: (K, V) => (A, B)): Nem[A, B] = {
-      implicit val ordering = Order[A].toOrdering
+      implicit val ordering: Ordering[A] = Order[A].toOrdering
       self
         .toSortedMap
         .map { case (k, v) => f(k, v) }
@@ -56,7 +56,7 @@ object DataHelper {
     }
 
     def mapK[A: Order](f: K => A): Nem[A, V] = {
-      implicit val ordering = Order[A].toOrdering
+      implicit val ordering: Ordering[A] = Order[A].toOrdering
       self
         .toSortedMap
         .map { case (k, v) => (f(k), v) }
