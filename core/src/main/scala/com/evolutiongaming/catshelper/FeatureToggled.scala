@@ -60,6 +60,7 @@ object FeatureToggled {
   )(
     toggleControl: (Boolean => F[Unit]) => F[Unit],
   ): Resource[F, Resource[F, Option[A]]] = Resource.suspend {
+    type ResourceF[R] = Resource[F, R]
 
     sealed trait State
     case class Active(a: A, awaitTermination: F[Unit]) extends State
@@ -91,7 +92,7 @@ object FeatureToggled {
               runManaged(rwLock.read.use(_ => awaitTermination)) as a.some
 
             case Empty =>
-              none[A].pure[Resource[F, *]]
+              none[A].pure[ResourceF]
           }
         }
 
@@ -119,6 +120,6 @@ object FeatureToggled {
     } yield featureToggledResource
   }
 
-  private def runManaged[F[_]: Concurrent](f: F[_]): Resource[F, Unit] =
+  private def runManaged[F[_]: Concurrent, A](f: F[A]): Resource[F, Unit] =
     Resource.make(f.start)(_.cancel).void
 }
