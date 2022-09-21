@@ -24,7 +24,7 @@ jobs:
           java-version: 17
 
       - name: build ${{ matrix.scala }}
-        run: sbt ++${{ matrix.scala }} clean coverage test mimaReportBinaryIssues
+        run: sbt ++${{ matrix.scala }} clean coverage test
 
       - name: test coverage
         if: success()
