@@ -48,8 +48,8 @@ object GroupWithin {
           def stopped: S = Stopped
           def full(as: Nel[A], timestamp: Long): S = Full(as, timestamp)
 
-          final case object Empty extends S
-          final case object Stopped extends S
+          case object Empty extends S
+          case object Stopped extends S
           final case class Full(as: Nel[A], timestamp: Long) extends S
         }
 

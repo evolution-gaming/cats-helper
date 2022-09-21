@@ -20,8 +20,8 @@ object Serial {
     sealed trait S
 
     object S {
-      final case object Idle extends S
-      final case object Active extends S
+      case object Idle extends S
+      case object Active extends S
       final case class Active(task: F[Unit]) extends S
     }
 
