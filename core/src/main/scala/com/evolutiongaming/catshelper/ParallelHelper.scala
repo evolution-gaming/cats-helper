@@ -8,7 +8,7 @@ object ParallelHelper {
 
   implicit class ParallelObjOps_ParallelHelper(val self: Parallel.type) extends AnyVal {
 
-    @deprecated("use `parFoldMap1` instead", "3.1.0")
+    @deprecated("use `parFoldMap1` instead", "3.2.0")
     def parFoldMap[T[_]: Foldable, F[_], A, B: Monoid](ta: T[A])(f: A => F[B])(implicit P: Parallel[F]): F[B] = {
       val M = Monoid[B]
       val A = P.applicative
@@ -19,12 +19,12 @@ object ParallelHelper {
       P.sequential(fb)
     }
 
-    @deprecated("use `parFold1` instead", "3.1.0")
+    @deprecated("use `parFold1` instead", "3.2.0")
     def parFold[T[_]: Foldable, F[_], A: Monoid](tfa: T[F[A]])(implicit P: Parallel[F]): F[A] = {
       parFoldMap(tfa)(Predef.identity)
     }
 
-    @deprecated("use `parFoldMap1` instead", "3.1.0")
+    @deprecated("use `parFoldMap1` instead", "3.2.0")
     def parFoldMapTraversable[F[_]: Parallel, A, B: Monoid](ta: TraversableOnce[A])(f: A => F[B]): F[B] = {
       val P = Parallel[F]
       val M = Monoid[B]
@@ -69,7 +69,7 @@ object ParallelHelper {
 
   implicit class ParallelOps_ParallelHelper[T[_], A](val self: T[A]) extends AnyVal {
 
-    @deprecated("use `parFoldMap1` instead", "3.1.0")
+    @deprecated("use `parFoldMap1` instead", "3.2.0")
     def parFoldMap[F[_], B: Monoid](f: A => F[B])(implicit F: Foldable[T], P: Parallel[F]): F[B] = {
       Parallel.parFoldMap(self)(f)
     }
@@ -78,7 +78,7 @@ object ParallelHelper {
 
   implicit class ParallelFOps_ParallelHelper[T[_], F[_], A](val self: T[F[A]]) extends AnyVal {
 
-    @deprecated("use `parFold1` instead", "3.1.0")
+    @deprecated("use `parFold1` instead", "3.2.0")
     def parFold(implicit M: Monoid[A], F: Foldable[T], P: Parallel[F]): F[A] = {
       Parallel.parFold(self)
     }
@@ -86,7 +86,7 @@ object ParallelHelper {
 
   implicit class IterableOnce_ParallelHelper[A](val self: TraversableOnce[A]) extends AnyVal {
 
-    @deprecated("use `parFoldMap1` instead", "3.1.0")
+    @deprecated("use `parFoldMap1` instead", "3.2.0")
     def parFoldMapTraversable[F[_]: Parallel, B: Monoid](f: A => F[B]): F[B] = {
       Parallel.parFoldMapTraversable(self)(f)
     }
