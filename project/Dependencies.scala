@@ -4,7 +4,7 @@ object Dependencies {
 
   val scalatest   = "org.scalatest"     %% "scalatest"       % "3.2.13"
   val `slf4j-api` = "org.slf4j"          % "slf4j-api"       % "2.0.1"
-  val logback     = "ch.qos.logback"     % "logback-classic" % "1.4.1"
+  val logback     = "ch.qos.logback"     % "logback-classic" % "1.4.4"
 
   object Cats {
     private val version = "2.8.0"
