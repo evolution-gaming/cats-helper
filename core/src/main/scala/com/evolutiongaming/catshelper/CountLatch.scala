@@ -24,7 +24,7 @@ import cats.syntax.all._
 sealed trait CountLatch[F[_]] {
 
   /** Increase latches by one */
-  def acquire: F[Unit]
+  def acquire(n: Int = 1): F[Unit]
 
   /** Decrease latches by one */
   def release: F[Unit]
@@ -53,20 +53,22 @@ object CountLatch {
     } yield
       new CountLatch[F] {
 
-        override def acquire: F[Unit] =
-          state.access
-            .flatMap {
-              case (state, set) =>
-                for {
-                  state <- state match {
-                    case Done               => Awaiting(1)
-                    case Awaiting(n, await) => Awaiting(n + 1, await).pure[F]
-                  }
-                  result <- set(state)
-                } yield result
-            }
-            .iterateUntil(identity)
-            .void
+        override def acquire(n: Int): F[Unit] =
+          if (n < 1) Async[F].unit
+          else
+            state.access
+              .flatMap {
+                case (state, set) =>
+                  for {
+                    state <- state match {
+                      case Done           => Awaiting(n)
+                      case Awaiting(l, a) => Awaiting(l + n, a).pure[F]
+                    }
+                    result <- set(state)
+                  } yield result
+              }
+              .iterateUntil(identity)
+              .void
 
         override def release: F[Unit] =
           Async[F].uncancelable { _ =>
