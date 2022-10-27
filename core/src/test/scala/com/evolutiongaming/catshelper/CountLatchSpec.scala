@@ -106,7 +106,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       latch <- CountLatch[IO](0)
       queue <- Queue.bounded[IO, Int](times)
       acquire = latch.acquire() >> queue.offer(0)
-      release = queue.take >> latch.release
+      release = queue.take >> latch.release()
       f1 <- acquire.replicateA(times).start
       f2 <- release.replicateA(times).start
       _ <- f1.joinWithNever
