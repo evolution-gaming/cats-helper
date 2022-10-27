@@ -1,6 +1,6 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.{Async, Concurrent, Deferred, Ref}
+import cats.effect.{Async, Deferred, Ref}
 import cats.syntax.all._
 
 /**
@@ -35,49 +35,45 @@ sealed trait CountLatch[F[_]] {
 
 object CountLatch {
 
-  def apply[F[_]: Async](n: Int = 0): F[CountLatch[F]] =
+  def apply[F[_]: Async](n: Int = 0): F[CountLatch[F]] = {
+
+    sealed trait State
+    case object Done extends State
+    case class Awaiting(latches: Int, signal: Deferred[F, Unit]) extends State
+    object Awaiting {
+      def apply(latches: Int): F[Awaiting] =
+        for {
+          await <- Deferred[F, Unit]
+        } yield Awaiting(latches, await)
+    }
+
     for {
-      state <- if (n > 0) State.awaiting(n) else State.Done[F]().pure[F]
-      state <- Ref.of[F, State[F]](state)
+      state <- if (n > 0) Awaiting(n) else Done.pure[F]
+      state <- Ref.of[F, State](state)
     } yield
       new CountLatch[F] {
 
         override def acquire: F[Unit] =
           state.update {
-            case State.Done()             => State.Awaiting(1, Deferred.unsafe[F, Unit])
-            case State.Awaiting(n, await) => State.Awaiting(n + 1, await)
+            case Done               => Awaiting(1, Deferred.unsafe[F, Unit])
+            case Awaiting(n, await) => Awaiting(n + 1, await)
           }
 
         override def release: F[Unit] =
           Async[F].uncancelable { _ =>
             state.modify {
-              case d: State.Done[F] => d -> Async[F].unit
-              case State.Awaiting(1, await) =>
-                State.Done[F]() -> await.complete(()).void
-              case State.Awaiting(n, await) =>
-                State.Awaiting(n - 1, await) -> Async[F].unit
+              case Done               => Done -> Async[F].unit
+              case Awaiting(1, await) => Done -> await.complete(()).void
+              case Awaiting(n, await) => Awaiting(n - 1, await) -> Async[F].unit
             }.flatten
           }
 
         override def await: F[Unit] =
           state.get.flatMap {
-            case State.Done()              => Async[F].unit
-            case State.Awaiting(_, signal) => signal.get
+            case Done                => Async[F].unit
+            case Awaiting(_, signal) => signal.get
           }
       }
-
-  private sealed trait State[F[_]]
-
-  private object State {
-    final case class Awaiting[F[_]](latches: Int, signal: Deferred[F, Unit])
-        extends State[F]
-
-    final case class Done[F[_]]() extends State[F]
-
-    def awaiting[F[_]: Concurrent](latches: Int): F[Awaiting[F]] =
-      for {
-        await <- Deferred[F, Unit]
-      } yield Awaiting(latches, await)
   }
 
 }
