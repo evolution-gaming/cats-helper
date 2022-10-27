@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
-import cats.Applicative
-import cats.effect.{Async, Deferred, Ref}
+import cats.{Applicative, Monad}
+import cats.effect.{Async, Deferred, MonadCancel, Ref}
 import cats.syntax.all._
 
 /**
@@ -102,6 +102,15 @@ object CountLatch {
             case Awaiting(_, signal) => signal.get
           }
       }
+  }
+
+  implicit final class CountLatchOps[F[_]](val latch: CountLatch[F])
+      extends AnyVal {
+
+    /** acquire CountLatch before [[fa]] and release it after, tolerating failure & cancellation of [[fa]] */
+    def surround[A](fa: F[A])(implicit F: MonadCancel[F, Throwable]): F[A] =
+      F.bracket(latch.acquire())(_ => fa)(_ => latch.release())
+
   }
 
 }
