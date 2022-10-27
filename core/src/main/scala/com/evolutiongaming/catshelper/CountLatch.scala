@@ -12,7 +12,7 @@ import cats.syntax.all._
   *    for {
   *       latch <- CountLatch[IO](1)
   *       fiber <- latch.await.start
-  *       _ <- latch.acquire
+  *       _ <- latch.acquire()
   *       _ <- latch.release
   *       _ <- latch.release
   *       _ <- fiber.joinWithNever
@@ -23,7 +23,7 @@ import cats.syntax.all._
   */
 sealed trait CountLatch[F[_]] {
 
-  /** Increase latches by one */
+  /** Increase latches on [[n]] */
   def acquire(n: Int = 1): F[Unit]
 
   /** Decrease latches by one */
