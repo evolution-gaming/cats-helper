@@ -28,7 +28,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
     val io = for {
       latch <- CountLatch[IO](1)
       blocked <- latch.blocked
-      _ <- latch.release
+      _ <- latch.release()
       done <- latch.done
     } yield {
       blocked shouldBe true
@@ -43,7 +43,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       done0 <- latch.done
       _ <- latch.acquire()
       blocked <- latch.blocked
-      _ <- latch.release
+      _ <- latch.release()
       done1 <- latch.done
     } yield {
       done0 shouldBe true
@@ -59,8 +59,8 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       blocked0 <- latch.blocked
       _ <- latch.acquire()
       blocked1 <- latch.blocked
-      _ <- latch.release
-      _ <- latch.release
+      _ <- latch.release()
+      _ <- latch.release()
       done <- latch.done
     } yield {
       blocked0 shouldBe true
@@ -76,8 +76,8 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       done0 <- latch.done
       _ <- latch.acquire(2)
       blocked <- latch.blocked
-      _ <- latch.release
-      _ <- latch.release
+      _ <- latch.release()
+      _ <- latch.release()
       done1 <- latch.done
     } yield {
       blocked shouldBe true
@@ -124,8 +124,8 @@ object CountLatchSpec {
   private val immediately = 1.millisecond
   implicit class CountLatchOps(val latch: CountLatch[IO]) extends AnyVal {
     def blocked: IO[Boolean] =
-      latch.await.as(false).timeoutTo(immediately, IO(true))
+      latch.await().as(false).timeoutTo(immediately, IO(true))
     def done: IO[Boolean] =
-      latch.await.as(true).timeoutTo(immediately, IO(false))
+      latch.await().as(true).timeoutTo(immediately, IO(false))
   }
 }

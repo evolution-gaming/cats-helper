@@ -27,10 +27,10 @@ sealed trait CountLatch[F[_]] {
   def acquire(n: Int = 1): F[Unit]
 
   /** Decrease latches by one */
-  def release: F[Unit]
+  def release(): F[Unit]
 
   /** Semantically blocks fiber while latches more than zero */
-  def await: F[Unit]
+  def await(): F[Unit]
 }
 
 object CountLatch {
@@ -74,7 +74,7 @@ object CountLatch {
                 .void
             }
 
-        override def release: F[Unit] =
+        override def release(): F[Unit] =
           F.uncancelable { _ =>
             state.modify {
               case Done               => Done -> F.unit
@@ -83,7 +83,7 @@ object CountLatch {
             }.flatten
           }
 
-        override def await: F[Unit] =
+        override def await(): F[Unit] =
           state.get.flatMap {
             case Done                => F.unit
             case Awaiting(_, signal) => signal.get
