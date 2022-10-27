@@ -41,47 +41,51 @@ object CountLatch {
     case object Done extends State
     case class Awaiting(latches: Int, signal: Deferred[F, Unit]) extends State
     object Awaiting {
-      def apply(latches: Int): F[Awaiting] =
+      def apply(latches: Int): F[State] =
         for {
           await <- Deferred[F, Unit]
         } yield Awaiting(latches, await)
     }
 
     for {
-      state <- if (n > 0) Awaiting(n) else Done.pure[F]
+      state <- if (n > 0) Awaiting(n) else Done.pure[F].widen[State]
       state <- Ref.of[F, State](state)
     } yield
       new CountLatch[F] {
 
+        val F = Async[F]
+
         override def acquire(n: Int): F[Unit] =
-          if (n < 1) Async[F].unit
+          if (n < 1) F.unit
           else
-            state.access
-              .flatMap {
-                case (state, set) =>
-                  for {
-                    state <- state match {
-                      case Done           => Awaiting(n)
-                      case Awaiting(l, a) => Awaiting(l + n, a).pure[F]
-                    }
-                    result <- set(state)
-                  } yield result
-              }
-              .iterateUntil(identity)
-              .void
+            F.uncancelable { _ =>
+              state.access
+                .flatMap {
+                  case (state, set) =>
+                    for {
+                      state <- state match {
+                        case Done           => Awaiting(n)
+                        case Awaiting(l, a) => Awaiting(l + n, a).pure[F]
+                      }
+                      result <- set(state)
+                    } yield result
+                }
+                .iterateUntil(identity)
+                .void
+            }
 
         override def release: F[Unit] =
-          Async[F].uncancelable { _ =>
+          F.uncancelable { _ =>
             state.modify {
-              case Done               => Done -> Async[F].unit
+              case Done               => Done -> F.unit
               case Awaiting(1, await) => Done -> await.complete(()).void
-              case Awaiting(n, await) => Awaiting(n - 1, await) -> Async[F].unit
+              case Awaiting(n, await) => Awaiting(n - 1, await) -> F.unit
             }.flatten
           }
 
         override def await: F[Unit] =
           state.get.flatMap {
-            case Done                => Async[F].unit
+            case Done                => F.unit
             case Awaiting(_, signal) => signal.get
           }
       }
