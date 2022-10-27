@@ -54,10 +54,19 @@ object CountLatch {
       new CountLatch[F] {
 
         override def acquire: F[Unit] =
-          state.update {
-            case Done               => Awaiting(1, Deferred.unsafe[F, Unit])
-            case Awaiting(n, await) => Awaiting(n + 1, await)
-          }
+          state.access
+            .flatMap {
+              case (state, set) =>
+                for {
+                  state <- state match {
+                    case Done               => Awaiting(1)
+                    case Awaiting(n, await) => Awaiting(n + 1, await).pure[F]
+                  }
+                  result <- set(state)
+                } yield result
+            }
+            .iterateUntil(identity)
+            .void
 
         override def release: F[Unit] =
           Async[F].uncancelable { _ =>

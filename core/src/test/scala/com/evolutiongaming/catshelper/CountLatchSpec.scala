@@ -1,6 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.IO
+import cats.effect.std.Queue
 import cats.effect.unsafe.IORuntime
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -73,8 +74,11 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
     val times = 100
     val io = for {
       latch <- CountLatch[IO](0)
-      f1 <- latch.acquire.replicateA(times).start
-      f2 <- latch.release.replicateA(times).start
+      queue <- Queue.bounded[IO, Int](times)
+      acquire = latch.acquire >> queue.offer(0)
+      release = queue.take >> latch.release
+      f1 <- acquire.replicateA(times).start
+      f2 <- release.replicateA(times).start
       _ <- f1.joinWithNever
       _ <- f2.joinWithNever
       done <- latch.done
