@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.Applicative
 import cats.effect.{Async, Deferred, Ref}
 import cats.syntax.all._
 
@@ -34,6 +35,18 @@ sealed trait CountLatch[F[_]] {
 }
 
 object CountLatch {
+
+  def empty[F[_]: Applicative]: CountLatch[F] =
+    new CountLatch[F] {
+
+      val F = Applicative[F]
+
+      override def acquire(n: Int): F[Unit] = F.unit
+
+      override def release(): F[Unit] = F.unit
+
+      override def await(): F[Unit] = F.unit
+    }
 
   def apply[F[_]: Async](n: Int = 0): F[CountLatch[F]] = {
 
