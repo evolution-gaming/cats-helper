@@ -3,7 +3,6 @@ package com.evolutiongaming.catshelper
 import cats.effect.Sync
 import cats.implicits._
 import cats.{Applicative, Functor, ~>}
-import ch.qos.logback.classic.util.ContextInitializer
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 import scala.reflect.ClassTag
@@ -49,18 +48,8 @@ object LogOf {
     }
   }
 
-  def logback[F[_] : Sync]: F[LogOf[F]] =
-    Sync[F].delay {
-      val context = new ch.qos.logback.classic.LoggerContext()
-      new ContextInitializer(context).autoConfig()
-      new LogOf[F] {
-
-        def apply(source: String): F[Log[F]] = Sync[F].delay { Log(context.getLogger(source)) }
-
-        def apply(source: Class[_]): F[Log[F]] = apply(source.getName.stripSuffix("$"))
-      }
-    }
-
+  @deprecated("use `slf4j` instead", "2.10.0")
+  def logback[F[_] : Sync]: F[LogOf[F]] = slf4j[F]
 
   def empty[F[_] : Applicative]: LogOf[F] = const(Log.empty[F].pure[F])
 

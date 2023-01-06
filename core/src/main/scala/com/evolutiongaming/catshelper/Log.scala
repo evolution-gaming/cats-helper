@@ -134,40 +134,6 @@ object Log {
     }
   }
 
-  def apply[F[_] : Sync](logger: ch.qos.logback.classic.Logger): Log[F] = new Log[F] {
-
-    import ch.qos.logback.classic.Level
-    import ch.qos.logback.classic.spi.LoggingEvent
-
-    import scala.collection.JavaConverters._
-
-    val FQCN = getClass.getName
-
-    def append(msg: => String, mdc: Mdc, level: Level, throwable: Throwable = null): F[Unit] = Sync[F].delay {
-      if (logger.isEnabledFor(level)) {
-        val event = new LoggingEvent(FQCN, logger, level, msg, throwable, null)
-        mdc.context.map(_.toSortedMap) foreach { mdc =>
-          event.setMDCPropertyMap(mdc.asJava)
-        }
-        logger.callAppenders(event)
-      }
-    }
-
-    def trace(msg: => String, mdc: Mdc): F[Unit] = append(msg, mdc, Level.TRACE)
-
-    def debug(msg: => String, mdc: Mdc): F[Unit] = append(msg, mdc, Level.DEBUG)
-
-    def info(msg: => String, mdc: Mdc): F[Unit] = append(msg, mdc, Level.INFO)
-
-    def warn(msg: => String, mdc: Mdc): F[Unit] = append(msg, mdc, Level.WARN)
-
-    def warn(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = append(msg, mdc, Level.WARN, cause)
-
-    def error(msg: => String, mdc: Mdc): F[Unit] = append(msg, mdc, Level.ERROR)
-
-    def error(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = append(msg, mdc, Level.ERROR, cause)
-  }
-
   def const[F[_]](unit: F[Unit]): Log[F] = new Log[F] {
 
     def trace(msg: => String, mdc: Log.Mdc) = unit
