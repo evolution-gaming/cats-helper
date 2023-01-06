@@ -36,22 +36,21 @@ lazy val root = project
   )
   .aggregate(
     core,
+    logback,
     testkit,
   )
 
 lazy val core = project
   .settings(
     commonSettings,
-
     // formerly this was a top-level module and thus it retains the old name
     name := "cats-helper",
-
     libraryDependencies ++= Seq(
       Cats.core,
       Cats.kernel,
       Cats.effect,
       `slf4j-api`,
-      logback,
+      Logback.classic % Test,
       scalatest % Test,
     ),
   )
@@ -59,12 +58,24 @@ lazy val core = project
     testkit % Test,
   )
 
+lazy val logback = project
+  .settings(
+    commonSettings,
+    name := "cats-helper-logback",
+    libraryDependencies ++= Seq(
+      Logback.classic,
+      scalatest % Test,
+    )
+  )
+  .dependsOn(
+    core,
+    testkit % Test,
+  )
+
 lazy val testkit = project
   .settings(
     commonSettings,
-
     name := "cats-helper-testkit",
-
     libraryDependencies ++= Seq(
       Cats.effectStd,
       Cats.effectTestkit,
