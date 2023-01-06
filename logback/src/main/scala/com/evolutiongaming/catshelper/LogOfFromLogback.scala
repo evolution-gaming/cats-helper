@@ -9,17 +9,17 @@ import com.evolutiongaming.catshelper.Log.Mdc
 import scala.collection.JavaConverters._
 
 /**
-  * Motivation:
-  *
+  * ===Motivation===
   * Direct logback usage required to overcome limitations of SLF4J MDC API.
   * SLF4J MDC API heavily rely on [[ThreadLocal]], example: ch.qos.logback.classic.util.LogbackMDCAdapter
   *
-  * Logback' [[LoggingEvent]] allow setting MDC directly as Java map that should have performance benefits compared with SLF4J implementation.
+  * Logback' [[LoggingEvent]] allow setting MDC directly as Java map that should have performance benefits compared with SLF4J/Logback implementation.
   *
-  * Please be aware that defining other version of logback might bring '''RUNTIME ERRORS''' or '''MISSING LOGS''' in case of binary incompatibility between them.
+  *  ==CAUTION!==
+  * Please be aware that using other version of logback (than used in `cats-helper-logback`) might bring '''RUNTIME ERRORS''' or '''MISSING LOGS''' in case of binary incompatibility between them.
   * Suggested approach is in using exactly same logback version as used in `cats-helper-logback` (among all others available through transitive dependencies)
   */
-object Logback {
+object LogOfFromLogback {
 
   def apply[F[_]: Sync]: F[LogOf[F]] =
     Sync[F].delay {
