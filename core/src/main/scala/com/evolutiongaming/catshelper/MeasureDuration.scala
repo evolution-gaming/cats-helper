@@ -74,15 +74,4 @@ object MeasureDuration {
       val start: G[G[FiniteDuration]] = f(self.start.map(f.apply))
     }
   }
-
-  import cats.effect.IO
-  import com.evolutiongaming.catshelper.syntax.measureDuration._
-
-  for {
-    int1 <- IO.pure(1).measured(elapsed => IO.println(s"elapsed: $elapsed"))
-    int2 <- IO.pure(1).measuredCase(
-      successF = elapsed => IO.println(s"Succeeded: $elapsed"),
-      failureF = elapsed => IO.println(s"Failed: $elapsed")
-    )
-  } yield int1 + int2
 }
