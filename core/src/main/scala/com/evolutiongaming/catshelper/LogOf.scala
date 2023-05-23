@@ -11,7 +11,7 @@ trait LogOf[F[_]] {
 
   def apply(source: String): F[Log[F]]
 
-  def apply(source: Class[_]): F[Log[F]]
+  def apply(source: Class[?]): F[Log[F]]
 }
 
 object LogOf {
@@ -33,7 +33,7 @@ object LogOf {
         Log[F](log)
       }
     }
-    def apply(source: Class[_]) = apply(source.getName.stripSuffix("$"))
+    def apply(source: Class[?]) = apply(source.getName.stripSuffix("$"))
   }
 
 
@@ -58,7 +58,7 @@ object LogOf {
 
     def apply(source: String) = log
 
-    def apply(source: Class[_]) = log
+    def apply(source: Class[?]) = log
   }
 
 
@@ -74,7 +74,7 @@ object LogOf {
         }
       }
 
-      def apply(source: Class[_]) = {
+      def apply(source: Class[?]) = {
         for {
           log <- f(self(source))
         } yield {

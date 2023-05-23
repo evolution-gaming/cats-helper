@@ -1,5 +1,13 @@
 import Dependencies._
 
+def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
+  CrossVersion.partialVersion(scalaVersion) match {
+    case Some((3, _)) => if3
+    case Some((2, 12 | 13)) => if2
+    case _ => Nil
+  }
+}
+
 inThisBuild(Seq(
   homepage := Some(new URL("http://github.com/evolution-gaming/cats-helper")),
 
@@ -52,6 +60,16 @@ lazy val core = project
       `slf4j-api`,
       Logback.classic % Test,
       scalatest % Test,
+    ),
+    libraryDependencies ++= crossSettings(
+      scalaVersion.value,
+      if3 = Nil,
+      if2 = List(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full))
+    ),
+    scalacOptions ++= crossSettings(
+      scalaVersion.value,
+      if3 = Seq("-Ykind-projector:underscores", "-language:implicitConversions"),
+      if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders")
     ),
   )
   .dependsOn(
