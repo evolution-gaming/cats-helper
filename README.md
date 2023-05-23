@@ -18,6 +18,34 @@ clock.micros // 1
 clock.instant // Instant.ofEpochMilli(2)
 ```
 
+## MeasureDuration
+
+Provides a way to measure duration of a computation in a pure way.
+
+Example:
+```scala
+import com.evolutiongaming.catshelper.MeasureDuration
+
+for {
+  duration <- MeasureDuration[IO].start
+  _        <- doSomething
+  duration <- duration
+} yield duration
+```
+
+Syntax extensions are also available, allowing to measure duration of a computation and execute an effect with it:
+```scala
+import com.evolutiongaming.catshelper.syntax.measureDuration._
+
+for {
+  int1 <- IO.pure(1).measured(elapsed => IO.println(s"elapsed: $elapsed"))
+  int2 <- IO.pure(1).measuredCase(
+    successF = elapsed => IO.println(s"Succeeded: $elapsed"),
+    failureF = elapsed => IO.println(s"Failed: $elapsed")
+  )
+} yield int1 + int2
+```
+
 ## SerialRef
 
 Like [`Ref`](https://typelevel.org/cats-effect/concurrency/ref.html) but allows `A => F[A]` rather than `A => A`  
