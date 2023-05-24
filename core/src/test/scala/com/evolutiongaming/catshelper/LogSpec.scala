@@ -103,7 +103,7 @@ object LogSpec {
         }
       }
 
-      def apply(source: Class[_]) = {
+      def apply(source: Class[?]) = {
         StateT { state =>
           val action = Action.OfClass(source)
           (state.add(action), log)
@@ -188,7 +188,7 @@ object LogSpec {
 
   object Action {
     final case class OfStr(source: String) extends Action
-    final case class OfClass(source: Class[_]) extends Action
+    final case class OfClass(source: Class[?]) extends Action
     final case class Trace(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
     final case class Debug(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
     final case class Info(msg: String, mdc: Log.Mdc = Log.Mdc.empty) extends Action
