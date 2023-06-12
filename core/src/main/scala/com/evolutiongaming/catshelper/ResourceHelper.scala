@@ -10,7 +10,7 @@ object ResourceHelper {
         timedAcquireAndRelease <- for {
           getMeasurement           <- MeasureDuration[F].start
           _                        <- Log[F].info(s"$name acquiring")
-          a <- self.allocated.attemptTap {
+          a                        <- self.allocated.attemptTap {
             case Left(err) => for {
               measureResult <- getMeasurement
               _ <- Log[F].error(s"$name acquisition failed in ${measureResult.toMillis}ms with $err", err)
