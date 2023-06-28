@@ -1,37 +1,47 @@
 import Dependencies._
 
-def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
-  CrossVersion.partialVersion(scalaVersion) match {
-    case Some((3, _)) => if3
-    case Some((2, 12 | 13)) => if2
-    case _ => Nil
-  }
+def crossSettings[T](
+    scalaVersion: String,
+    if3: List[T] = Nil,
+    if2: List[T] = Nil
+) = scalaVersion match {
+  case version if version.startsWith("3") => if3
+  case _                                  => if2
 }
 
-inThisBuild(Seq(
-  homepage := Some(new URL("http://github.com/evolution-gaming/cats-helper")),
+enablePlugins(GitVersioning)
 
-  organization := "com.evolutiongaming",
-  organizationName := "Evolution",
-  organizationHomepage := Some(url("http://evolution.com")),
+inThisBuild(
+  Seq(
+    homepage := Some(new URL("http://github.com/evolution-gaming/cats-helper")),
+    organization := "com.evolution",
+    organizationName := "Evolution",
+    organizationHomepage := Some(url("http://evolution.com")),
 
-  startYear := Some(2019),
-  licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
+    startYear := Some(2019),
+    licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.8", "3.2.0", "2.12.15"),
+    versionScheme := Some("semver-spec"),
+    crossScalaVersions := Seq("2.13.8", "3.3.0", "2.12.15"),
+    scalaVersion := crossScalaVersions.value.head,
 
-  versionScheme := Some("semver-spec"),
+    sonatypeCredentialHost := "s01.oss.sonatype.org",
+    sonatypeRepository := "https://s01.oss.sonatype.org/service/local",
 
-  scalaVersion := crossScalaVersions.value.head,
-
-  publishTo := Some(Resolver.evolutionReleases),
-))
+    scmInfo := Some(
+      ScmInfo(
+        url("https://github.com/evolution-gaming/cats-helper"),
+        "git@github.com:evolution-gaming/cats-helper.git"
+      )
+    ),
+    Test / publishArtifact := false
+  )
+)
 
 // Settings that can't be defined on a higher level go here.
 // Usually such settings have defaults defined by some plugin in its `projectSettings`.
 lazy val commonSettings = Seq(
-  releaseCrossBuild := true,
-  scalacOptsFailOnWarn := Some(false),
+  scalacOptsFailOnWarn := Some(false)
 )
 
 lazy val root = project
@@ -40,12 +50,12 @@ lazy val root = project
     commonSettings,
     name := "cats-helper",
     publish / skip := true,
-    publishArtifact := false,
+    publishArtifact := false
   )
   .aggregate(
     core,
     logback,
-    testkit,
+    testkit
   )
 
 lazy val core = project
@@ -59,21 +69,26 @@ lazy val core = project
       Cats.effect,
       `slf4j-api`,
       Logback.classic % Test,
-      scalatest % Test,
+      scalatest % Test
     ),
     libraryDependencies ++= crossSettings(
       scalaVersion.value,
       if3 = Nil,
-      if2 = List(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full))
+      if2 = List(
+        compilerPlugin(
+          "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full
+        )
+      )
     ),
     scalacOptions ++= crossSettings(
       scalaVersion.value,
-      if3 = Seq("-Ykind-projector:underscores", "-language:implicitConversions"),
+      if3 =
+        List("-Ykind-projector:underscores", "-language:implicitConversions"),
       if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders")
-    ),
+    )
   )
   .dependsOn(
-    testkit % Test,
+    testkit % Test
   )
 
 lazy val logback = project
@@ -82,12 +97,12 @@ lazy val logback = project
     name := "cats-helper-logback",
     libraryDependencies ++= Seq(
       Logback.classic,
-      scalatest % Test,
+      scalatest % Test
     )
   )
   .dependsOn(
     core,
-    testkit % Test,
+    testkit % Test
   )
 
 lazy val testkit = project
@@ -98,6 +113,6 @@ lazy val testkit = project
       Cats.effectStd,
       Cats.effectTestkit,
       Cats.effectLaws,
-      scalatest % Optional,
-    ),
+      scalatest % Optional
+    )
   )
