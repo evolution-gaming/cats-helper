@@ -22,7 +22,7 @@ inThisBuild(
     licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
     versionScheme := Some("semver-spec"),
-    crossScalaVersions := Seq("2.13.8", "3.3.0", "2.12.15"),
+    crossScalaVersions := Seq("2.13.11", "3.3.0", "2.12.18"),
     scalaVersion := crossScalaVersions.value.head,
 
     sonatypeCredentialHost := "s01.oss.sonatype.org",
