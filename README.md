@@ -2,13 +2,13 @@
 [![Build Status](https://github.com/evolution-gaming/cats-helper/workflows/CI/badge.svg)](https://github.com/evolution-gaming/cats-helper/actions?query=workflow%3ACI)
 [![Coverage Status](https://coveralls.io/repos/evolution-gaming/cats-helper/badge.svg)](https://coveralls.io/r/evolution-gaming/cats-helper)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/69204a35e17b4e068db5861524bef5b7)](https://www.codacy.com/app/evolution-gaming/cats-helper?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=evolution-gaming/cats-helper&amp;utm_campaign=Badge_Grade)
-[![Version](https://img.shields.io/badge/version-click-blue)](https://evolution.jfrog.io/artifactory/api/search/latestVersion?g=com.evolutiongaming&a=cats-helper_2.13&repos=public)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.evolution/cats-helper.13/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.evolution/cats-helper_2.13)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellowgreen.svg)](https://opensource.org/licenses/MIT)
 
 ## ClockHelper
 
 ```scala
-import com.evolutiongaming.catshelper.ClockHelper._
+import com.evolution.catshelper.ClockHelper._
 
 val clock = Clock.const[Id](nanos = 1000, millis = 2)
 
@@ -24,7 +24,7 @@ Provides a way to measure duration of a computation in a pure way.
 
 Example:
 ```scala
-import com.evolutiongaming.catshelper.MeasureDuration
+import com.evolution.catshelper.MeasureDuration
 
 for {
   duration <- MeasureDuration[IO].start
@@ -35,7 +35,7 @@ for {
 
 Syntax extensions are also available, allowing to measure duration of a computation and execute an effect with it:
 ```scala
-import com.evolutiongaming.catshelper.syntax.measureDuration._
+import com.evolution.catshelper.syntax.measureDuration._
 
 for {
   int1 <- IO.pure(1).measured(elapsed => IO.println(s"elapsed: $elapsed"))
@@ -52,7 +52,7 @@ Like [`Ref`](https://typelevel.org/cats-effect/concurrency/ref.html) but allows 
 Ensures that updates are run serially
 
 ```scala
-import com.evolutiongaming.catshelper.SerialRef
+import com.evolution.catshelper.SerialRef
 
 for {
   ref <- SerialRef.of[IO, Int](0)
@@ -209,5 +209,5 @@ However we will do our best to avoid unnecessary breakages.
 ```scala
 addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
 
-libraryDependencies += "com.evolutiongaming" %% "cats-helper" % "2.2.3"
+libraryDependencies += "com.evolution" %% "cats-helper" % "2.2.3"
 ```
