@@ -8,7 +8,7 @@
 ## ClockHelper
 
 ```scala
-import com.evolutiongaming.catshelper.ClockHelper._
+import com.evolution.catshelper.ClockHelper._
 
 val clock = Clock.const[Id](nanos = 1000, millis = 2)
 
@@ -24,7 +24,7 @@ Provides a way to measure duration of a computation in a pure way.
 
 Example:
 ```scala
-import com.evolutiongaming.catshelper.MeasureDuration
+import com.evolution.catshelper.MeasureDuration
 
 for {
   duration <- MeasureDuration[IO].start
@@ -35,7 +35,7 @@ for {
 
 Syntax extensions are also available, allowing to measure duration of a computation and execute an effect with it:
 ```scala
-import com.evolutiongaming.catshelper.syntax.measureDuration._
+import com.evolution.catshelper.syntax.measureDuration._
 
 for {
   int1 <- IO.pure(1).measured(elapsed => IO.println(s"elapsed: $elapsed"))
@@ -52,7 +52,7 @@ Like [`Ref`](https://typelevel.org/cats-effect/concurrency/ref.html) but allows 
 Ensures that updates are run serially
 
 ```scala
-import com.evolutiongaming.catshelper.SerialRef
+import com.evolution.catshelper.SerialRef
 
 for {
   ref <- SerialRef.of[IO, Int](0)
@@ -209,5 +209,5 @@ However we will do our best to avoid unnecessary breakages.
 ```scala
 addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
 
-libraryDependencies += "com.evolutiongaming" %% "cats-helper" % "2.2.3"
+libraryDependencies += "com.evolution" %% "cats-helper" % "2.2.3"
 ```
