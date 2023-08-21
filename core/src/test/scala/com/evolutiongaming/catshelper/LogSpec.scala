@@ -2,12 +2,14 @@ package com.evolutiongaming.catshelper
 
 import cats.Id
 import cats.arrow.FunctionK
-import cats.effect.{IO, Ref}
+import cats.effect.IO
 
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import com.evolutiongaming.catshelper.IOSuite.*
+
+import scala.concurrent.duration.*
 
 class LogSpec extends AnyFunSuite with Matchers {
 
@@ -69,15 +71,18 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.OfStr("source")))
   }
 
-  test("MDC cleanup") {
+  test("MDC ThreadLocal cleanup") {
 
     val io = for {
       logOf <- LogOf.slf4j[IO]
       log <- logOf(getClass)
       _ <- log.info("whatever", Log.Mdc("k" -> "v"))
-    } yield org.slf4j.MDC.getCopyOfContextMap
+    } yield {
+      val context = org.slf4j.MDC.getCopyOfContextMap
+      context shouldEqual null
+    }
 
-    io.unsafeRunSync() shouldEqual null
+    io.unsafeRunSync()
   }
 
   test("MDC lazy evaluation") {
@@ -90,7 +95,8 @@ class LogSpec extends AnyFunSuite with Matchers {
     val io = for {
       log <- LogOf.slf4j[IO]
       log <- log("test-lazy-mdc")
-      _   <- log.trace("whatever", mdc) // trace is disabled
+      _   <- IO.sleep(1.second)                                 // await for logger initialisation: https://www.slf4j.org/codes.html#replay
+      _   <- log.trace("should not appear in (debug) log", mdc) // trace is disabled in logback-text.xml
     } yield used shouldEqual false
 
     io.unsafeRunSync()

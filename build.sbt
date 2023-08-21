@@ -83,7 +83,17 @@ lazy val logback = project
     libraryDependencies ++= Seq(
       Logback.classic,
       scalatest % Test,
-    )
+    ),
+    libraryDependencies ++= crossSettings(
+      scalaVersion.value,
+      if3 = Nil,
+      if2 = List(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full))
+    ),
+    scalacOptions ++= crossSettings(
+      scalaVersion.value,
+      if3 = Seq("-Ykind-projector:underscores", "-language:implicitConversions"),
+      if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders")
+    ),
   )
   .dependsOn(
     core,
