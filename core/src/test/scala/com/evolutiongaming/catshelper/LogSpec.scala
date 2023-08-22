@@ -9,7 +9,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import com.evolutiongaming.catshelper.IOSuite._
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 class LogSpec extends AnyFunSuite with Matchers {
 
