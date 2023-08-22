@@ -42,7 +42,7 @@ object LogOfFromLogback {
       val FQCN = getClass.getName
 
       def append(msg: => String,
-                 mdc: Mdc,
+                 mdc: => Mdc,
                  level: Level,
                  throwable: Throwable = null): F[Unit] = Sync[F].delay {
         if (logger.isEnabledFor(level)) {
@@ -55,25 +55,25 @@ object LogOfFromLogback {
         }
       }
 
-      def trace(msg: => String, mdc: Mdc): F[Unit] =
+      def trace(msg: => String, mdc: => Mdc): F[Unit] =
         append(msg, mdc, Level.TRACE)
 
-      def debug(msg: => String, mdc: Mdc): F[Unit] =
+      def debug(msg: => String, mdc: => Mdc): F[Unit] =
         append(msg, mdc, Level.DEBUG)
 
-      def info(msg: => String, mdc: Mdc): F[Unit] =
+      def info(msg: => String, mdc: => Mdc): F[Unit] =
         append(msg, mdc, Level.INFO)
 
-      def warn(msg: => String, mdc: Mdc): F[Unit] =
+      def warn(msg: => String, mdc: => Mdc): F[Unit] =
         append(msg, mdc, Level.WARN)
 
-      def warn(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] =
+      def warn(msg: => String, cause: Throwable, mdc: => Mdc): F[Unit] =
         append(msg, mdc, Level.WARN, cause)
 
-      def error(msg: => String, mdc: Mdc): F[Unit] =
+      def error(msg: => String, mdc: => Mdc): F[Unit] =
         append(msg, mdc, Level.ERROR)
 
-      def error(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] =
+      def error(msg: => String, cause: Throwable, mdc: => Mdc): F[Unit] =
         append(msg, mdc, Level.ERROR, cause)
     }
 
