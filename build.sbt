@@ -68,7 +68,7 @@ lazy val logback = project
     libraryDependencies ++= Seq(
       Logback.classic,
       scalatest % Test,
-    ),
+    )
   )
   .dependsOn(
     core,
