@@ -7,9 +7,6 @@ import cats.effect.IO
 import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import com.evolutiongaming.catshelper.IOSuite._
-
-import scala.concurrent.duration._
 
 class LogSpec extends AnyFunSuite with Matchers {
 
@@ -71,35 +68,15 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.OfStr("source")))
   }
 
-  test("MDC ThreadLocal cleanup") {
+  test("MDC cleanup") {
 
     val io = for {
       logOf <- LogOf.slf4j[IO]
       log <- logOf(getClass)
       _ <- log.info("whatever", Log.Mdc("k" -> "v"))
-    } yield {
-      val context = org.slf4j.MDC.getCopyOfContextMap
-      context shouldEqual null
-    }
+    } yield org.slf4j.MDC.getCopyOfContextMap
 
-    io.unsafeRunSync()
-  }
-
-  test("MDC lazy evaluation") {
-    var used = false
-    def mdc = {
-      used = true
-      Log.Mdc.empty
-    }
-
-    val io = for {
-      log <- LogOf.slf4j[IO]
-      log <- log("test-lazy-mdc")
-      _   <- IO.sleep(1.second)                                 // await for logger initialisation: https://www.slf4j.org/codes.html#replay
-      _   <- log.trace("should not appear in (debug) log", mdc) // trace is disabled in logback-text.xml
-    } yield used shouldEqual false
-
-    io.unsafeRunSync()
+    io.unsafeRunSync() shouldEqual null
   }
 
   test("LogOf.log") {
@@ -139,49 +116,49 @@ object LogSpec {
   val log: Log[StateT] = {
     val log = new Log[StateT] {
 
-      def trace(msg: => String, mdc: => Log.Mdc) = {
+      def trace(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Trace(msg, mdc)
           (state.add(action), ())
         }
       }
 
-      def debug(msg: => String, mdc: => Log.Mdc) = {
+      def debug(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Debug(msg, mdc)
           (state.add(action), ())
         }
       }
 
-      def info(msg: => String, mdc: => Log.Mdc) = {
+      def info(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Info(msg, mdc)
           (state.add(action), ())
         }
       }
 
-      def warn(msg: => String, mdc: => Log.Mdc) = {
+      def warn(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Warn0(msg, mdc)
           (state.add(action), ())
         }
       }
 
-      def warn(msg: => String, cause: Throwable, mdc: => Log.Mdc) = {
+      def warn(msg: => String, cause: Throwable, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Warn1(msg, cause, mdc)
           (state.add(action), ())
         }
       }
 
-      def error(msg: => String, mdc: => Log.Mdc) = {
+      def error(msg: => String, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Error0(msg, mdc)
           (state.add(action), ())
         }
       }
 
-      def error(msg: => String, cause: Throwable, mdc: => Log.Mdc) = {
+      def error(msg: => String, cause: Throwable, mdc: Log.Mdc) = {
         StateT { state =>
           val action = Action.Error1(msg, cause, mdc)
           (state.add(action), ())
