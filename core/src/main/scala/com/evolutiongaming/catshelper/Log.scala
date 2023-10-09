@@ -5,6 +5,7 @@ import cats.effect.Sync
 import cats.{Applicative, Semigroup, ~>}
 import org.slf4j.{Logger, MDC}
 
+import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 trait Log[F[_]] {
@@ -44,66 +45,91 @@ object Log {
   object Mdc {
 
     private object Empty extends Mdc
-    private final case class Context(getValues: () => Map[String, String]) extends Mdc {
-      lazy val values: SortedMap[String, String] = SortedMap(getValues().toSeq: _*)
+    private final case class EagerContext(values: NonEmptyMap[String, String]) extends Mdc {
+      override def toString: String = s"MDC(${values.toSortedMap.mkString(", ")})"
+    }
+    private final class LazyContext(val getMdc: () => Mdc) extends Mdc {
 
-      override def toString: String = s"MDC(${values.mkString(", ")})"
+      override def toString: String = getMdc().toString
 
-      override def hashCode(): Int = values.hashCode()
+      override def hashCode(): Int = getMdc().hashCode()
 
       override def equals(obj: Any): Boolean = obj match {
-        case that: Context => this.values.equals(that.values)
+        case that: LazyContext => this.getMdc().equals(that.getMdc())
         case _ => false
       }
+    }
+    private object LazyContext {
+      def apply(mdc: => Mdc): LazyContext = new LazyContext(() => mdc)
     }
 
     val empty: Mdc = Empty
 
     type Record = (String, String)
 
-    @deprecated("Use Mdc.Lazy.apply. If it's not enough - Mdc.Lazy.fromMap", "3.9.0")
-    def apply(head: Record, tail: Record*): Mdc = Lazy.fromMap( (head +: tail).toMap)
+    @deprecated("Use Mdc.Lazy.apply or Mdc.Eager.apply", "3.9.0")
+    def apply(head: Record, tail: Record*): Mdc = Eager(head, tail*)
 
-    @deprecated("Use Mdc.Lazy.fromSeq", "3.9.0")
-    def fromSeq(seq: Seq[Record]): Mdc = Lazy.fromSeq(seq)
+    @deprecated("Use Mdc.Lazy.fromSeq or Mdc.Eager.fromSeq", "3.9.0")
+    def fromSeq(seq: Seq[Record]): Mdc = Eager.fromSeq(seq)
 
-    @deprecated("Use Mdc.Lazy.fromMap", "3.9.0")
-    def fromMap(map: Map[String, String]): Mdc = Lazy.fromMap(map)
+    @deprecated("Use Mdc.Lazy.fromMap or Mdc.Eager.fromMap", "3.9.0")
+    def fromMap(map: Map[String, String]): Mdc = Eager.fromMap(map)
 
-    object Lazy {
-      def apply(v1: => Record): Mdc = fromMap(Map(v1))
-      def apply(v1: => Record, v2: => Record): Mdc = fromMap(Map(v1, v2))
-      def apply(v1: => Record, v2: => Record, v3: => Record): Mdc = fromMap(Map(v1, v2, v3))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record): Mdc = fromMap(Map(v1, v2, v3, v4))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record): Mdc =
-        fromMap(Map(v1, v2, v3, v4, v5))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record): Mdc =
-        fromMap(Map(v1, v2, v3, v4, v5, v6))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record): Mdc =
-        fromMap(Map(v1, v2, v3, v4, v5, v6, v7))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record): Mdc =
-        fromMap(Map(v1, v2, v3, v4, v5, v6, v7, v8))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record): Mdc =
-        fromMap(Map(v1, v2, v3, v4, v5, v6, v7, v8, v9))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record, v10: => Record): Mdc =
-        fromMap(Map(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10))
+    object Eager {
+      def apply(head: Record, tail: Record*): Mdc = EagerContext(NonEmptyMap.of(head, tail: _*))
 
-      def fromSeq(seq: => Seq[Record]): Mdc = fromMap(seq.toMap)
+      def fromSeq(seq: Seq[Record]): Mdc = NonEmptyMap.fromMap(SortedMap(seq: _*)).fold(empty){ nem => EagerContext(nem) }
 
-      def fromMap(map: => Map[String, String]): Mdc = Context(() => map)
+      def fromMap(map: Map[String, String]): Mdc = fromSeq(map.toSeq)
     }
 
-    implicit final val mdcSemigroup: Semigroup[Mdc] = Semigroup.instance {
-      case (Empty, right) => right
-      case (left, Empty) => left
-      case (Context(v1), Context(v2)) => Context(() => v1() ++ v2())
+    object Lazy {
+      def apply(v1: => Record): Mdc = LazyContext(Eager(v1))
+      def apply(v1: => Record, v2: => Record): Mdc = LazyContext(Eager(v1, v2))
+      def apply(v1: => Record, v2: => Record, v3: => Record): Mdc = LazyContext(Eager(v1, v2, v3))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record): Mdc = LazyContext(Eager(v1, v2, v3, v4))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8, v9))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record, v10: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10))
+
+      def fromSeq(seq: => Seq[Record]): Mdc = LazyContext(Eager.fromSeq(seq))
+
+      def fromMap(map: => Map[String, String]): Mdc = LazyContext(Eager.fromMap(map))
+    }
+
+    implicit final val mdcSemigroup: Semigroup[Mdc] = {
+      @tailrec def joinContexts(c1: Mdc, c2: Mdc): Mdc = (c1, c2) match {
+        case (Empty, right) => right
+        case (left, Empty) => left
+        case (EagerContext(v1), EagerContext(v2)) => EagerContext(v1 ++ v2)
+        case (c1: LazyContext, c2: LazyContext) => joinContexts(c1.getMdc(), c2.getMdc())
+        case (c1: LazyContext, c2: EagerContext) => joinContexts(c1.getMdc(), c2)
+        case (c1: EagerContext, c2: LazyContext) => joinContexts(c1, c2.getMdc())
+      }
+
+      Semigroup.instance(joinContexts)
     }
 
     implicit final class MdcOps(val mdc: Mdc) extends AnyVal {
 
-      def context: Option[NonEmptyMap[String, String]] = mdc match {
-        case Empty => None
-        case c: Context => NonEmptyMap.fromMap(c.values)
+      def context: Option[NonEmptyMap[String, String]] = {
+        @tailrec  def contextInner(mdc: Mdc): Option[NonEmptyMap[String, String]] = mdc match {
+          case Empty => None
+          case EagerContext(values) => Some(values)
+          case lc: LazyContext => contextInner(lc.getMdc())
+        }
+
+        contextInner(mdc)
       }
     }
   }
