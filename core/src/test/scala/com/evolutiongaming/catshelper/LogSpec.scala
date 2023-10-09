@@ -46,25 +46,25 @@ class LogSpec extends AnyFunSuite with Matchers {
     val stateT = for {
       log0 <- logOf("source")
       log   = log0.prefixed(">").mapK(FunctionK.id)
-      _    <- log.trace("trace", Log.Mdc(mdc))
-      _    <- log.debug("debug", Log.Mdc(mdc))
-      _    <- log.info("info", Log.Mdc(mdc))
-      _    <- log.warn("warn", Log.Mdc(mdc))
-      _    <- log.warn("warn", Error, Log.Mdc(mdc))
-      _    <- log.error("error", Log.Mdc(mdc))
-      _    <- log.error("error", Error, Log.Mdc(mdc))
+      _    <- log.trace("trace", Log.Mdc.Lazy(mdc))
+      _    <- log.debug("debug", Log.Mdc.Lazy(mdc))
+      _    <- log.info("info", Log.Mdc.Lazy(mdc))
+      _    <- log.warn("warn", Log.Mdc.Lazy(mdc))
+      _    <- log.warn("warn", Error, Log.Mdc.Lazy(mdc))
+      _    <- log.error("error", Log.Mdc.Lazy(mdc))
+      _    <- log.error("error", Error, Log.Mdc.Lazy(mdc))
     } yield {}
 
 
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
-      Action.Error1("> error", Error, Log.Mdc(mdc)),
-      Action.Error0("> error", Log.Mdc(mdc)),
-      Action.Warn1("> warn", Error, Log.Mdc(mdc)),
-      Action.Warn0("> warn", Log.Mdc(mdc)),
-      Action.Info("> info", Log.Mdc(mdc)),
-      Action.Debug("> debug", Log.Mdc(mdc)),
-      Action.Trace("> trace", Log.Mdc(mdc)),
+      Action.Error1("> error", Error, Log.Mdc.Lazy(mdc)),
+      Action.Error0("> error", Log.Mdc.Lazy(mdc)),
+      Action.Warn1("> warn", Error, Log.Mdc.Lazy(mdc)),
+      Action.Warn0("> warn", Log.Mdc.Lazy(mdc)),
+      Action.Info("> info", Log.Mdc.Lazy(mdc)),
+      Action.Debug("> debug", Log.Mdc.Lazy(mdc)),
+      Action.Trace("> trace", Log.Mdc.Lazy(mdc)),
       Action.OfStr("source")))
   }
 
@@ -73,7 +73,7 @@ class LogSpec extends AnyFunSuite with Matchers {
     val io = for {
       logOf <- LogOf.slf4j[IO]
       log <- logOf(getClass)
-      _ <- log.info("whatever", Log.Mdc("k" -> "v"))
+      _ <- log.info("whatever", Log.Mdc.Lazy("k" -> "v"))
     } yield org.slf4j.MDC.getCopyOfContextMap
 
     io.unsafeRunSync() shouldEqual null
