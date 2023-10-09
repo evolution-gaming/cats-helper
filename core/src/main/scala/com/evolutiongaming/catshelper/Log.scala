@@ -5,6 +5,7 @@ import cats.effect.Sync
 import cats.{Applicative, Semigroup, ~>}
 import org.slf4j.{Logger, MDC}
 
+import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
 trait Log[F[_]] {
@@ -44,30 +45,91 @@ object Log {
   object Mdc {
 
     private object Empty extends Mdc
-    private final case class Context(values: NonEmptyMap[String, String]) extends Mdc {
+    private final case class EagerContext(values: NonEmptyMap[String, String]) extends Mdc {
       override def toString: String = s"MDC(${values.toSortedMap.mkString(", ")})"
+    }
+    private final class LazyContext(val getMdc: () => Mdc) extends Mdc {
+
+      override def toString: String = getMdc().toString
+
+      override def hashCode(): Int = getMdc().hashCode()
+
+      override def equals(obj: Any): Boolean = obj match {
+        case that: LazyContext => this.getMdc().equals(that.getMdc())
+        case _ => false
+      }
+    }
+    private object LazyContext {
+      def apply(mdc: => Mdc): LazyContext = new LazyContext(() => mdc)
     }
 
     val empty: Mdc = Empty
 
-    def apply(head: (String, String), tail: (String, String)*): Mdc = Context(NonEmptyMap.of(head, tail: _*))
+    type Record = (String, String)
 
-    def fromSeq(seq: Seq[(String, String)]): Mdc =
-      NonEmptyMap.fromMap(SortedMap(seq: _*)).fold(empty){ nem => Context(nem) }
+    @deprecated("Use Mdc.Lazy.apply or Mdc.Eager.apply", "3.9.0")
+    def apply(head: Record, tail: Record*): Mdc = Eager(head, tail*)
 
-    def fromMap(map: Map[String, String]): Mdc = fromSeq(map.toSeq)
+    @deprecated("Use Mdc.Lazy.fromSeq or Mdc.Eager.fromSeq", "3.9.0")
+    def fromSeq(seq: Seq[Record]): Mdc = Eager.fromSeq(seq)
 
-    implicit final val mdcSemigroup: Semigroup[Mdc] = Semigroup.instance {
-      case (Empty, right) => right
-      case (left, Empty) => left
-      case (Context(v1), Context(v2)) => Context(v1 ++ v2)
+    @deprecated("Use Mdc.Lazy.fromMap or Mdc.Eager.fromMap", "3.9.0")
+    def fromMap(map: Map[String, String]): Mdc = Eager.fromMap(map)
+
+    object Eager {
+      def apply(head: Record, tail: Record*): Mdc = EagerContext(NonEmptyMap.of(head, tail: _*))
+
+      def fromSeq(seq: Seq[Record]): Mdc = NonEmptyMap.fromMap(SortedMap(seq: _*)).fold(empty){ nem => EagerContext(nem) }
+
+      def fromMap(map: Map[String, String]): Mdc = fromSeq(map.toSeq)
+    }
+
+    object Lazy {
+      def apply(v1: => Record): Mdc = LazyContext(Eager(v1))
+      def apply(v1: => Record, v2: => Record): Mdc = LazyContext(Eager(v1, v2))
+      def apply(v1: => Record, v2: => Record, v3: => Record): Mdc = LazyContext(Eager(v1, v2, v3))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record): Mdc = LazyContext(Eager(v1, v2, v3, v4))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8, v9))
+      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record, v10: => Record): Mdc =
+        LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10))
+
+      def fromSeq(seq: => Seq[Record]): Mdc = LazyContext(Eager.fromSeq(seq))
+
+      def fromMap(map: => Map[String, String]): Mdc = LazyContext(Eager.fromMap(map))
+    }
+
+    implicit final val mdcSemigroup: Semigroup[Mdc] = {
+      @tailrec def joinContexts(c1: Mdc, c2: Mdc): Mdc = (c1, c2) match {
+        case (Empty, right) => right
+        case (left, Empty) => left
+        case (EagerContext(v1), EagerContext(v2)) => EagerContext(v1 ++ v2)
+        case (c1: LazyContext, c2: LazyContext) => joinContexts(c1.getMdc(), c2.getMdc())
+        case (c1: LazyContext, c2: EagerContext) => joinContexts(c1.getMdc(), c2)
+        case (c1: EagerContext, c2: LazyContext) => joinContexts(c1, c2.getMdc())
+      }
+
+      Semigroup.instance(joinContexts)
     }
 
     implicit final class MdcOps(val mdc: Mdc) extends AnyVal {
 
-      def context: Option[NonEmptyMap[String, String]] = mdc match {
-        case Empty => None
-        case Context(values) => Some(values)
+      def context: Option[NonEmptyMap[String, String]] = {
+        @tailrec  def contextInner(mdc: Mdc): Option[NonEmptyMap[String, String]] = mdc match {
+          case Empty => None
+          case EagerContext(values) => Some(values)
+          case lc: LazyContext => contextInner(lc.getMdc())
+        }
+
+        contextInner(mdc)
       }
     }
   }
