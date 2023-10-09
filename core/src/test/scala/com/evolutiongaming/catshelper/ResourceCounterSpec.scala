@@ -3,7 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.effect.std.CountDownLatch
 import cats.effect.syntax.all.*
 import cats.effect.unsafe.IORuntime
-import cats.effect.{Deferred, IO, Ref, Resource}
+import cats.effect.{IO, Ref, Resource}
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

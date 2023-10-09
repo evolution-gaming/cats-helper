@@ -6,7 +6,7 @@ import ch.qos.logback.classic.spi.LoggingEvent
 import ch.qos.logback.classic.util.ContextInitializer
 import com.evolutiongaming.catshelper.Log.Mdc
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
   * ===Motivation===
