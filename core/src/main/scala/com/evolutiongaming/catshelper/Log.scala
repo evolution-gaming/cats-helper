@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.data.NonEmptyMap
 import cats.effect.Sync
+import cats.syntax.all.*
 import cats.{Applicative, Semigroup, ~>}
 import org.slf4j.{Logger, MDC}
 
@@ -252,5 +253,24 @@ object Log {
     }
 
     def prefixed(prefix: String): Log[F] = mapMsg(msg => s"$prefix $msg")
+
+    def mapMdc(f: Log.Mdc => Log.Mdc): Log[F] = new Log[F] {
+
+      def trace(msg: => String, mdc: Mdc): F[Unit] = self.trace(msg, f(mdc))
+
+      def debug(msg: => String, mdc: Mdc): F[Unit] = self.debug(msg, f(mdc))
+
+      def info(msg: => String, mdc: Mdc): F[Unit] = self.info(msg, f(mdc))
+
+      def warn(msg: => String, mdc: Mdc): F[Unit] = self.warn(msg, f(mdc))
+
+      def warn(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = self.warn(msg, cause, f(mdc))
+
+      def error(msg: => String, mdc: Mdc): F[Unit] = self.error(msg, f(mdc))
+
+      def error(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = self.error(msg, cause, f(mdc))
+    }
+
+    def withMdc(mdc: Log.Mdc): Log[F] = mapMdc(mdc1 => mdc |+| mdc1)
   }
 }
