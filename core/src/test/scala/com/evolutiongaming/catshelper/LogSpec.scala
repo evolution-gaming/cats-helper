@@ -68,6 +68,34 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.OfStr("source")))
   }
 
+  test("trace, debug, info, warn, error with preset MDC") {
+
+    val mdc = Log.Mdc.Eager("label" -> "preset")
+
+    val stateT = for {
+      log0 <- logOf("source")
+      log = log0.withMdc(mdc)
+      _ <- log.trace("trace")
+      _ <- log.debug("debug")
+      _ <- log.info("info")
+      _ <- log.warn("warn")
+      _ <- log.warn("warn", Error)
+      _ <- log.error("error")
+      _ <- log.error("error", Error)
+    } yield {}
+
+    val (state, _) = stateT.run(State(Nil))
+    state shouldEqual State(List(
+      Action.Error1("error", Error, mdc),
+      Action.Error0("error", mdc),
+      Action.Warn1("warn", Error, mdc),
+      Action.Warn0("warn", mdc),
+      Action.Info("info", mdc),
+      Action.Debug("debug", mdc),
+      Action.Trace("trace", mdc),
+      Action.OfStr("source")))
+  }
+
   test("MDC cleanup") {
 
     val io = for {
