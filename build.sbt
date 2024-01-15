@@ -25,6 +25,8 @@ inThisBuild(Seq(
   scalaVersion := crossScalaVersions.value.head,
 
   publishTo := Some(Resolver.evolutionReleases),
+
+  autoAPIMappings := true,
 ))
 
 // Settings that can't be defined on a higher level go here.
