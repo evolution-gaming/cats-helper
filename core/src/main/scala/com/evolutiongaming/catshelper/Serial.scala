@@ -5,6 +5,22 @@ import cats.effect.syntax.all._
 import cats.syntax.all._
 import cats.effect.kernel.Async
 
+/**
+ * Allows running effects serially, so only one effect can be running at a given moment of time.
+ * Also preserves the order of effects. It's possible to wait for the effect to complete
+ * or just enqueue it and forget.
+ *
+ * Example:
+ * {{{
+ *  for {
+ *    serial  <- Serial.of[IO]
+ *
+ *    waitF1  <- serial.apply(f1) // f1 is guaranteed to run before f2, because f1 is enqueued first
+ *    _       <- serial.apply(f2) // don't wait for f2 to complete
+ *    _       <- waitF1           // wait for f1 to complete, f2 may still be running
+ *  } yield ()
+ * }}}
+ */
 trait Serial[F[_]] {
 
   /**
