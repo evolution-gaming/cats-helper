@@ -6,6 +6,12 @@ import cats.effect.std.Semaphore
 import cats.implicits._
 import cats.~>
 
+/** Similar to [[cats.effect.std.AtomicCell]].
+  * 
+  * [[SerialRef]] was created when [[cats.effect.std.AtomicCell]] did not exist
+  * yet, and is kept for backwards compatibility purposes and ability to use
+  * the same code for both Cats Effect 2 and Cats Effect 3.
+  */
 trait SerialRef[F[_], A] {
 
   def get: F[A]
