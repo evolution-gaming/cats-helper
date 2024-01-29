@@ -39,9 +39,14 @@ object FromFuture {
         for {
           future <- Sync[F].delay(future)
           result <- future.value.fold {
-            Async[F].async_[A] { callback =>
-              future.onComplete { a =>
-                callback(a.toEither)
+            Async[F].async[A] { callback =>
+              Async[F].delay {
+                future.onComplete { a =>
+                  callback(a.toEither)
+                }
+                // immitates semantic _before_ v3.5
+                // https://github.com/typelevel/cats-effect/releases/tag/v3.5.0
+                Async[F].unit.some
               }
             }
           } {
@@ -62,10 +67,15 @@ object FromFuture {
           executor <- Async[F].executionContext
           future <- Sync[F].delay(future)
           result <- future.value.fold {
-            Async[F].async_[A] { callback =>
-              future.onComplete { a =>
-                callback(a.toEither)
-              }(executor)
+            Async[F].async[A] { callback =>
+              Async[F].delay {
+                future.onComplete { a =>
+                  callback(a.toEither)
+                }(executor)
+                // immitates semantic _before_ v3.5
+                // https://github.com/typelevel/cats-effect/releases/tag/v3.5.0
+                Async[F].unit.some
+              }
             }
           } {
             case Success(a) => Async[F].pure(a)
@@ -79,8 +89,8 @@ object FromFuture {
   def functionK[F[_]: FromFuture]: FunctionK[Future, F] =
     new FunctionK[Future, F] {
 
-    def apply[A](fa: Future[A]) = FromFuture.summon[F].apply(fa)
-  }
+      def apply[A](fa: Future[A]) = FromFuture.summon[F].apply(fa)
+    }
 
   implicit val futureFromFuture: FromFuture[Future] = new FromFuture[Future] {
     def apply[A](future: => Future[A]) = future
