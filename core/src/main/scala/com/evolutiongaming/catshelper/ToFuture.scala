@@ -28,7 +28,7 @@ object ToFuture {
 
   implicit def ioToFuture(implicit runtime: IORuntime): ToFuture[IO] = new ToFuture[IO] {
     def apply[A](fa: IO[A]) = {
-      Try(fa.syncStep.unsafeRunSync()) match {
+      Try(fa.syncStep(Int.MaxValue).unsafeRunSync()) match {
         case Success(Left(computation)) =>
           computation.unsafeToFuture()
         case Success(Right(value)) =>
