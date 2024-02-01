@@ -41,7 +41,7 @@ object ToTry {
 
       for {
         a <- Try {
-          fa.syncStep.unsafeRunSync() match {
+          fa.syncStep(Int.MaxValue).unsafeRunSync() match {
             case Left(computation) =>
               computation.unsafeRunTimed(timeout)
             case Right(value) =>
@@ -58,7 +58,7 @@ object ToTry {
 
 
   implicit val idToTry: ToTry[Id] = new ToTry[Id] {
-    def apply[A](fa: Id[A]) = Success(fa)
+    def apply[A](fa: Id[A]): Try[A] = Success(fa)
   }
 
 

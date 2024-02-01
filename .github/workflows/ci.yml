@@ -11,9 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         scala:
-          - 2.13.8
+          - 2.13.12
           - 3.3.0
-          - 2.12.15
+          - 2.12.18
 
     steps:
       - uses: actions/checkout@v3

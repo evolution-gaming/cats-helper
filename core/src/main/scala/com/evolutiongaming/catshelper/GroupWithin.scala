@@ -24,7 +24,7 @@ object GroupWithin {
 
   def empty[F[_]]: GroupWithin[F] = new GroupWithin[F] {
 
-    def apply[A](settings: Settings)(f: Nel[A] => F[Unit]) = {
+    def apply[A](settings: Settings)(f: Nel[A] => F[Unit]): Resource[F, Enqueue[F, A]] = {
       val enqueue = new Enqueue[F, A] {
         def apply(a: A) = f(Nel.of(a))
       }
