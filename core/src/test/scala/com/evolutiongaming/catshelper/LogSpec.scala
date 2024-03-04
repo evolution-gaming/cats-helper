@@ -155,6 +155,21 @@ class LogSpec extends AnyFunSuite with Matchers {
     logByClass should not be null
     logByName should not be null
   }
+
+  test("Log.console") {
+    val log = Log.console[IO]
+    val mdc = Log.Mdc.Lazy("answer" -> "42")
+    val io = for {
+      _ <- log.trace("trace msg", mdc)
+      _ <- log.debug("debug msg", mdc)
+      _ <- log.info("info msg", mdc)
+      _ <- log.warn("warn msg", mdc)
+      _ <- log.warn("warn msg", new RuntimeException("warn exception"), mdc)
+      _ <- log.error("error msg", mdc)
+      _ <- log.error("error msg", new RuntimeException("error exception"), mdc)
+    } yield {}
+    io.unsafeRunSync()
+  }
 }
 
 object LogSpec {

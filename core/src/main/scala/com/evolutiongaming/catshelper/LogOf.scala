@@ -1,8 +1,9 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Sync
+import cats.effect.std.Console
 import cats.implicits._
-import cats.{Applicative, Functor, ~>}
+import cats.{Applicative, Monad, Functor, ~>}
 import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 import scala.reflect.ClassTag
@@ -53,6 +54,8 @@ object LogOf {
 
   def empty[F[_] : Applicative]: LogOf[F] = const(Log.empty[F].pure[F])
 
+
+  def console[F[_]: Monad: Console]: LogOf[F] = const(Log.console[F].pure[F])
 
   def const[F[_]](log: F[Log[F]]): LogOf[F] = new LogOf[F] {
 

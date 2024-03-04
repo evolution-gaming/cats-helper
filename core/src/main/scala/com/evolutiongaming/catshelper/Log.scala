@@ -1,7 +1,9 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.NonEmptyMap
+import cats.Monad
 import cats.effect.Sync
+import cats.effect.std.Console
 import cats.syntax.all.*
 import cats.{Applicative, Semigroup, ~>}
 import org.slf4j.{Logger, MDC}
@@ -215,6 +217,26 @@ object Log {
   }
 
   def empty[F[_]: Applicative]: Log[F] = const(Applicative[F].unit)
+
+  def console[F[_]: Monad: Console]: Log[F] = new Log[F] {
+
+    val C = Console[F]
+
+    override def trace(msg: => String, mdc: Mdc): F[Unit] = C.println(s"TRACE $mdc: $msg")
+    
+    override def debug(msg: => String, mdc: Mdc): F[Unit] = C.println(s"DEBUG $mdc: $msg")
+    
+    override def info(msg: => String, mdc: Mdc): F[Unit] = C.println(s"INFO $mdc: $msg")
+    
+    override def warn(msg: => String, mdc: Mdc): F[Unit] = C.println(s"WARN $mdc: $msg")
+    
+    override def warn(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = C.println(s"WARN $mdc: $msg") >> C.printStackTrace(cause)
+    
+    override def error(msg: => String, mdc: Mdc): F[Unit] = C.errorln(s"ERROR $mdc: $msg")
+    
+    override def error(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = C.errorln(s"ERROR $mdc: $msg") >> C.printStackTrace(cause)
+    
+  }
 
   implicit class LogOps[F[_]](val self: Log[F]) extends AnyVal {
 
