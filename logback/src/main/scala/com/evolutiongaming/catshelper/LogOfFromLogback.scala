@@ -8,6 +8,7 @@ import com.evolutiongaming.catshelper.Log.Mdc
 
 import scala.collection.JavaConverters._
 
+// format: off
 /**
   * ===Motivation===
   * Direct logback usage required to overcome limitations of SLF4J MDC API.
@@ -19,6 +20,7 @@ import scala.collection.JavaConverters._
   * Please be aware that using other version of logback (than used in `cats-helper-logback`) might bring '''RUNTIME ERRORS''' or '''MISSING LOGS''' in case of binary incompatibility between them.
   * Suggested approach is in using exactly same logback version as used in `cats-helper-logback` (among all others available through transitive dependencies)
   */
+// format: on
 object LogOfFromLogback {
 
   def apply[F[_]: Sync]: F[LogOf[F]] =
@@ -41,16 +43,20 @@ object LogOfFromLogback {
 
       val FQCN = getClass.getName
 
-      def append(msg: => String,
-                 mdc: Mdc,
-                 level: Level,
-                 throwable: Throwable = null): F[Unit] = Sync[F].delay {
+      def append(
+          msg: => String,
+          mdc: Mdc,
+          level: Level,
+          throwable: Throwable = null
+      ): F[Unit] = Sync[F].delay {
         if (logger.isEnabledFor(level)) {
           val event =
             new LoggingEvent(FQCN, logger, level, msg, throwable, null)
-          mdc.context.map(_.toSortedMap) foreach { mdc =>
-            event.setMDCPropertyMap(mdc.asJava)
+          val mdc1 = mdc.context match {
+            case Some(mdc) => mdc.toSortedMap.asJava
+            case None      => new java.util.HashMap[String, String]
           }
+          event.setMDCPropertyMap(mdc1)
           logger.callAppenders(event)
         }
       }
