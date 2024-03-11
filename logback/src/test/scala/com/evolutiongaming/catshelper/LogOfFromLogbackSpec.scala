@@ -11,6 +11,7 @@ class LogOfFromLogbackSpec extends AnyFunSuite with Matchers {
     val io = for {
       logOf <- LogOfFromLogback[IO]
       log <- logOf(getClass)
+      _ <- log.info("lets start ...")
       _ <- log.info("hello from logback", Log.Mdc.Lazy("k" -> "test value for K"))
     } yield ()
 

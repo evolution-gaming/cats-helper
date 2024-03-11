@@ -54,7 +54,7 @@ object LogOfFromLogback {
             new LoggingEvent(FQCN, logger, level, msg, throwable, null)
           val mdc1 = mdc.context match {
             case Some(mdc) => mdc.toSortedMap.asJava
-            case None      => new java.util.HashMap[String, String]
+            case None      => java.util.Collections.emptyMap[String, String]()
           }
           event.setMDCPropertyMap(mdc1)
           logger.callAppenders(event)
