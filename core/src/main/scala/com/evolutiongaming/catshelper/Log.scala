@@ -47,7 +47,9 @@ object Log {
   sealed trait Mdc
   object Mdc {
 
-    private object Empty extends Mdc
+    private object Empty extends Mdc {
+      override def toString: String = "MDC()"
+    }
     private final case class EagerContext(values: NonEmptyMap[String, String]) extends Mdc {
       override def toString: String = s"MDC(${values.toSortedMap.mkString(", ")})"
     }
