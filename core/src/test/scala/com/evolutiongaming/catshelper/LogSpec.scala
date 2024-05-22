@@ -157,7 +157,7 @@ class LogSpec extends AnyFunSuite with Matchers {
   }
 
   test("Log.console") {
-    val log = Log.console[IO]
+    val log = Log.console[IO]("my-test-name")
     val mdc = Log.Mdc.Lazy("answer" -> "42")
     val io = for {
       _ <- log.trace("trace msg", mdc)

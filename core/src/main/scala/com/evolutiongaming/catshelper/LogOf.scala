@@ -55,7 +55,12 @@ object LogOf {
   def empty[F[_] : Applicative]: LogOf[F] = const(Log.empty[F].pure[F])
 
 
-  def console[F[_]: Monad: Console]: LogOf[F] = const(Log.console[F].pure[F])
+  def console[F[_]: Monad: Console]: LogOf[F] = new LogOf[F] {
+
+    def apply(source: String) = Log.console[F](source).pure[F]
+
+    def apply(source: Class[?]) = apply(source.getName.stripSuffix("$"))
+  }
 
   def const[F[_]](log: F[Log[F]]): LogOf[F] = new LogOf[F] {
 
