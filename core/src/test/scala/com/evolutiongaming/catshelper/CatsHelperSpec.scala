@@ -1,6 +1,5 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.implicits._
 import cats.effect.kernel.Ref
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}

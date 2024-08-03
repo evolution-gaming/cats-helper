@@ -11,7 +11,7 @@ trait RandomIdOf[F[_]] {
 
 object RandomIdOf {
 
-  def apply[F[_]](implicit F: RandomIdOf[F]): RandomIdOf[F] = F
+  def apply[F[_]](implicit fa: RandomIdOf[F]): RandomIdOf[F] = F
 
 
   def uuid[F[_] : Sync]: RandomIdOf[F] = new RandomIdOf[F] {
