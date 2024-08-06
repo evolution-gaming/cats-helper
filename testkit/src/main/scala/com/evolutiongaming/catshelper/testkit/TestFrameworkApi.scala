@@ -1,7 +1,6 @@
 package com.evolutiongaming.catshelper.testkit
 
 import cats.effect.IO
-import cats.implicits._
 import cats.effect.testkit.TestContext
 import org.scalatest.exceptions.{TestCanceledException, TestFailedException}
 
