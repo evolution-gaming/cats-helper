@@ -18,7 +18,7 @@ inThisBuild(Seq(
   startYear := Some(2019),
   licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.12", "3.3.0", "2.12.18"),
+  crossScalaVersions := Seq("2.13.15", "3.3.3"),
 
   versionScheme := Some("semver-spec"),
 
@@ -72,7 +72,7 @@ lazy val core = project
     libraryDependencies ++= crossSettings(
       scalaVersion.value,
       if3 = Nil,
-      if2 = List(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full))
+      if2 = List(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full))
     ),
     scalacOptions ++= crossSettings(
       scalaVersion.value,
