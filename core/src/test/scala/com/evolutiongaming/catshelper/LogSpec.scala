@@ -122,13 +122,13 @@ class LogSpec extends AnyFunSuite with Matchers {
 
   test("preset MDC concatenates with in-place MDC") {
 
-        val stateT = for {
+    val stateT = for {
       log0 <- logOf("source")
       log = log0.withMdc(Log.Mdc.Eager("preset" -> "value"))
       _ <- log.info("info", Log.Mdc.Eager("info" -> "value"))
     } yield {}
 
-        val (state, _) = stateT.run(State(Nil))
+    val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
       Action.Info("info", Log.Mdc.Eager("info" -> "value", "preset" -> "value")),
       Action.OfStr("source")
