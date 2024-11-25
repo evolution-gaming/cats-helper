@@ -92,5 +92,16 @@ object LogOf {
     }
 
     def forClass[C](implicit C: ClassTag[C]): F[Log[F]] = self.apply(C.runtimeClass)
+
+    def mapLog(f: Log[F] => Log[F])(implicit F: Monad[F]): LogOf[F] = new MapLog(self, f)
+
+    def prefixed(prefix: String)(implicit F: Monad[F]): LogOf[F] = mapLog(_.prefixed(prefix))
+
+    def withField(key: String, value: String)(implicit F: Monad[F]): LogOf[F] = mapLog(_.withField(key, value))
+  }
+
+  private class MapLog[F[_]: Monad](logOf: LogOf[F], mapper: Log[F] => Log[F]) extends LogOf[F] {
+    override def apply(source: String): F[Log[F]] = logOf.apply(source).map(mapper)
+    override def apply(source: Class[?]): F[Log[F]] = logOf.apply(source).map(mapper)
   }
 }

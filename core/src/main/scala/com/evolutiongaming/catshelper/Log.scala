@@ -290,6 +290,8 @@ object Log {
 
     def prefixed(prefix: String): Log[F] = mapMsg(msg => s"$prefix $msg")
 
+    def withField(key: String, value: String): Log[F] = prefixed(s"$key=$value")
+
     def mapMdc(f: Log.Mdc => Log.Mdc): Log[F] = new Log[F] {
 
       def trace(msg: => String, mdc: Mdc): F[Unit] = self.trace(msg, f(mdc))
