@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 
 class LoggerInterpolatorSyntaxSpec extends AnyFunSuite with Matchers {
 
-  import LogSpec.*
+  import LogSpec._
 
   test("trace, debug, info, warn, error works with LoggerInterpolator syntax") {
     implicit val log0 = log
