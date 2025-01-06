@@ -118,6 +118,23 @@ trait Log[F[_]] {
 }
 ```
 
+Syntax extensions are also available, allowing to log like a string interpolator:
+
+```scala
+import com.evolutiongaming.catshelper.syntax.LoggerInterpolatorSyntax.Interpolator
+
+info"info log"
+
+warn"warn log"
+
+error"error log"
+
+debug"debug log"
+
+trace"trace log"
+
+```
+
 ## Runtime
 
 ```scala

@@ -11,7 +11,7 @@ import com.evolutiongaming.catshelper.IOSuite._
 
 class LogSpec extends AnyFunSuite with Matchers {
 
-  import LogSpec._
+  import LogSpec.*
 
   test("trace, debug, info, warn, error") {
 
