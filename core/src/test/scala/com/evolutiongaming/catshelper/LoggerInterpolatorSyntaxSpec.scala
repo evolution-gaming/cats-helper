@@ -3,10 +3,9 @@ package com.evolutiongaming.catshelper
 import com.evolutiongaming.catshelper.syntax.LoggerInterpolatorSyntax.Interpolator
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import LogSpec._
 
 class LoggerInterpolatorSyntaxSpec extends AnyFunSuite with Matchers {
-
-  import LogSpec._
 
   test("trace, debug, info, warn, error works with LoggerInterpolator syntax") {
     implicit val log0 = log
