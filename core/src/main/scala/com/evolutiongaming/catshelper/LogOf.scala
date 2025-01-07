@@ -8,6 +8,43 @@ import org.slf4j.{ILoggerFactory, LoggerFactory}
 
 import scala.reflect.ClassTag
 
+/** Factory of [[Log]] instances.
+  *
+  * The intented usage is to have a single instance of `LogOf` in the
+  * application and use it to create `Log` instances for each class.
+  *
+  * The following could be written somewhere in the application initialization
+  * code such as [[cats.effect.IOApp]] instance:
+  * {{{
+  * implicit val logOf = LogOf.slf4j[F]
+  * }}}
+  * 
+  * Then the typical example could look like following:
+  * {{{
+  * class UserService[F[_]: Monad](log: Log[F]) {
+  * 
+  *  def create(user: User): F[Unit] = {
+  *     for {       
+  *       _ <- log.info(s"Creating user...")
+  *       _ <- ...
+  *     } yield ()
+  *   }
+  * }
+  * 
+  * object UserService {
+  * 
+  *   def of[F[_]: LogOf]: F[UserService[F]] = {
+  *     for {
+  *       log <- LogOf[F].forClass[UserService]
+  *       service = new UserService[F](log)
+  *     } yield service
+  *   }
+  * 
+  * }
+  * }}}
+  * 
+  * @see [[org.slf4j.LoggerFactory]] for a typical underlying implementation.
+  */
 trait LogOf[F[_]] {
 
   def apply(source: String): F[Log[F]]
