@@ -19,12 +19,12 @@ import scala.reflect.ClassTag
   * implicit val logOf = LogOf.slf4j[F]
   * }}}
   * 
-  * Then the typical example could look like following:
+  * Then a typical example would be:
   * {{{
   * class UserService[F[_]: Monad](log: Log[F]) {
   * 
   *  def create(user: User): F[Unit] = {
-  *     for {       
+  *     for {
   *       _ <- log.info(s"Creating user...")
   *       _ <- ...
   *     } yield ()

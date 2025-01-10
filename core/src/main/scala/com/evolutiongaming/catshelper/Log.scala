@@ -18,7 +18,7 @@ import scala.collection.immutable.SortedMap
   * The recommendation is to avoid passing `Log` instances implicitly as there
   * could be multiple instances of `Log`, which could lead to confusion and
   * log messages attributed to the wrong class, which leaked its own `Log`
-  * instances accidentially.
+  * instances accidentally.
   * 
   * @see [[LogOf]] for usage examples.
   * @see [[org.slf4j.Logger]] for a typical underlying implementation.
