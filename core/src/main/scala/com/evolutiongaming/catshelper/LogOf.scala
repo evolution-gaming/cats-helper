@@ -66,9 +66,12 @@ import scala.reflect.ClassTag
   * `withField` method on `LogOf` itself.
   * 
   * If `LogOf` is used in such a way, it should not be passed implicitly, to
-  * avoid accidential mix up of the `LogOf` instances. For sake of uniformity,
-  * if this approach is used, the recommended practice is to never pass `Log`
-  * instance anywhere at all, creating a new one each time it is required.
+  * avoid accidential mix up of the `LogOf` instances.
+  * 
+  * For sake of uniformity, if this approach is used, the recommended practice
+  * is to never pass `Log` instance anywhere at all, creating a new one each
+  * time it is required. Saying that, it is acceptable to reuse them for
+  * performance or brevity reasons.
   * 
   * A typical example of such usage could be following:
   * {{{
@@ -107,7 +110,7 @@ import scala.reflect.ClassTag
   * 
   * This approach introduces a slight overhead, because it requires creating
   * both `LogOf` and `Log` instances on each call, but allows passing an
-  * additonal context to the called methods.
+  * additional context to the called methods.
   * 
   * @see [[org.slf4j.LoggerFactory]] for a typical underlying implementation.
   */
