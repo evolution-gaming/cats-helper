@@ -21,7 +21,8 @@ import scala.collection.immutable.SortedMap
   * instances accidentally.
   * 
   * @see [[LogOf]] for usage examples.
-  * @see [[org.slf4j.Logger]] for a typical underlying implementation.
+  * @see [[https://slf4j.org/api/org/slf4j/Logger.html Logger]] for a typical
+  * underlying implementation.
   */
 trait Log[F[_]] {
 

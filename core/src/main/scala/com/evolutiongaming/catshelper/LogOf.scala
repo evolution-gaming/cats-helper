@@ -29,22 +29,21 @@ import scala.reflect.ClassTag
   * {{{
   * class UserService[F[_]: Monad](log: Log[F]) {
   * 
-  *  def create(user: User): F[Unit] = {
-  *     for {
-  *       _ <- log.info(s"Creating user...")
-  *       _ <- ...
-  *     } yield ()
-  *   }
+  *  def create(user: User): F[Unit] =
+  *    for {
+  *      _ <- log.info(s"Creating user...")
+  *      _ <- ...
+  *    } yield ()
+  *   
   * }
   * 
   * object UserService {
   * 
-  *   def of[F[_]: LogOf]: F[UserService[F]] = {
+  *   def of[F[_]: LogOf]: F[UserService[F]] =
   *     for {
   *       log <- LogOf[F].forClass[UserService]
   *       service = new UserService[F](log)
   *     } yield service
-  *   }
   * 
   * }
   * }}}
@@ -77,26 +76,24 @@ import scala.reflect.ClassTag
   * {{{
   * class HandleService[F[_]: Monad] {
   *
-  *   def create(logOf: LogOf[F]): F[String] = {
+  *   def create(logOf: LogOf[F]): F[String] =
   *     for {
   *       log <- logOf.forClass[HandleService]
   *       _   <- log.info(s"Creating handle...")
   *       _   <- ...
   *     } yield ()
-  *   }
   * 
   * }
   * 
   * class UserService[F[_]: Monad](handleService: HandleService[F]) {
   *
-  *   def create(user: User, logOf: LogOf[F]): F[Unit] = {
+  *   def create(user: User, logOf: LogOf[F]): F[Unit] =
   *     for {
   *       log    <- logOf.forClass[UserService]
   *       _      <- log.info(s"Creating user...")
   *       handle <- handleService.create(logOf.withField("user", user.id))
   *       _      <- ...
   *     } yield ()
-  *   }
   * 
   * }
   * 
@@ -112,7 +109,8 @@ import scala.reflect.ClassTag
   * both `LogOf` and `Log` instances on each call, but allows passing an
   * additional context to the called methods.
   * 
-  * @see [[org.slf4j.LoggerFactory]] for a typical underlying implementation.
+  * @see [[https://slf4j.org/api/org/slf4j/LoggerFactory.html LoggerFactory]]
+  * for a typical underlying implementation.
   */
 trait LogOf[F[_]] {
 
