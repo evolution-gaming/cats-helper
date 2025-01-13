@@ -9,7 +9,13 @@ import org.slf4j.{ILoggerFactory, LoggerFactory}
 import scala.reflect.ClassTag
 
 /** Factory of [[Log]] instances.
-  *
+  * 
+  * There are, currently, two ways of using the class and it is recommended to
+  * select one, describe it in project coding guidelines, and stick with it
+  * to avoid a confusion for the newcomers. Both ways are described below.
+  * 
+  * =Traditional approach=
+  * 
   * The intented usage is to have a single instance of `LogOf` in the
   * application and use it to create `Log` instances for each class.
   *
@@ -42,6 +48,66 @@ import scala.reflect.ClassTag
   * 
   * }
   * }}}
+  * 
+  * The expected output, depending on the logging configuration, would be:
+  * {{{
+  * [2025-01-13T12:24:23.0Z] INFO UserService - Creating user...
+  * }}}
+  * 
+  * The main advantage of such approach is a minimal boilerplate when passing
+  * `LogOf` around, and an ability to reuse `LogOf` and `Log` instances,
+  * decreasing the performance overhead.
+  * 
+  * =MDC-style approach=
+  * 
+  * The alternative way to use `LogOf` is to create a child instance each time
+  * the additional information should be passed to the underlying call, making
+  * it a poor's man MDC. The additonial information is then to be passed using
+  * `withField` method on `LogOf` itself.
+  * 
+  * If `LogOf` is used in such a way, it should not be passed implicitly, to
+  * avoid accidential mix up of the `LogOf` instances. For sake of uniformity,
+  * if this approach is used, the recommended practice is to never pass `Log`
+  * instance anywhere at all, creating a new one each time it is required.
+  * 
+  * A typical example of such usage could be following:
+  * {{{
+  * class HandleService[F[_]: Monad] {
+  *
+  *   def create(logOf: LogOf[F]): F[String] = {
+  *     for {
+  *       log <- logOf.forClass[HandleService]
+  *       _   <- log.info(s"Creating handle...")
+  *       _   <- ...
+  *     } yield ()
+  *   }
+  * 
+  * }
+  * 
+  * class UserService[F[_]: Monad](handleService: HandleService[F]) {
+  *
+  *   def create(user: User, logOf: LogOf[F]): F[Unit] = {
+  *     for {
+  *       log    <- logOf.forClass[UserService]
+  *       _      <- log.info(s"Creating user...")
+  *       handle <- handleService.create(logOf.withField("user", user.id))
+  *       _      <- ...
+  *     } yield ()
+  *   }
+  * 
+  * }
+  * 
+  * }}}
+  * 
+  * The expected output, depending on the logging configuration, would be:
+  * {{{
+  * [2025-01-13T12:24:23.0Z] INFO UserService - Creating user...
+  * [2025-01-13T12:24:23.0Z] INFO HandleService user=n32fkj43asxa45ak - Creating handle...
+  * }}}
+  * 
+  * This approach introduces a slight overhead, because it requires creating
+  * both `LogOf` and `Log` instances on each call, but allows passing an
+  * additonal context to the called methods.
   * 
   * @see [[org.slf4j.LoggerFactory]] for a typical underlying implementation.
   */
