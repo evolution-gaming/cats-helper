@@ -27,16 +27,6 @@ import scala.reflect.ClassTag
   * 
   * Then a typical example would be:
   * {{{
-  * class UserService[F[_]: Monad](log: Log[F]) {
-  * 
-  *  def create(user: User): F[Unit] =
-  *    for {
-  *      _ <- log.info(s"Creating user...")
-  *      _ <- ...
-  *    } yield ()
-  *   
-  * }
-  * 
   * object UserService {
   * 
   *   def of[F[_]: LogOf]: F[UserService[F]] =
@@ -45,6 +35,16 @@ import scala.reflect.ClassTag
   *       service = new UserService[F](log)
   *     } yield service
   * 
+  * }
+  * 
+  * class UserService[F[_]: Monad](log: Log[F]) {
+  * 
+  *  def create(user: User): F[Unit] =
+  *    for {
+  *      _ <- log.info(s"Creating user...")
+  *      _ <- ...
+  *    } yield ()
+  *   
   * }
   * }}}
   * 
