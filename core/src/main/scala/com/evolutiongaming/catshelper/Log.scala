@@ -11,7 +11,7 @@ import org.slf4j.{Logger, MDC}
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
-/** Context specific logger instance.
+/** Named/prefixed logger instance.
   * 
   * Use [[LogOf]] to create the new instances of the class.
   * 
