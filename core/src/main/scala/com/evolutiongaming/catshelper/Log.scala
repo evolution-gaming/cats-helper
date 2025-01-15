@@ -15,10 +15,8 @@ import scala.collection.immutable.SortedMap
   * 
   * Use [[LogOf]] to create the new instances of the class.
   * 
-  * The recommendation is to avoid passing `Log` instances implicitly as there
-  * could be multiple instances of `Log`, which could lead to confusion and
-  * log messages attributed to the wrong class, which leaked its own `Log`
-  * instances accidentally.
+  * Avoid passing `Log` instances implicitly. Passing implicit instances around could "leak" a logger
+  * into an unrelated code, and create a confusion with wrongly attributed log messages.
   * 
   * @see [[LogOf]] for usage examples.
   * @see [[https://slf4j.org/api/org/slf4j/Logger.html Logger]] for a typical
