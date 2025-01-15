@@ -11,6 +11,17 @@ import org.slf4j.{Logger, MDC}
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
+/** Named/prefixed logger instance.
+  * 
+  * Use [[LogOf]] to create the new instances of the class.
+  * 
+  * Avoid passing `Log` instances implicitly. Passing implicit instances around could "leak" a logger
+  * into an unrelated code, and create a confusion with wrongly attributed log messages.
+  * 
+  * @see [[LogOf]] for usage examples.
+  * @see [[https://slf4j.org/api/org/slf4j/Logger.html Logger]] for a typical
+  * underlying implementation.
+  */
 trait Log[F[_]] {
 
   @inline def trace(msg: => String): F[Unit] = trace(msg, mdc = Log.Mdc.empty)
