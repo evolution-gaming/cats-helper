@@ -18,7 +18,7 @@ inThisBuild(Seq(
   startYear := Some(2019),
   licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.15", "3.3.3"),
+  crossScalaVersions := Seq("2.13.16", "3.3.3"),
 
   versionScheme := Some("semver-spec"),
 
