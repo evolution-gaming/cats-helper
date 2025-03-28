@@ -41,7 +41,8 @@ object ToTry {
 
       for {
         a <- Try {
-          fa.syncStep(Int.MaxValue).unsafeRunSync() match {
+          // `limit` can be adjusted with Cats-Effect config `cats.effect.auto.yield.threshold.multiplier`
+          fa.syncStep(limit = runtime.config.autoYieldThreshold).unsafeRunSync() match {
             case Left(computation) =>
               computation.unsafeRunTimed(timeout)
             case Right(value) =>

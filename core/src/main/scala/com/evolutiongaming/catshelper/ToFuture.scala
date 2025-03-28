@@ -28,7 +28,8 @@ object ToFuture {
 
   implicit def ioToFuture(implicit runtime: IORuntime): ToFuture[IO] = new ToFuture[IO] {
     def apply[A](fa: IO[A]) = {
-      Try(fa.syncStep(Int.MaxValue).unsafeRunSync()) match {
+      // `limit` can be adjusted with Cats-Effect config `cats.effect.auto.yield.threshold.multiplier`
+      Try(fa.syncStep(limit = runtime.config.autoYieldThreshold).unsafeRunSync()) match {
         case Success(Left(computation)) =>
           computation.unsafeToFuture()
         case Success(Right(value)) =>
