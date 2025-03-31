@@ -28,12 +28,7 @@ object ToFuture {
 
   implicit def ioToFuture(implicit runtime: IORuntime): ToFuture[IO] = new ToFuture[IO] {
     def apply[A](fa: IO[A]): Future[A] =
-      Try(fa.unsafeRunSync()) match {
-        case Success(value) =>
-          Future.successful(value)
-        case Failure(error) =>
-          Future.failed(error)
-      }
+      fa.unsafeToFuture()
   }
 
 

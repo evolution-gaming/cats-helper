@@ -36,12 +36,8 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
         value.asRight[Throwable]
       }
 
-      val future = either.toFuture
-
-      future.value.isDefined shouldEqual true
-
       for {
-        actual <- future.recover { case error => error.asLeft }
+        actual <- either.toFuture.recover { case error => error.asLeft }
       } yield {
         actual shouldEqual expected
       }
