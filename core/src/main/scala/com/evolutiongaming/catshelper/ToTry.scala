@@ -35,24 +35,8 @@ object ToTry {
     */
   def ioToTry(timeout: FiniteDuration)(implicit runtime: IORuntime): ToTry[IO] = new ToTry[IO] {
 
-    def apply[A](fa: IO[A]) = {
-
-      def error: Try[A] = Failure[A](new TimeoutException(timeout.toString()))
-
-      for {
-        a <- Try {
-          // `limit` can be adjusted with Cats-Effect config `cats.effect.auto.yield.threshold.multiplier`
-          // default `limit = Int.MaxValue` may cause `StackOverflowException` in case of very long `flatMap` chains
-          fa.syncStep(limit = runtime.config.autoYieldThreshold).unsafeRunSync() match {
-            case Left(computation) =>
-              computation.unsafeRunTimed(timeout)
-            case Right(value) =>
-              Some(value)
-          }
-        }
-        a <- a.fold(error) { a => Success(a) }
-      } yield a
-    }
+    def apply[A](fa: IO[A]): Try[A] = 
+      Try(fa.unsafeRunSync())
   }
 
 
@@ -65,6 +49,6 @@ object ToTry {
 
 
   implicit val tryToTry: ToTry[Try] = new ToTry[Try] {
-    def apply[A](fa: Try[A]) = fa
+    def apply[A](fa: Try[A]): Try[A] = fa
   }
 }

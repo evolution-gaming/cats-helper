@@ -22,32 +22,27 @@ object ToFuture {
 
   def functionK[F[_]: ToFuture]: FunctionK[F, Future] = new FunctionK[F, Future] {
 
-    def apply[A](fa: F[A]) = ToFuture.summon[F].apply(fa)
+    def apply[A](fa: F[A]): Future[A] = ToFuture.summon[F].apply(fa)
   }
 
 
   implicit def ioToFuture(implicit runtime: IORuntime): ToFuture[IO] = new ToFuture[IO] {
-    def apply[A](fa: IO[A]) = {
-      // `limit` can be adjusted with Cats-Effect config `cats.effect.auto.yield.threshold.multiplier`
-      // default `limit = Int.MaxValue` may cause `StackOverflowException` in case of very long `flatMap` chains
-      Try(fa.syncStep(limit = runtime.config.autoYieldThreshold).unsafeRunSync()) match {
-        case Success(Left(computation)) =>
-          computation.unsafeToFuture()
-        case Success(Right(value)) =>
+    def apply[A](fa: IO[A]): Future[A] =
+      Try(fa.unsafeRunSync()) match {
+        case Success(value) =>
           Future.successful(value)
         case Failure(error) =>
           Future.failed(error)
       }
-    }
   }
 
 
   implicit val idToFuture: ToFuture[Id] = new ToFuture[Id] {
-    def apply[A](fa: Id[A]) = Future.successful(fa)
+    def apply[A](fa: Id[A]): Future[A] = Future.successful(fa)
   }
 
   implicit val futureToFuture: ToFuture[Future] = new ToFuture[Future] {
-    def apply[A](fa: Future[A]) = fa
+    def apply[A](fa: Future[A]): Future[A] = fa
   }
 
 

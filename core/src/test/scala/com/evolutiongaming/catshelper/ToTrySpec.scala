@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.IO
-import cats.implicits._
-import com.evolutiongaming.catshelper.IOSuite._
-import com.evolutiongaming.catshelper.CatsHelper._
+import cats.effect.{IO, Ref}
+import cats.implicits.*
+import com.evolutiongaming.catshelper.IOSuite.*
+import com.evolutiongaming.catshelper.CatsHelper.*
 
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NoStackTrace
@@ -19,7 +19,18 @@ class ToTrySpec extends AnyFunSuite with Matchers {
   for {
     (name, value, expected) <- List(
       ("success", ().pure[IO],                success(())),
-      ("failure", Error.raiseError[IO, Unit], failure[Unit](Error))
+      ("failure", Error.raiseError[IO, Unit], failure[Unit](Error)),
+      (
+        "success-big-stack",
+
+        for {
+          ref <- Ref.of[IO, Int](0)
+          _ <- Vector.fill(100000)(1).traverse_[IO, Unit](n => ref.update(_ + n))
+          result <- ref.get
+        } yield result,
+
+        success(100000),
+      ),
     )
   } {
     test(name) {
