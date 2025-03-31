@@ -10,12 +10,12 @@ object Dependencies {
   }
 
   object Cats {
-    private val version = "2.12.0"
+    private val version = "2.13.0"
     val core = "org.typelevel" %% "cats-core" % version
     val kernel = "org.typelevel" %% "cats-kernel" % version
     val macros = "org.typelevel" %% "cats-macros" % version
 
-    private val effectVersion = "3.5.7"
+    private val effectVersion = "3.6.0"
     val effect = "org.typelevel" %% "cats-effect" % effectVersion
     val effectLaws = "org.typelevel" %% "cats-effect-laws" % effectVersion
     val effectTestkit = "org.typelevel" %% "cats-effect-testkit" % effectVersion
