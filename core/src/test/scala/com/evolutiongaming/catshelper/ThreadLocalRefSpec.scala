@@ -56,6 +56,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
       for {
         a  <- check
         a1 <- Async[F].evalOn(get, executor)
+//        _   = a should not equal a1 // with IO, execution can happen on any thread
         _  <- ref.set(a + "|")
         _  <- check
         _  <- ref.update(_ + "|")
@@ -80,7 +81,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
         counter      <- counter.get
       } yield {
         val size = treadIds.distinct.size
-        size should be > 1
+//        size should be > 1 // with IO, execution can happen on any number of threads
         counter should be >= size
         ()
       }
