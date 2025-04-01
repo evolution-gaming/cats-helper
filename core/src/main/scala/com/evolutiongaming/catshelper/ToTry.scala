@@ -35,16 +35,14 @@ object ToTry {
     * @param timeout used only for computation after first seen async boundary, covering all computations onwards
     *                in case there is no async boundary found, timeout is not used
     */
-  @deprecated("use implicit `ioToTry` without `timeout` argument", "3.11.4")
-  def ioToTry(timeout: FiniteDuration)(implicit runtime: IORuntime): ToTry[IO] =
-    ioToTry
-
-
-  implicit def ioToTry(implicit ioRuntime: IORuntime): ToTry[IO] = new ToTry[IO] {
-
+  def ioToTry(timeout: FiniteDuration)(implicit runtime: IORuntime): ToTry[IO] = new ToTry[IO] {
     def apply[A](fa: IO[A]): Try[A] =
-      Try(fa.unsafeRunSync())
+      Try(fa.timeout(timeout).unsafeRunSync())
+
   }
+
+
+  implicit def ioToTry(implicit ioRuntime: IORuntime): ToTry[IO] = ioToTry(1.minute)
 
 
   implicit val idToTry: ToTry[Id] = new ToTry[Id] {
