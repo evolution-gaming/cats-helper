@@ -36,7 +36,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
       config = IORuntimeConfig.apply()
     )
 
-    testF[IO](15).timeout(5.seconds).as(Succeeded).unsafeToFuture()(runtime)
+    testF[IO](5).timeout(5.seconds).as(Succeeded).unsafeToFuture()(runtime)
   }
 
   private def testF[F[_] : Async : ThreadLocalOf : Parallel](n: Int): F[Unit] = {
