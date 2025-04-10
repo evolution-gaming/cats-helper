@@ -6,7 +6,8 @@ import ch.qos.logback.classic.spi.LoggingEvent
 import ch.qos.logback.classic.util.ContextInitializer
 import com.evolutiongaming.catshelper.Log.Mdc
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 // format: off
 /**
@@ -25,7 +26,9 @@ object LogOfFromLogback {
 
   def apply[F[_]: Sync]: F[LogOf[F]] =
     Sync[F].delay {
-      val context = new ch.qos.logback.classic.LoggerContext()
+      // see SLF4J compatibility Readme section
+      val slf4jCtx = Try { org.slf4j.LoggerFactory.getILoggerFactory().asInstanceOf[ch.qos.logback.classic.LoggerContext] }
+      val context  = slf4jCtx.getOrElse(new ch.qos.logback.classic.LoggerContext())
       new ContextInitializer(context).autoConfig()
       new LogOf[F] {
 
