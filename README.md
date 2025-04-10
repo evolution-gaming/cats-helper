@@ -206,7 +206,7 @@ Suggested approach is in using exactly same logback version as used in `cats-hel
 
 #### SLF4J compatibility
 In some cases it may be necessary to allocate the logback instance manually as well as using the SLF4J API in the end user code. However, if multiple LoggerContexts are instantiated at the same time, this could lead to unexpected behaviour, such as the RollingFileAppender writing to multiple files instead of one.
-To cover such cases, the internal implementations of `LogOfFromLogback` use the SLF4J API to instantiate the logback context, so that later use of the SLF4J API will pick up the same context instance created by `LogOfFromLogback`.
+To cover such cases, the internal implementation of `LogOfFromLogback` uses the SLF4J API to instantiate the logback context, so that later use of the SLF4J API will pick up the same context instance created by `LogOfFromLogback`.
 
 ## PureTest
 
