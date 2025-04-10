@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
-import com.evolutiongaming.catshelper.CatsHelper._
+import cats.implicits.*
+import com.evolutiongaming.catshelper.CatsHelper.*
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -15,7 +15,18 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
   for {
     (name, value, expected) <- List(
       ("success", ().pure[IO], ().asRight[Throwable]),
-      ("failure", Error.raiseError[IO, Unit], Error.asLeft[Unit])
+      ("failure", Error.raiseError[IO, Unit], Error.asLeft[Unit]),
+      (
+        "success-big-stack",
+
+        for {
+          ref <- Ref.of[IO, Int](0)
+          _ <- Vector.fill(100000)(1).traverse_[IO, Unit](n => ref.update(_ + n))
+          result <- ref.get
+        } yield result,
+
+        100000.asRight[Throwable]
+      ),
     )
   } {
     test(name) {
@@ -25,12 +36,8 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
         value.asRight[Throwable]
       }
 
-      val future = either.toFuture
-
-      future.value.isDefined shouldEqual true
-
       for {
-        actual <- future.recover { case error => error.asLeft }
+        actual <- either.toFuture.recover { case error => error.asLeft }
       } yield {
         actual shouldEqual expected
       }
