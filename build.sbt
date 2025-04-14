@@ -32,7 +32,6 @@ inThisBuild(Seq(
 // Settings that can't be defined on a higher level go here.
 // Usually such settings have defaults defined by some plugin in its `projectSettings`.
 lazy val commonSettings = Seq(
-  releaseCrossBuild := true,
   scalacOptsFailOnWarn := Some(false),
 )
 
