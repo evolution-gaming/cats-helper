@@ -31,6 +31,7 @@ object LogOfFromLogback {
       val context  = slf4jCtx.getOrElse {
         val ctx = new ch.qos.logback.classic.LoggerContext()
         new ContextInitializer(ctx).autoConfig()
+        ctx
       }
       new LogOf[F] {
 
