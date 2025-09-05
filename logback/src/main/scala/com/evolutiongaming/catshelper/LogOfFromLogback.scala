@@ -28,8 +28,10 @@ object LogOfFromLogback {
     Sync[F].delay {
       // see SLF4J compatibility Readme section
       val slf4jCtx = Try { org.slf4j.LoggerFactory.getILoggerFactory().asInstanceOf[ch.qos.logback.classic.LoggerContext] }
-      val context  = slf4jCtx.getOrElse(new ch.qos.logback.classic.LoggerContext())
-      new ContextInitializer(context).autoConfig()
+      val context  = slf4jCtx.getOrElse {
+        val ctx = new ch.qos.logback.classic.LoggerContext()
+        new ContextInitializer(ctx).autoConfig()
+      }
       new LogOf[F] {
 
         def apply(source: String): F[Log[F]] = Sync[F].delay {
