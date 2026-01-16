@@ -22,30 +22,25 @@ object ToFuture {
 
   def functionK[F[_]: ToFuture]: FunctionK[F, Future] = new FunctionK[F, Future] {
 
-    def apply[A](fa: F[A]) = ToFuture.summon[F].apply(fa)
+    def apply[A](fa: F[A]): Future[A] = ToFuture.summon[F].apply(fa)
   }
 
 
+  /**
+    * Note: There was an interesting discussion about `SyncIO` in Cats Effect (https://github.com/typelevel/cats-effect/issues/4337)
+    */
   implicit def ioToFuture(implicit runtime: IORuntime): ToFuture[IO] = new ToFuture[IO] {
-    def apply[A](fa: IO[A]) = {
-      Try(fa.syncStep(Int.MaxValue).unsafeRunSync()) match {
-        case Success(Left(computation)) =>
-          computation.unsafeToFuture()
-        case Success(Right(value)) =>
-          Future.successful(value)
-        case Failure(error) =>
-          Future.failed(error)
-      }
-    }
+    def apply[A](fa: IO[A]): Future[A] =
+      fa.unsafeToFuture()
   }
 
 
   implicit val idToFuture: ToFuture[Id] = new ToFuture[Id] {
-    def apply[A](fa: Id[A]) = Future.successful(fa)
+    def apply[A](fa: Id[A]): Future[A] = Future.successful(fa)
   }
 
   implicit val futureToFuture: ToFuture[Future] = new ToFuture[Future] {
-    def apply[A](fa: Future[A]) = fa
+    def apply[A](fa: Future[A]): Future[A] = fa
   }
 
 
