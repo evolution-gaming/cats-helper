@@ -84,7 +84,7 @@ object ParallelHelper {
     }
   }
 
-  implicit class IterableOnce_ParallelHelper[A](val self: TraversableOnce[A]) extends AnyVal {
+  implicit class IterableOnce_ParallelHelper[A](val self: IterableOnce[A]) extends AnyVal {
 
     @deprecated("use `parFoldMap1` instead", "3.2.0")
     def parFoldMapTraversable[F[_]: Parallel, B: Monoid](f: A => F[B]): F[B] = {
