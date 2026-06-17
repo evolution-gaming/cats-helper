@@ -8,6 +8,7 @@ import cats.implicits.*
 import cats.{Applicative, ApplicativeError, MonadError}
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 import scala.reflect.ClassTag
 import scala.util.{Either, Try}
 
@@ -146,21 +147,34 @@ object CatsHelper {
     }
   }
 
-  implicit final class ResourceLogOps[F[_], A](val self: Resource[F, A]) extends AnyVal {
-    def log(name: String)(implicit F: Sync[F], log: Log[F], md: MeasureDuration[F]): Resource[F, A] = Resource {
+  implicit final class ResourceObservabilityOps[F[_], A](val self: Resource[F, A]) extends AnyVal {
+
+    /**
+     * Add callbacks to a resource. Use for things like metrics and logs.
+     * It's very important that these callbacks shouldn't fail,
+     * otherwise there can be a resource leak.
+     */
+    def observe(
+      onAcquireStart: Option[F[Unit]] = None,
+      onAcquireSuccess: Option[(A, FiniteDuration) => F[Unit]] = None,
+      onAcquireFail: Option[(Throwable, FiniteDuration) => F[Unit]] = None,
+      onReleaseStart: Option[A => F[Unit]] = None,
+      onReleaseSuccess: Option[FiniteDuration => F[Unit]] = None,
+      onReleaseFail: Option[(Throwable, FiniteDuration) => F[Unit]] = None,
+    )(implicit F: Sync[F], md: MeasureDuration[F]): Resource[F, A] = Resource {
       for {
         timedAcquireAndRelease <- for {
           getMeasurement <- MeasureDuration[F].start
-          _ <- Log[F].info(s"$name acquiring")
+          _ <- onAcquireStart.sequence_
           a <- self.allocated.attemptTap {
             case Left(err) => for {
               measureResult <- getMeasurement
-              _ <- Log[F].error(s"$name acquisition failed in ${measureResult.toMillis}ms with $err", err)
+              _ <- onAcquireFail.traverse_(_(err, measureResult))
             } yield ()
 
-            case Right(_) => for {
+            case Right((obj, _)) => for {
               measureResult <- getMeasurement
-              _ <- Log[F].info(s"$name acquired in ${measureResult.toMillis}ms")
+              _ <- onAcquireSuccess.traverse_(_(obj, measureResult))
             } yield ()
           }
         } yield a
@@ -169,21 +183,47 @@ object CatsHelper {
 
         timedRelease = for {
           getMeasurement <- MeasureDuration[F].start
-          _ <- Log[F].info(s"$name releasing")
+          _ <- onReleaseStart.traverse_(_(timedAcquire))
           _ <- release.attemptTap {
             case Left(err) => for {
               measureResult <- getMeasurement
-              _ <- Log[F].error(s"$name release failed in ${measureResult.toMillis}ms with $err", err)
+              _ <- onReleaseFail.traverse_(_(err, measureResult))
             } yield ()
 
             case Right(a) => for {
               measureResult <- getMeasurement
-              _ <- Log[F].info(s"$name released in ${measureResult.toMillis}ms")
+              _ <- onReleaseSuccess.traverse_(_(measureResult))
             } yield a
           }
         } yield ()
 
       } yield (timedAcquire, timedRelease)
+    }
+  }
+
+  implicit final class ResourceLogOps[F[_], A](val self: Resource[F, A]) extends AnyVal {
+
+    def log(name: String)(implicit F: Sync[F], log: Log[F], md: MeasureDuration[F]): Resource[F, A] = {
+      self.observe(
+        onAcquireStart = Some(
+          Log[F].info(s"$name acquiring")
+        ),
+        onAcquireSuccess = Some((_, duration) =>
+          Log[F].info(s"$name acquired in ${duration.toMillis}ms")
+        ),
+        onReleaseStart = Some(_ =>
+          Log[F].info(s"$name releasing")
+        ),
+        onReleaseSuccess = Some(duration =>
+          Log[F].info(s"$name released in ${duration.toMillis}ms")
+        ),
+        onAcquireFail = Some((err, duration) =>
+          Log[F].error(s"$name acquisition failed in ${duration.toMillis}ms with $err", err)
+        ),
+        onReleaseFail = Some((err, duration) =>
+          Log[F].error(s"$name release failed in ${duration.toMillis}ms with $err", err)
+        ),
+      )
     }
   }
 }
