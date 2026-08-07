@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    uses: evolution-gaming/scala-github-actions/.github/workflows/ci.yml@add-scala-ci-workflow
+    uses: evolution-gaming/scala-github-actions/.github/workflows/ci.yml@v6
     secrets: inherit
     with:
       scala_versions: '["2.13.18", "3.3.7"]'
