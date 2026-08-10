@@ -3,11 +3,11 @@ package com.evolutiongaming.catshelper
 import cats.Id
 import cats.arrow.FunctionK
 import cats.effect.IO
-
-import scala.util.control.NoStackTrace
+import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import com.evolutiongaming.catshelper.IOSuite._
+
+import scala.util.control.NoStackTrace
 
 class LogSpec extends AnyFunSuite with Matchers {
 
@@ -17,16 +17,15 @@ class LogSpec extends AnyFunSuite with Matchers {
 
     val stateT = for {
       log0 <- logOf("source")
-      log   = log0.prefixed(">").mapK(FunctionK.id)
-      _    <- log.trace("trace")
-      _    <- log.debug("debug")
-      _    <- log.info("info")
-      _    <- log.warn("warn")
-      _    <- log.warn("warn", Error)
-      _    <- log.error("error")
-      _    <- log.error("error", Error)
+      log = log0.prefixed(">").mapK(FunctionK.id)
+      _ <- log.trace("trace")
+      _ <- log.debug("debug")
+      _ <- log.info("info")
+      _ <- log.warn("warn")
+      _ <- log.warn("warn", Error)
+      _ <- log.error("error")
+      _ <- log.error("error", Error)
     } yield {}
-
 
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
@@ -37,7 +36,8 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Info("> info"),
       Action.Debug("> debug"),
       Action.Trace("> trace"),
-      Action.OfStr("source")))
+      Action.OfStr("source"),
+    ))
   }
 
   test("trace, debug, info, warn, error with MDC") {
@@ -46,16 +46,15 @@ class LogSpec extends AnyFunSuite with Matchers {
 
     val stateT = for {
       log0 <- logOf("source")
-      log   = log0.prefixed(">").mapK(FunctionK.id)
-      _    <- log.trace("trace", Log.Mdc.Lazy(mdc))
-      _    <- log.debug("debug", Log.Mdc.Lazy(mdc))
-      _    <- log.info("info", Log.Mdc.Lazy(mdc))
-      _    <- log.warn("warn", Log.Mdc.Lazy(mdc))
-      _    <- log.warn("warn", Error, Log.Mdc.Lazy(mdc))
-      _    <- log.error("error", Log.Mdc.Lazy(mdc))
-      _    <- log.error("error", Error, Log.Mdc.Lazy(mdc))
+      log = log0.prefixed(">").mapK(FunctionK.id)
+      _ <- log.trace("trace", Log.Mdc.Lazy(mdc))
+      _ <- log.debug("debug", Log.Mdc.Lazy(mdc))
+      _ <- log.info("info", Log.Mdc.Lazy(mdc))
+      _ <- log.warn("warn", Log.Mdc.Lazy(mdc))
+      _ <- log.warn("warn", Error, Log.Mdc.Lazy(mdc))
+      _ <- log.error("error", Log.Mdc.Lazy(mdc))
+      _ <- log.error("error", Error, Log.Mdc.Lazy(mdc))
     } yield {}
-
 
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
@@ -66,7 +65,8 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Info("> info", Log.Mdc.Lazy(mdc)),
       Action.Debug("> debug", Log.Mdc.Lazy(mdc)),
       Action.Trace("> trace", Log.Mdc.Lazy(mdc)),
-      Action.OfStr("source")))
+      Action.OfStr("source"),
+    ))
   }
 
   test("trace, debug, info, warn, error with preset MDC") {
@@ -94,7 +94,8 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Info("info", mdc),
       Action.Debug("debug", mdc),
       Action.Trace("trace", mdc),
-      Action.OfStr("source")))
+      Action.OfStr("source"),
+    ))
   }
 
   test("preset MDC override by in-place MDC") {
@@ -116,7 +117,7 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Error0("error", mdc0),
       Action.Info("info", mdc1),
       Action.Warn0("warn", mdc0),
-      Action.OfStr("source")
+      Action.OfStr("source"),
     ))
   }
 
@@ -131,7 +132,7 @@ class LogSpec extends AnyFunSuite with Matchers {
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
       Action.Info("info", Log.Mdc.Eager("info" -> "value", "preset" -> "value")),
-      Action.OfStr("source")
+      Action.OfStr("source"),
     ))
   }
 
@@ -251,19 +252,16 @@ object LogSpec {
     log.mapK(FunctionK.id)
   }
 
-
   final case class State(actions: List[Action]) {
 
     def add(action: Action): State = copy(actions = action :: actions)
   }
-
 
   type StateT[A] = cats.data.StateT[Id, State, A]
 
   object StateT {
     def apply[A](f: State => (State, A)): StateT[A] = cats.data.StateT[Id, State, A](f)
   }
-
 
   sealed trait Action
 

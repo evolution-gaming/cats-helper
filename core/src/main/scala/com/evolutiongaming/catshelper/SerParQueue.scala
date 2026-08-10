@@ -1,5 +1,6 @@
 package com.evolutiongaming.catshelper
 
+import cats.effect.kernel.Async
 import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.effect.{Concurrent, Sync}
@@ -7,31 +8,27 @@ import cats.implicits._
 import cats.{Applicative, Monad, Parallel}
 
 import scala.annotation.tailrec
-import cats.effect.kernel.Async
 
 /**
-  * The idea behind this queue is to parallelize some parts of otherwise serial queue
-  * There are two types of tasks: one which has key `defined` - Some(key) (keyful) and those that have `None` (keyless)
-  * In case of enqueueing keyless task it will be run after all tasks enqueued before.
-  * Also tasks enqueued after will wait until `keyless` task is completed.
-  *
-  * In case of enqueueing keyful task it will be run after all keyless or same key tasks enqueued before
-  * Also keyful tasks or the one with matching key enqueued after will wait until `keyless` task is completed.
-  *
-  * It also means that enqueued one after another keyful tasks with different keys will be run in parallel
-  *
-  * In short, this queue enforces:
-  * * order per unique key for keyful tasks
-  * * global order for keyless tasks
-  *
-  * Example:
-  *   enqueued operations of
-  *     (a.some, 0), (none, 1), (a.some, 2), (b.some, 3), (c.some, 4), (none, 5)
-  *   will be run in the following order
-  *                                 (a.some, 2)
-  *     (a.some, 0) => (none, 1) => (b.some, 3) =>  (none, 5)
-  *                                 (c.some, 4)
-  */
+ * The idea behind this queue is to parallelize some parts of otherwise serial queue There are two
+ * types of tasks: one which has key `defined` - Some(key) (keyful) and those that have `None`
+ * (keyless) In case of enqueueing keyless task it will be run after all tasks enqueued before. Also
+ * tasks enqueued after will wait until `keyless` task is completed.
+ *
+ * In case of enqueueing keyful task it will be run after all keyless or same key tasks enqueued
+ * before Also keyful tasks or the one with matching key enqueued after will wait until `keyless`
+ * task is completed.
+ *
+ * It also means that enqueued one after another keyful tasks with different keys will be run in
+ * parallel
+ *
+ * In short, this queue enforces: * order per unique key for keyful tasks * global order for keyless
+ * tasks
+ *
+ * Example: enqueued operations of (a.some, 0), (none, 1), (a.some, 2), (b.some, 3), (c.some, 4),
+ * (none, 5) will be run in the following order (a.some, 2) (a.some, 0) => (none, 1) => (b.some, 3) =>
+ * (none, 5) (c.some, 4)
+ */
 trait SerParQueue[F[_], -K] {
 
   def apply[A](key: Option[K])(task: F[A]): F[F[A]]
@@ -113,7 +110,7 @@ object SerParQueue {
 
       @tailrec def loop(in: In, task: Task): F[Unit] = {
         in match {
-          case In.Empty     => task
+          case In.Empty => task
           case In.Par(h, t) => loop(t, h.values.toList.parSequence_.add(task))
           case In.Ser(h, t) => loop(t, h.add(task))
         }
@@ -227,27 +224,28 @@ object SerParQueue {
                             (S.Par(out = out.updated(key, Task.empty)), start0(key, task))
                         }
 
-                      case S.Par(in: In.Par, out)        => (S.Par(in.add(key, task), out), void)
-                      case S.Par(in: In.Ser, out)        => (S.Par(in.add(key, task), out), void)
-                      case S.Ser(in: In.Par, out)        => (S.Ser(in.add(key, task), out), void)
+                      case S.Par(in: In.Par, out) => (S.Par(in.add(key, task), out), void)
+                      case S.Par(in: In.Ser, out) => (S.Par(in.add(key, task), out), void)
+                      case S.Ser(in: In.Par, out) => (S.Ser(in.add(key, task), out), void)
                       case S.Ser(in: In.SerOrEmpty, out) => (S.Ser(in.add(key, task), out), void)
                     }
 
                   case None =>
                     ref.modify {
-                      case S.Empty                       => (S.Ser(), start1(task))
-                      case S.Par(in: In.Ser, out)        => (S.Par(in.add(task), out), void)
+                      case S.Empty => (S.Ser(), start1(task))
+                      case S.Par(in: In.Ser, out) => (S.Par(in.add(task), out), void)
                       case S.Par(in: In.ParOrEmpty, out) => (S.Par(in.add(task), out), void)
-                      case S.Ser(In.Empty, out)          => (S.Ser(In.Empty, out.add(task)), void)
-                      case S.Ser(in: In.Ser, out)        => (S.Ser(in.add(task), out), void)
-                      case S.Ser(in: In.Par, out)        => (S.Ser(in.add(task), out), void)
+                      case S.Ser(In.Empty, out) => (S.Ser(In.Empty, out.add(task)), void)
+                      case S.Ser(in: In.Ser, out) => (S.Ser(in.add(task), out), void)
+                      case S.Ser(in: In.Par, out) => (S.Ser(in.add(task), out), void)
                     }
                 }
                 _ <- a
-              } yield for {
-                a <- d.get
-                a <- a.liftTo[F]
-              } yield a
+              } yield
+                for {
+                  a <- d.get
+                  a <- a.liftTo[F]
+                } yield a
             }
           }
         }
@@ -255,6 +253,10 @@ object SerParQueue {
   }
 
   private implicit class Ops[F[_], A](val self: F[A]) extends AnyVal {
-    def add(task: F[Unit])(implicit F: Monad[F]): F[Unit] = self *> task
+    def add(
+      task: F[Unit],
+    )(implicit
+      F: Monad[F],
+    ): F[Unit] = self *> task
   }
 }

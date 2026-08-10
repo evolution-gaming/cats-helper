@@ -2,10 +2,10 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.IO
 import cats.syntax.all._
+import com.evolutiongaming.catshelper.IOSuite._
+import com.evolutiongaming.catshelper.ParallelHelper._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
-import com.evolutiongaming.catshelper.ParallelHelper._
-import com.evolutiongaming.catshelper.IOSuite._
 
 class ParallelHelperTest extends AsyncFunSuite with Matchers {
 

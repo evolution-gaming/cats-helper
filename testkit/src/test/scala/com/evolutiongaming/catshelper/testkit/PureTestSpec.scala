@@ -42,7 +42,7 @@ class PureTestSpec extends AnyFreeSpec {
     val counter = Ref.unsafe[IO, Int](0)
     assertThrows[TestFailedException] {
       PureTest.flakinessCheckIterations(5).ioTest { _ =>
-        counter.modify(i => (i + 1) -> i).map(_ should not be (4))
+        counter.modify(i => (i + 1) -> i).map(_ should not be 4)
       }
     }
   }

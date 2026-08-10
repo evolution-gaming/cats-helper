@@ -37,7 +37,8 @@ lazy val commonSettings = Seq(
 
 val alias: Seq[sbt.Def.Setting[?]] =
 //  addCommandAlias("check", "all versionPolicyCheck Compile/doc") ++
-  addCommandAlias("check", "show version") ++
+  addCommandAlias("check", "all scalafmtCheckRepo Compile/doc") ++
+    addCommandAlias("fmt", "+scalafmtRepo") ++
     addCommandAlias("build", "+all compile test")
 
 lazy val root = project
@@ -71,12 +72,12 @@ lazy val core = project
     libraryDependencies ++= crossSettings(
       scalaVersion.value,
       if3 = Nil,
-      if2 = List(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.4" cross CrossVersion.full))
+      if2 = List(compilerPlugin(("org.typelevel" % "kind-projector" % "0.13.4").cross(CrossVersion.full))),
     ),
     scalacOptions ++= crossSettings(
       scalaVersion.value,
       if3 = Seq("-Ykind-projector:underscores", "-language:implicitConversions"),
-      if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders")
+      if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders"),
     ),
   )
   .dependsOn(
@@ -90,7 +91,7 @@ lazy val logback = project
     libraryDependencies ++= Seq(
       Logback.classic,
       scalatest % Test,
-    )
+    ),
   )
   .dependsOn(
     core,

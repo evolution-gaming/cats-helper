@@ -21,7 +21,6 @@ object CatsHelper {
     }
   }
 
-
   implicit class MonadErrorOpsCatsHelper[F[_], E](val self: MonadError[F, E]) extends AnyVal {
 
     def redeemWith[A, B](fa: F[A])(recover: E => F[B], ab: A => F[B]): F[B] = {
@@ -29,7 +28,6 @@ object CatsHelper {
       self.handleErrorWith(fb)(recover)
     }
   }
-
 
   implicit class ConcurrentOpsCatsHelper[F[_]](val self: Concurrent[F]) extends AnyVal {
 
@@ -45,57 +43,75 @@ object CatsHelper {
 
       for {
         started <- Deferred[F, Unit]
-        fiber   <- faOf(started).start
-        _       <- started.get
+        fiber <- faOf(started).start
+        _ <- started.get
       } yield fiber
     }
   }
 
-
   implicit class IdOpsCatsHelper[A](val self: A) extends AnyVal {
 
-    def castM[F[_]: MonadThrowable, B <: A](implicit tag: ClassTag[B]): F[B] = {
+    def castM[F[_]: MonadThrowable, B <: A](
+      implicit
+      tag: ClassTag[B],
+    ): F[B] = {
 
       def error = new ClassCastException(s"${ self.getClass.getName } cannot be cast to ${ tag.runtimeClass.getName }")
 
       castOpt[B].fold { error.raiseError[F, B] } { _.pure[F] }
     }
 
-
-    def castOpt[B <: A](implicit tag: ClassTag[B]): Option[B] = tag.unapply(self)
+    def castOpt[B <: A](
+      implicit
+      tag: ClassTag[B],
+    ): Option[B] = tag.unapply(self)
   }
-
 
   implicit class OpsCatsHelper[F[_], A](val self: F[A]) extends AnyVal {
 
-    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
+    def startEnsure(
+      implicit
+      F: Concurrent[F],
+    ): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
 
+    def toTry(
+      implicit
+      F: ToTry[F],
+    ): Try[A] = F.apply(self)
 
-    def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
-
-
-    def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
+    def toFuture(
+      implicit
+      F: ToFuture[F],
+    ): Future[A] = F.apply(self)
   }
-
 
   implicit class TryOpsCatsHelper[A](val self: Try[A]) extends AnyVal {
 
-    def fromTry[F[_]](implicit fromTry: FromTry[F]): F[A] = fromTry(self)
+    def fromTry[F[_]](
+      implicit
+      fromTry: FromTry[F],
+    ): F[A] = fromTry(self)
   }
-
 
   implicit class ResourceOpsCatsHelper[F[_], A](val self: Resource[F, A]) extends AnyVal {
 
-    def fenced(implicit F: Concurrent[F]): Resource[F, A] = ResourceFenced(self)
+    def fenced(
+      implicit
+      F: Concurrent[F],
+    ): Resource[F, A] = ResourceFenced(self)
 
     def semiflatMap[B](f: A => F[B]): Resource[F, B] = {
       self.flatMap { a => f(a).toResource }
     }
 
     /**
-      * Helps to decrease chance of getting StackOverflowError described in https://github.com/typelevel/cats-effect/issues/469
-      */
-    def breakFlatMapChain(implicit F: BracketThrowable[F]): Resource[F, A] = {
+     * Helps to decrease chance of getting StackOverflowError described in
+     * https://github.com/typelevel/cats-effect/issues/469
+     */
+    def breakFlatMapChain(
+      implicit
+      F: BracketThrowable[F],
+    ): Resource[F, A] = {
       Resource.suspend {
         self
           .allocated
@@ -104,14 +120,12 @@ object CatsHelper {
     }
   }
 
-
   implicit class ResourceObjOpsCatsHelper(val self: Resource.type) extends AnyVal {
 
     def release[F[_]: Applicative](release: F[Unit]): Resource[F, Unit] = {
       Resource(((), release).pure[F])
     }
   }
-
 
   implicit class BooleanOpsCatsHelper(val self: Boolean) extends AnyVal {
 
@@ -133,35 +147,49 @@ object CatsHelper {
   }
 
   private[CatsHelper] class BooleanOpsTrueOrFApply[F[_]](val b: Boolean) extends AnyVal {
-    def apply[A](left: => A)(implicit F: Applicative[F]): EitherT[F, A, Unit] = {
+    def apply[A](
+      left: => A,
+    )(implicit
+      F: Applicative[F],
+    ): EitherT[F, A, Unit] = {
       val either = if (b) Right(()) else Left(left)
       EitherT(either.pure[F])
     }
   }
 
   private[CatsHelper] class BooleanOpsFalseOrFApply[F[_]](val b: Boolean) extends AnyVal {
-    def apply[A](left: => A)(implicit F: Applicative[F]): EitherT[F, A, Unit] = {
+    def apply[A](
+      left: => A,
+    )(implicit
+      F: Applicative[F],
+    ): EitherT[F, A, Unit] = {
       val either = if (b) Left(left) else Right(())
       EitherT(either.pure[F])
     }
   }
 
   implicit final class ResourceLogOps[F[_], A](val self: Resource[F, A]) extends AnyVal {
-    def log(name: String)(implicit F: Sync[F], log: Log[F], md: MeasureDuration[F]): Resource[F, A] = Resource {
+    def log(
+      name: String,
+    )(implicit
+      F: Sync[F],
+      log: Log[F],
+      md: MeasureDuration[F],
+    ): Resource[F, A] = Resource {
       for {
         timedAcquireAndRelease <- for {
           getMeasurement <- MeasureDuration[F].start
           _ <- Log[F].info(s"$name acquiring")
           a <- self.allocated.attemptTap {
             case Left(err) => for {
-              measureResult <- getMeasurement
-              _ <- Log[F].error(s"$name acquisition failed in ${measureResult.toMillis}ms with $err", err)
-            } yield ()
+                measureResult <- getMeasurement
+                _ <- Log[F].error(s"$name acquisition failed in ${ measureResult.toMillis }ms with $err", err)
+              } yield ()
 
             case Right(_) => for {
-              measureResult <- getMeasurement
-              _ <- Log[F].info(s"$name acquired in ${measureResult.toMillis}ms")
-            } yield ()
+                measureResult <- getMeasurement
+                _ <- Log[F].info(s"$name acquired in ${ measureResult.toMillis }ms")
+              } yield ()
           }
         } yield a
 
@@ -172,14 +200,14 @@ object CatsHelper {
           _ <- Log[F].info(s"$name releasing")
           _ <- release.attemptTap {
             case Left(err) => for {
-              measureResult <- getMeasurement
-              _ <- Log[F].error(s"$name release failed in ${measureResult.toMillis}ms with $err", err)
-            } yield ()
+                measureResult <- getMeasurement
+                _ <- Log[F].error(s"$name release failed in ${ measureResult.toMillis }ms with $err", err)
+              } yield ()
 
             case Right(a) => for {
-              measureResult <- getMeasurement
-              _ <- Log[F].info(s"$name released in ${measureResult.toMillis}ms")
-            } yield a
+                measureResult <- getMeasurement
+                _ <- Log[F].info(s"$name released in ${ measureResult.toMillis }ms")
+              } yield a
           }
         } yield ()
 

@@ -10,7 +10,6 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.util.{Failure, Try}
 
-
 class CatsHelperSpec extends AnyFunSuite with Matchers {
 
   implicit val ioRuntime: IORuntime = IORuntime.global

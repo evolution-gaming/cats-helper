@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
+import cats.effect.implicits._
 import cats.effect.kernel.Ref
 import cats.effect.std.Semaphore
-import cats.effect.implicits._
 import cats.effect.{Clock, Concurrent, Resource, Temporal}
 import cats.implicits._
 import cats.{Applicative, ~>}
@@ -21,7 +21,6 @@ object GroupWithin {
 
   final case class Settings(delay: FiniteDuration, size: Int)
 
-
   def empty[F[_]]: GroupWithin[F] = new GroupWithin[F] {
 
     def apply[A](settings: Settings)(f: Nel[A] => F[Unit]): Resource[F, Enqueue[F, A]] = {
@@ -31,7 +30,6 @@ object GroupWithin {
       Resource.pure(enqueue)
     }
   }
-
 
   def apply[F[_]: Temporal]: GroupWithin[F] = {
 
@@ -59,7 +57,7 @@ object GroupWithin {
         } else {
           val result = for {
             semaphore <- Semaphore[F](1)
-            ref       <- Ref[F].of(S.empty)
+            ref <- Ref[F].of(S.empty)
           } yield {
 
             def consume(as: Nel[A]) = semaphore.permit.use { _ => f(as.reverse) }
@@ -69,7 +67,7 @@ object GroupWithin {
                 _ <- Temporal[F].sleep(settings.delay)
                 a <- ref.modify {
                   case s: S.Full if s.timestamp == timestamp => (S.empty, consume(s.as))
-                  case s                                     => (s, void)
+                  case s => (s, void)
                 }
                 a <- a
               } yield a
@@ -89,7 +87,7 @@ object GroupWithin {
                         val as = a :: s.as
                         if (as.size >= settings.size) (S.empty, consume(as))
                         else (s.copy(as = as), void)
-                      case S.Empty   => (S.full(Nel.of(a), t), startTimer(t))
+                      case S.Empty => (S.full(Nel.of(a), t), startTimer(t))
                       case S.Stopped => (S.stopped, void)
                     }
                     a <- a
@@ -101,7 +99,7 @@ object GroupWithin {
             val release = ref
               .modify {
                 case s: S.Full => (S.stopped, consume(s.as))
-                case _         => (S.stopped, void)
+                case _ => (S.stopped, void)
               }
               .flatten
 
@@ -114,7 +112,6 @@ object GroupWithin {
     }
   }
 
-
   trait Enqueue[F[_], A] {
 
     def apply(a: A): F[Unit]
@@ -124,9 +121,7 @@ object GroupWithin {
 
     def empty[F[_]: Applicative, A]: Enqueue[F, A] = const[F, A](().pure[F])
 
-
     def const[F[_], A](value: F[Unit]): Enqueue[F, A] = _ => value
-
 
     implicit class EnqueueOps[F[_], A](val self: Enqueue[F, A]) extends AnyVal {
 

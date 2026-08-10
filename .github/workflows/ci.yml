@@ -9,7 +9,6 @@ jobs:
   test:
     uses: evolution-gaming/scala-github-actions/.github/workflows/ci.yml@dde27b9bd793d41d5aacf8fb74403c9de5da1146 # v6.3.0
     with:
-      # TODO both gaps are pre-existing: `check` was stubbed to `show version`, so neither was
-      # actually enforced. Enable once sbt-version-policy and sbt-scalafmt are added.
+      # TODO both gaps are pre-existing: `check` was stubbed to `show version`, it wasn't
+      # actually enforced. Enable once sbt-version-policy is added.
       version_policy_check: false
-      scalafmt_check: false

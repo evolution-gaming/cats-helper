@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Sync
-import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.classic.spi.LoggingEvent
 import ch.qos.logback.classic.util.ContextInitializer
+import ch.qos.logback.classic.{Level, Logger}
 import com.evolutiongaming.catshelper.Log.Mdc
 
 import scala.jdk.CollectionConverters._
@@ -27,8 +27,9 @@ object LogOfFromLogback {
   def apply[F[_]: Sync]: F[LogOf[F]] =
     Sync[F].delay {
       // see SLF4J compatibility Readme section
-      val slf4jCtx = Try { org.slf4j.LoggerFactory.getILoggerFactory().asInstanceOf[ch.qos.logback.classic.LoggerContext] }
-      val context  = slf4jCtx.getOrElse {
+      val slf4jCtx =
+        Try { org.slf4j.LoggerFactory.getILoggerFactory().asInstanceOf[ch.qos.logback.classic.LoggerContext] }
+      val context = slf4jCtx.getOrElse {
         val ctx = new ch.qos.logback.classic.LoggerContext()
         new ContextInitializer(ctx).autoConfig()
         ctx
@@ -50,17 +51,17 @@ object LogOfFromLogback {
       val FQCN = getClass.getName
 
       def append(
-          msg: => String,
-          mdc: Mdc,
-          level: Level,
-          throwable: Throwable = null
+        msg: => String,
+        mdc: Mdc,
+        level: Level,
+        throwable: Throwable = null,
       ): F[Unit] = Sync[F].delay {
         if (logger.isEnabledFor(level)) {
           val event =
             new LoggingEvent(FQCN, logger, level, msg, throwable, null)
           val mdc1 = mdc.context match {
             case Some(mdc) => mdc.toSortedMap.asJava
-            case None      => java.util.Collections.emptyMap[String, String]()
+            case None => java.util.Collections.emptyMap[String, String]()
           }
           event.setMDCPropertyMap(mdc1)
           logger.callAppenders(event)

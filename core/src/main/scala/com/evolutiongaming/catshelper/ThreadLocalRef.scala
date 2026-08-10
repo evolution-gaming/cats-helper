@@ -1,10 +1,10 @@
 package com.evolutiongaming.catshelper
 
-import cats.implicits._
-import cats.effect.{IO, Sync}
-import cats.~>
 import CatsHelper._
 import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Sync}
+import cats.implicits._
+import cats.~>
 
 trait ThreadLocalRef[F[_], A] {
 
@@ -19,7 +19,7 @@ trait ThreadLocalRef[F[_], A] {
 
 object ThreadLocalRef {
 
-  def apply[F[_] : Sync, A](threadLocal: ThreadLocal[A]): ThreadLocalRef[F, A] = new ThreadLocalRef[F, A] {
+  def apply[F[_]: Sync, A](threadLocal: ThreadLocal[A]): ThreadLocalRef[F, A] = new ThreadLocalRef[F, A] {
 
     def get = Sync[F].delay { threadLocal.get() }
 
@@ -43,8 +43,7 @@ object ThreadLocalRef {
     }
   }
 
-
-  def of[F[_] : Sync : ToTry, A](fa: F[A]): F[ThreadLocalRef[F, A]] = {
+  def of[F[_]: Sync: ToTry, A](fa: F[A]): F[ThreadLocalRef[F, A]] = {
     for {
       threadLocal <- Sync[F].delay { ThreadLocal.withInitial { () => fa.toTry.get } }
     } yield {
@@ -52,9 +51,7 @@ object ThreadLocalRef {
     }
   }
 
-
-  def of[F[_] : Sync : ToTry, A](a: => A): F[ThreadLocalRef[F, A]] = of(Sync[F].delay(a))
-
+  def of[F[_]: Sync: ToTry, A](a: => A): F[ThreadLocalRef[F, A]] = of(Sync[F].delay(a))
 
   implicit class ThreadLocalRefOps[F[_], A](val self: ThreadLocalRef[F, A]) extends AnyVal {
 
@@ -71,7 +68,6 @@ object ThreadLocalRef {
   }
 }
 
-
 trait ThreadLocalOf[F[_]] {
 
   def apply[A](fa: F[A]): F[ThreadLocalRef[F, A]]
@@ -81,13 +77,22 @@ trait ThreadLocalOf[F[_]] {
 
 object ThreadLocalOf {
 
-  def apply[F[_]](implicit F: ThreadLocalOf[F]): ThreadLocalOf[F] = F
+  def apply[F[_]](
+    implicit
+    F: ThreadLocalOf[F],
+  ): ThreadLocalOf[F] = F
 
-  def summon[F[_]](implicit F: ThreadLocalOf[F]): ThreadLocalOf[F] = F
+  def summon[F[_]](
+    implicit
+    F: ThreadLocalOf[F],
+  ): ThreadLocalOf[F] = F
 
-  def ioThreadLocalOf(implicit runtime: IORuntime): ThreadLocalOf[IO] = threadLocalOf
+  def ioThreadLocalOf(
+    implicit
+    runtime: IORuntime,
+  ): ThreadLocalOf[IO] = threadLocalOf
 
-  implicit def threadLocalOf[F[_] : Sync : ToTry]: ThreadLocalOf[F] = new ThreadLocalOf[F] {
+  implicit def threadLocalOf[F[_]: Sync: ToTry]: ThreadLocalOf[F] = new ThreadLocalOf[F] {
 
     override def apply[A](fa: F[A]): F[ThreadLocalRef[F, A]] = ThreadLocalRef.of(fa)
 

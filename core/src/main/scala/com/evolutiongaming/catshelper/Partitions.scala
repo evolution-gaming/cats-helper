@@ -14,7 +14,6 @@ object Partitions {
 
   type Partition = Int
 
-
   def const[K, V](value: V): Partitions[K, V] = new Partitions[K, V] {
 
     def get(key: K) = value
@@ -24,7 +23,7 @@ object Partitions {
 
   def of[F[_]: Monad, K: Hash, V](
     nrOfPartitions: Int,
-    valueOf: Partition => F[V]
+    valueOf: Partition => F[V],
   ): F[Partitions[K, V]] = {
     if (nrOfPartitions <= 1) {
       valueOf(0).map(const)
@@ -35,7 +34,6 @@ object Partitions {
         .map { partitions => Partitions[K, V](partitions) }
     }
   }
-
 
   private def apply[K: Hash, V](partitions: Vector[V]): Partitions[K, V] = {
 

@@ -39,27 +39,27 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
   private def `support settings = 0`[F[_]: Temporal] = {
     val settings = GroupWithin.Settings(delay = 1.minute, size = 0)
     for {
-      ref         <- Ref[F].of(List.empty[Nel[Int]])
-      groupWithin  = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
-      _           <- groupWithin.use { enqueue0 =>
+      ref <- Ref[F].of(List.empty[Nel[Int]])
+      groupWithin = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
+      _ <- groupWithin.use { enqueue0 =>
         val enqueue = enqueue0.mapK(FunctionK.id)
         for {
           _ <- enqueue(1)
           _ <- enqueue(2)
         } yield {}
       }
-      a          <- ref.get
+      a <- ref.get
     } yield {
       a shouldEqual List(Nel.of(2), Nel.of(1))
     }
   }
 
-  private def `collect until size reached`[F[_] : Temporal] = {
+  private def `collect until size reached`[F[_]: Temporal] = {
     val settings = GroupWithin.Settings(delay = 1.minute, size = 2)
     for {
-      ref         <- Ref[F].of(List.empty[Nel[Int]])
-      groupWithin  = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
-      _           <- groupWithin.use { enqueue =>
+      ref <- Ref[F].of(List.empty[Nel[Int]])
+      groupWithin = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
+      _ <- groupWithin.use { enqueue =>
         for {
           _ <- enqueue(1)
           _ <- enqueue(2)
@@ -67,19 +67,19 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
           _ <- enqueue(4)
         } yield {}
       }
-      a          <- ref.get
+      a <- ref.get
     } yield {
       a shouldEqual List(Nel.of(3, 4), Nel.of(1, 2))
     }
   }
 
-  private def `collect until deadline reached`[F[_] : Temporal] = {
+  private def `collect until deadline reached`[F[_]: Temporal] = {
     val delay = 1.minute
     val settings = GroupWithin.Settings(delay = delay, size = 100)
     for {
-      ref         <- Ref[F].of(List.empty[Nel[Int]])
-      groupWithin  = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
-      a           <- groupWithin.use { enqueue =>
+      ref <- Ref[F].of(List.empty[Nel[Int]])
+      groupWithin = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
+      a <- groupWithin.use { enqueue =>
         for {
           _ <- enqueue(1)
           _ <- enqueue(2)
@@ -97,18 +97,18 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     }
   }
 
-  private def `consume on release`[F[_] : Temporal] = {
+  private def `consume on release`[F[_]: Temporal] = {
     val settings = GroupWithin.Settings(delay = 1.minute, size = 100)
     for {
-      deferred    <- Deferred[F, Nel[Int]]
-      groupWithin  = GroupWithin[F].apply[Int](settings) { a => deferred.complete(a).void }
-      _           <- groupWithin.use { enqueue =>
+      deferred <- Deferred[F, Nel[Int]]
+      groupWithin = GroupWithin[F].apply[Int](settings) { a => deferred.complete(a).void }
+      _ <- groupWithin.use { enqueue =>
         for {
           _ <- enqueue(1)
           _ <- enqueue(2)
         } yield {}
       }
-      a          <- deferred.get
+      a <- deferred.get
     } yield {
       a shouldEqual Nel.of(1, 2)
     }

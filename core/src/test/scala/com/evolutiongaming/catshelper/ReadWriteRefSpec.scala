@@ -28,9 +28,9 @@ class ReadWriteRefSpec extends AnyFreeSpec {
 
     // Note that this test case also covers parallelism of `read` and exclusiveness of `wright`.
 
-    val dr = 10.millis  // read duration
-    val dw = 1.second   // write duration
-    val ds = 1.nano     // scheduling delay duration
+    val dr = 10.millis // read duration
+    val dw = 1.second // write duration
+    val ds = 1.nano // scheduling delay duration
 
     val r: IO[(Int, FiniteDuration)] =
       rw.read.use(i => (IO.pure(i), getTime).tupled <* IO.sleep(dr))
@@ -82,7 +82,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
 
     IO.race(
       readForever.start *> IO.sleep(1.nano) *> writeThatGetsCancelled *> IO.never,
-      IO.sleep(1.second) *> (read, getTime).tupled
+      IO.sleep(1.second) *> (read, getTime).tupled,
     ).map(_ shouldBe Right((0, cancelTime)))
 
   }
@@ -108,7 +108,10 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     // go undetected, since IO run loop may execute a cancellable batch as a single fused runnable.
     // Hence here we resort to actual multi-threaded executors for actual concurrency.
 
-    final class Env(implicit val ec: ExecutionContext)
+    final class Env(
+      implicit
+      val ec: ExecutionContext,
+    )
     val env = cats.effect.Resource {
       IO {
         val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
@@ -125,12 +128,12 @@ class ReadWriteRefSpec extends AnyFreeSpec {
 
           (for {
             rw <- ReadWriteRef[IO].of(1)
-            _  <- {
+            _ <- {
               val tryReadAndCancel = rw.read.use(_ => IO.unit).start.flatMap(_.cancel) *> IO.cede
               val repeated = List.fill(1000)(tryReadAndCancel).sequence_
               List.fill(16)(repeated).parSequence_
             }
-            _  <- rw.write.use(_ => IO.unit).timeout(100.millis)
+            _ <- rw.write.use(_ => IO.unit).timeout(100.millis)
           } yield ()).evalOn(ec)
         }
         .unsafeRunTimed(10.seconds)
@@ -155,7 +158,7 @@ class ReadWriteRefSpec extends AnyFreeSpec {
     import env._
     for {
       rw <- ReadWriteRef[IO].of(0)
-      a  <- body(Scope(env, rw))
+      a <- body(Scope(env, rw))
     } yield a
   }
 }

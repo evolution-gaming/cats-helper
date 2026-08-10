@@ -53,7 +53,10 @@ private[testkit] object PureTestRunner {
     config.testFrameworkApi.completeWith(result, env.testContext.state)
   }
 
-  private[testkit] class EnvImpl[F[_]](implicit val async: Async[F]) extends PureTest.Env[F] with TestInstances {
+  private[testkit] class EnvImpl[F[_]](
+    implicit
+    val async: Async[F],
+  ) extends PureTest.Env[F] with TestInstances {
     val testContext: TestContext = TestContext()
 
     val ioRuntime: IORuntime = materializeRuntime(Ticker(testContext))
@@ -70,5 +73,3 @@ private[testkit] object PureTestRunner {
     }
   }
 }
-
-

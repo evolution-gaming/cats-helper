@@ -1,11 +1,12 @@
 package com.evolutiongaming.catshelper
 
+import cats.Hash
 import cats.data.{NonEmptyList => Nel}
+import cats.effect.kernel.Async
 import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.effect.{Clock, Concurrent, IO, Sync, Temporal}
 import cats.syntax.all._
-import cats.Hash
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -13,7 +14,6 @@ import org.scalatest.matchers.should.Matchers
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
-import cats.effect.kernel.Async
 
 class SerialKeyTest extends AsyncFunSuite with Matchers {
   import SerialKeyTest._
@@ -22,17 +22,17 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
 
   test("run in parallel for different keys & serially for same") {
     val result = for {
-      q  <- Queue.of[IO, String, Int]
+      q <- Queue.of[IO, String, Int]
       da <- Deferred[IO, Int]
-      _  <- q.start("a") { da.get }
-      a  <- q("a") { 1.pure[IO] }
+      _ <- q.start("a") { da.get }
+      a <- q("a") { 1.pure[IO] }
 
       db <- Deferred[IO, Int]
-      _  <- q.start("b") { db.get }
-      b  <- q("b") { 1.pure[IO] }
-      _  <- db.complete(0)
-      b  <- b
-      _  <- IO { b shouldEqual 1 }
+      _ <- q.start("b") { db.get }
+      b <- q("b") { 1.pure[IO] }
+      _ <- db.complete(0)
+      b <- b
+      _ <- IO { b shouldEqual 1 }
 
       _ <- da.complete(0)
       a <- a
@@ -58,7 +58,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
 
   test("run many") {
     val tasks = 1000
-    val keys  = 10
+    val keys = 10
 
     val duration = {
       val ms = Clock[IO].monotonic.map(_.toMillis)
@@ -67,9 +67,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
 
     val result = for {
       logOf <- LogOf.slf4j[IO]
-      log   <- logOf(SerParQueueTest.getClass)
-      q     <- SerParQueue.of[IO, Int]
-      d     <- duration
+      log <- logOf(SerParQueueTest.getClass)
+      q <- SerParQueue.of[IO, Int]
+      d <- duration
       a <- 0
         .iterateForeverM { a =>
           for {
@@ -97,7 +97,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
             }
         }
       d <- d
-      _ <- IO { log.info(s"took ${d.toMillis}ms for $keys parallel streams with $tasks each") }
+      _ <- IO { log.info(s"took ${ d.toMillis }ms for $keys parallel streams with $tasks each") }
       _ <- IO { a.distinct shouldEqual List(tasks) }
     } yield {}
     result.run(1.minute)
@@ -112,7 +112,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         q <- Queue.of[IO, Int, String]
         _ <- q.run(key, "a")
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a"))) }
       } yield {}
       result.run()
     }
@@ -128,7 +128,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- IO { a shouldEqual error.asLeft }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a"))) }
       } yield {}
       result.run()
     }
@@ -150,7 +150,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("b"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("b"))) }
       } yield {}
       result.run()
     }
@@ -166,7 +166,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key, "a")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a"))) }
       } yield {}
       result.run()
     }
@@ -193,7 +193,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a", "c"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a", "c"))) }
       } yield {}
       result.run()
     }
@@ -206,7 +206,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key, "b")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a", "b"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a", "b"))) }
       } yield {}
       result.run()
     }
@@ -228,7 +228,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a", "b"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a", "b"))) }
       } yield {}
       result.run()
     }
@@ -251,7 +251,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a", "b"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a", "b"))) }
       } yield {}
       result.run()
     }
@@ -279,7 +279,7 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a", "b", "c"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a", "b", "c"))) }
       } yield {}
       result.run()
     }
@@ -303,16 +303,18 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual Map((key, Nel.of("a", "b", "c"))) }
+        _ <- IO { rs shouldEqual Map((key, Nel.of("a", "b", "c"))) }
       } yield {}
       result.run()
     }
   }
 
-
   private implicit class Ops[F[_], A](val self: F[A]) {
 
-    def unfinished(implicit sync: Async[F]): F[Unit] = {
+    def unfinished(
+      implicit
+      sync: Async[F],
+    ): F[Unit] = {
       for {
         a <- self.timeout(10.millis).attempt
         _ <- Sync[F].delay { a should matchPattern { case Left(_: TimeoutException) => () } }
@@ -322,7 +324,12 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
 
   private implicit class QueueOps[F[_], K, A](val self: Queue[F, K, A]) {
 
-    def run(key: K, a: A)(implicit F: Sync[F]): F[A] = {
+    def run(
+      key: K,
+      a: A,
+    )(implicit
+      F: Sync[F],
+    ): F[A] = {
       for {
         b <- self(key) { a.pure[F] }
         b <- b
@@ -362,7 +369,7 @@ object SerialKeyTest {
             def get = {
               ref
                 .get
-                .map { _.map { case (key, values) => (key, values.reverse)} }
+                .map { _.map { case (key, values) => (key, values.reverse) } }
             }
           }
         }
@@ -380,7 +387,7 @@ object SerialKeyTest {
 
     def of[F[_]: Async, K: Hash, A]: F[Queue[F, K, A]] = {
       for {
-        queue    <- SerialKey.of[F, K]
+        queue <- SerialKey.of[F, K]
         records0 <- Records.of[F, K, A]
       } yield {
         new Queue[F, K, A] {
@@ -394,7 +401,13 @@ object SerialKeyTest {
 
     implicit class QueueOpsSerParQueueTest[F[_], K, A](val self: Queue[F, K, A]) extends AnyVal {
 
-      def start(key: K)(task: F[A])(implicit F: Concurrent[F]): F[F[A]] = {
+      def start(
+        key: K,
+      )(
+        task: F[A],
+      )(implicit
+        F: Concurrent[F],
+      ): F[F[A]] = {
         for {
           d <- Deferred[F, Unit]
           a <- self(key) { d.complete(()) *> task }
