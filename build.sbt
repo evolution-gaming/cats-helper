@@ -1,4 +1,5 @@
-import Dependencies._
+import Dependencies.*
+import sbtversionpolicy.Compatibility.BinaryCompatible
 
 def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
   CrossVersion.partialVersion(scalaVersion) match {
@@ -27,6 +28,8 @@ inThisBuild(Seq(
   publishTo := Some(Resolver.evolutionReleases),
 
   autoAPIMappings := true,
+
+  versionPolicyIntention := BinaryCompatible,
 ))
 
 // Settings that can't be defined on a higher level go here.
@@ -36,8 +39,7 @@ lazy val commonSettings = Seq(
 )
 
 val alias: Seq[sbt.Def.Setting[?]] =
-//  addCommandAlias("check", "all versionPolicyCheck Compile/doc") ++
-  addCommandAlias("check", "all scalafmtCheckRepo Compile/doc") ++
+  addCommandAlias("check", "all scalafmtCheckRepo versionPolicyCheck Compile/doc") ++
     addCommandAlias("fmt", "+scalafmtRepo") ++
     addCommandAlias("build", "+all compile testFull")
 
