@@ -14,24 +14,37 @@ trait FromFuture[F[_]] {
 
 object FromFuture {
 
-  /** Convinient summon-and-run function
+  /**
+   * Convinient summon-and-run function
    *
-   * @example {{{
-   *          class Foo[F[_]: FromFuture: Monad](db: FutureDB){
-   *            def query(lines: Int): F[Unit] = FromFuture.defer[F](db.query(lines))
-   *          }
-   * }}} */
+   * @example
+   *   {{{ class Foo[F[_]: FromFuture: Monad](db: FutureDB){ def query(lines: Int): F[Unit] =
+   *   FromFuture.defer[F](db.query(lines)) } }}}
+   */
   def defer[F[_]]: FromFutureDeferPA[F] = new FromFutureDeferPA[F]()
 
   private[FromFuture] class FromFutureDeferPA[F[_]](val __ : Boolean = true) extends AnyVal {
-    def apply[A](future: => Future[A])(implicit F: FromFuture[F]): F[A] = F(future)
+    def apply[A](
+      future: => Future[A],
+    )(implicit
+      F: FromFuture[F],
+    ): F[A] = F(future)
   }
 
-  def apply[F[_]](implicit F: FromFuture[F]): FromFuture[F] = F
+  def apply[F[_]](
+    implicit
+    F: FromFuture[F],
+  ): FromFuture[F] = F
 
-  def summon[F[_]](implicit F: FromFuture[F]): FromFuture[F] = F
+  def summon[F[_]](
+    implicit
+    F: FromFuture[F],
+  ): FromFuture[F] = F
 
-  def lift[F[_]: Async](implicit executor: ExecutionContext): FromFuture[F] = {
+  def lift[F[_]: Async](
+    implicit
+    executor: ExecutionContext,
+  ): FromFuture[F] = {
 
     new FromFuture[F] {
 

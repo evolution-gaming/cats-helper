@@ -44,7 +44,13 @@ object Foldable1 {
 
   object implicits {
     implicit class OpsFoldable1[F[_], A](val fa: F[A]) extends AnyVal {
-      def fold[B](b: B)(f: (B, A) => B)(implicit F: Foldable1[F]): B = F.fold(fa, b)(f)
+      def fold[B](
+        b: B,
+      )(
+        f: (B, A) => B,
+      )(implicit
+        F: Foldable1[F],
+      ): B = F.fold(fa, b)(f)
     }
   }
 }

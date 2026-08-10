@@ -10,7 +10,6 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
 
-
 class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
   import ResourceBreakFlatMapChainTest._
 
@@ -34,17 +33,17 @@ class ResourceBreakFlatMapChainTest extends AsyncFunSuite with Matchers {
 
   test("cancellable") {
     val result = for {
-      started  <- Deferred[IO, Unit]
+      started <- Deferred[IO, Unit]
       released <- Deferred[IO, Unit]
-      resource  = for {
+      resource = for {
         _ <- Resource.release { released.complete(()).void }
         _ <- started.complete(()).toResource
         _ <- IO.never.as(()).toResource
       } yield {}
-      fiber    <- resource.breakFlatMapChain.use { _ => ().pure[IO] }.start
-      _        <- started.get
-      _        <- fiber.cancel
-      _        <- released.get
+      fiber <- resource.breakFlatMapChain.use { _ => ().pure[IO] }.start
+      _ <- started.get
+      _ <- fiber.cancel
+      _ <- released.get
     } yield {}
     result.run()
   }

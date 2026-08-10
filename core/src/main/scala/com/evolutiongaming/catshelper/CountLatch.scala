@@ -1,37 +1,45 @@
 package com.evolutiongaming.catshelper
 
-import cats.{Applicative, Functor}
 import cats.effect.syntax.all._
 import cats.effect.{Async, Deferred, MonadCancel, Ref, Resource}
 import cats.syntax.all._
+import cats.{Applicative, Functor}
 
 /**
-  * Analog of [[cats.effect.std.CountDownLatch]] that supports increases of latches after creation via method [[CountLatch.acquire]]
-  *
-  * Example:
-  * {{{
-  *    import cats.effect.IO
-  *    for {
-  *       latch <- CountLatch[IO](1)
-  *       fiber <- latch.await.start
-  *       _ <- latch.acquire()
-  *       _ <- latch.release
-  *       _ <- latch.release
-  *       _ <- fiber.joinWithNever
-  *    } yield {}
-  * }}}
-  *
-  * @tparam F effect type, expected to be [[cats.effect.IO]]
-  */
+ * Analog of [[cats.effect.std.CountDownLatch]] that supports increases of latches after creation
+ * via method [[CountLatch.acquire]]
+ *
+ * Example:
+ * {{{
+ *    import cats.effect.IO
+ *    for {
+ *       latch <- CountLatch[IO](1)
+ *       fiber <- latch.await.start
+ *       _ <- latch.acquire()
+ *       _ <- latch.release
+ *       _ <- latch.release
+ *       _ <- fiber.joinWithNever
+ *    } yield {}
+ * }}}
+ *
+ * @tparam F
+ *   effect type, expected to be [[cats.effect.IO]]
+ */
 sealed trait CountLatch[F[_]] {
 
-  /** Increase latches on [[n]] */
+  /**
+   * Increase latches on [[n]]
+   */
   def acquire(n: Int = 1): F[Unit]
 
-  /** Decrease latches on [[n]] */
+  /**
+   * Decrease latches on [[n]]
+   */
   def release(n: Int = 1): F[Unit]
 
-  /** Semantically blocks fiber while latches more than zero */
+  /**
+   * Semantically blocks fiber while latches more than zero
+   */
   def await(): F[Unit]
 }
 
@@ -64,57 +72,68 @@ object CountLatch {
     for {
       state <- if (n > 0) Awaiting(n) else Done.pure[F].widen[State]
       state <- Ref.of[F, State](state)
-    } yield
-      new CountLatch[F] {
+    } yield new CountLatch[F] {
 
-        val F = Async[F]
+      val F = Async[F]
 
-        override def acquire(n: Int): F[Unit] =
-          if (n < 1) F.unit
-          else
-            state.access
-              .flatMap {
-                case (state, set) =>
-                  for {
-                    state <- state match {
-                      case Done           => Awaiting(n)
-                      case Awaiting(l, a) => Awaiting(l + n, a).pure[F]
-                    }
-                    result <- set(state)
-                  } yield result
-              }
-              .iterateUntil(identity)
-              .void
-              .uncancelable
-
-        override def release(n: Int): F[Unit] =
-          state
-            .modify {
-              case Done => Done -> F.unit
-              case Awaiting(l, await) =>
-                if (l > n) Awaiting(l - n, await) -> F.unit
-                else Done -> await.complete(()).void
+      override def acquire(n: Int): F[Unit] =
+        if (n < 1) F.unit
+        else
+          state.access
+            .flatMap {
+              case (state, set) =>
+                for {
+                  state <- state match {
+                    case Done => Awaiting(n)
+                    case Awaiting(l, a) => Awaiting(l + n, a).pure[F]
+                  }
+                  result <- set(state)
+                } yield result
             }
-            .flatten
+            .iterateUntil(identity)
+            .void
             .uncancelable
 
-        override def await(): F[Unit] =
-          state.get.flatMap {
-            case Done                => F.unit
-            case Awaiting(_, signal) => signal.get
+      override def release(n: Int): F[Unit] =
+        state
+          .modify {
+            case Done => Done -> F.unit
+            case Awaiting(l, await) =>
+              if (l > n) Awaiting(l - n, await) -> F.unit
+              else Done -> await.complete(()).void
           }
-      }
+          .flatten
+          .uncancelable
+
+      override def await(): F[Unit] =
+        state.get.flatMap {
+          case Done => F.unit
+          case Awaiting(_, signal) => signal.get
+        }
+    }
   }
 
   implicit final class CountLatchOps[F[_]](val latch: CountLatch[F])
-      extends AnyVal {
+  extends AnyVal {
 
-    /** create [[Resource]] that will acquire & release the latch */
-    def asResource(implicit F: Functor[F]): Resource[F, Unit] =
+    /**
+     * create [[Resource]] that will acquire & release the latch
+     */
+    def asResource(
+      implicit
+      F: Functor[F],
+    ): Resource[F, Unit] =
       Resource.make[F, Unit](latch.acquire())(_ => latch.release())
 
-    /** acquire CountLatch before [[fa]] and release it after, tolerating failure & cancellation of [[fa]] */
-    def surround[A](fa: F[A])(implicit F: MonadCancel[F, Throwable]): F[A] =
+    /**
+     * acquire CountLatch before [[fa]] and release it after, tolerating failure & cancellation of
+     * [[fa]]
+     */
+    def surround[A](
+      fa: F[A],
+    )(implicit
+      F: MonadCancel[F, Throwable],
+    ): F[A] =
       F.bracket(latch.acquire())(_ => fa)(_ => latch.release())
 
   }

@@ -1,11 +1,10 @@
 package com.evolutiongaming.catshelper
 
-
-import cats.{Functor, ~>}
 import cats.effect.Concurrent
-import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.implicits._
+import cats.effect.kernel.{Deferred, Ref}
 import cats.implicits._
+import cats.{Functor, ~>}
 
 trait LazyVal[F[_], A] {
 
@@ -16,15 +15,14 @@ trait LazyVal[F[_], A] {
 
 object LazyVal {
 
-  def const[F[_] : Functor, A](a: F[A]): LazyVal[F, A] = new LazyVal[F, A] {
+  def const[F[_]: Functor, A](a: F[A]): LazyVal[F, A] = new LazyVal[F, A] {
 
     def get = a
 
     def getLoaded = a.map(_.some)
   }
 
-
-  def of[F[_] : Concurrent, A](load: => F[A]): F[LazyVal[F, A]] = {
+  def of[F[_]: Concurrent, A](load: => F[A]): F[LazyVal[F, A]] = {
     for {
       ref <- Ref[F].of(none[F[A]])
     } yield {
@@ -32,9 +30,9 @@ object LazyVal {
     }
   }
 
-  def apply[F[_] : Concurrent, A](
+  def apply[F[_]: Concurrent, A](
     ref: Ref[F, Option[F[A]]],
-    load: => F[A]
+    load: => F[A],
   ): LazyVal[F, A] = {
     new LazyVal[F, A] {
 
@@ -50,7 +48,7 @@ object LazyVal {
             } yield a
             ref
               .modify {
-                case None    => (d.get.rethrow.some, load1)
+                case None => (d.get.rethrow.some, load1)
                 case Some(a) => (a.some, a)
               }
               .flatten
@@ -77,7 +75,6 @@ object LazyVal {
       }
     }
   }
-
 
   implicit class LazyValOps[F[_], A](val self: LazyVal[F, A]) extends AnyVal {
 

@@ -1,8 +1,8 @@
 package com.evolutiongaming.catshelper
 
-import java.util.UUID
-
 import cats.effect.Sync
+
+import java.util.UUID
 
 trait RandomIdOf[F[_]] {
   def apply: F[RandomId]
@@ -10,9 +10,12 @@ trait RandomIdOf[F[_]] {
 
 object RandomIdOf {
 
-  def apply[F[_]](implicit fa: RandomIdOf[F]): RandomIdOf[F] = fa
+  def apply[F[_]](
+    implicit
+    fa: RandomIdOf[F],
+  ): RandomIdOf[F] = fa
 
-  def uuid[F[_] : Sync]: RandomIdOf[F] = new RandomIdOf[F] {
+  def uuid[F[_]: Sync]: RandomIdOf[F] = new RandomIdOf[F] {
 
     def apply = Sync[F].delay { RandomId(UUID.randomUUID().toString) }
   }

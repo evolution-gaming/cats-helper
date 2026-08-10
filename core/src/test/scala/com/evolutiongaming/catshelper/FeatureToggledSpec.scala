@@ -1,11 +1,11 @@
 package com.evolutiongaming.catshelper
 
+import cats.effect.implicits._
 import cats.effect.kernel.Outcome.Succeeded
 import cats.effect.kernel.Ref
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource, std}
 import cats.implicits._
-import cats.effect.implicits._
 import com.evolutiongaming.catshelper.testkit.PureTest.ioTest
 import com.evolutiongaming.catshelper.testkit.{PureTest, TestRuntime}
 import org.scalactic.source.Position
@@ -18,17 +18,22 @@ import scala.concurrent.duration._
 
 class FeatureToggledSpec extends AnyFreeSpec {
   implicit val ioRuntime: IORuntime = IORuntime.global
-  
+
   "end-to-end polling" in scope { s =>
     import s._, env._
 
     val d = 10.seconds
     for {
       flag <- Ref[IO].of(false)
-      ftr   = FeatureToggled.polling(baseResource, flag.get, d)
+      ftr = FeatureToggled.polling(baseResource, flag.get, d)
 
       _ <- ftr.use { access =>
-        def expect(fetchResult: Option[Int], es: List[Int])(implicit pos: Position): IO[Unit] = {
+        def expect(
+          fetchResult: Option[Int],
+          es: List[Int],
+        )(implicit
+          pos: Position,
+        ): IO[Unit] = {
           // Polling events first to make sure they are independent from access
           (events, access.use(IO.pure)).tupled.map(_ shouldBe ((es, fetchResult))).void
         }
@@ -79,14 +84,13 @@ class FeatureToggledSpec extends AnyFreeSpec {
 
       for {
         toggle <- std.Queue.bounded[IO, Boolean](1).flatTap(_.offer(true))
-        ftr     = FeatureToggled.of(baseResource, gracePeriod)(toggle.take.flatMap(_).foreverM)
+        ftr = FeatureToggled.of(baseResource, gracePeriod)(toggle.take.flatMap(_).foreverM)
 
         _ <- ftr.use { access =>
           IO.sleep(1.nano) *> f((s, access, toggle.offer(_)))
         }
       } yield ()
     }
-
 
     "keeps resource alive while in use" in localScope { ls =>
       val (s, access, toggle) = ls
@@ -96,24 +100,24 @@ class FeatureToggledSpec extends AnyFreeSpec {
       for {
         f1 <- access.use(_ => sleepUntil(targetTime) *> events).start
 
-        _  <- IO.sleep(1.nano)
-        _  <- toggle(false)
+        _ <- IO.sleep(1.nano)
+        _ <- toggle(false)
 
         // Resource must become immediately unavailable for new access.
-        _  <- IO.sleep(1.nano)
-        _  <- access.use(IO.pure).timeout(1.nano).map(_ shouldBe None)
+        _ <- IO.sleep(1.nano)
+        _ <- access.use(IO.pure).timeout(1.nano).map(_ shouldBe None)
 
         // But must be still alive while it's in use.
-        _  <- sleepUntil(targetTime - 1.nano)
-        _  <- events.map(_ shouldBe List(1))
-        _  <- f1.join.flatMap {
+        _ <- sleepUntil(targetTime - 1.nano)
+        _ <- events.map(_ shouldBe List(1))
+        _ <- f1.join.flatMap {
           case Succeeded(value) => value.map(_ shouldBe List(1))
           case x => fail(s"Expected outcome Succeeded but was $x")
         }
 
         // Finally it goes down as soon as there is no usages.
-        _  <- sleepUntil(targetTime + 1.nano)
-        _  <- events.map(_ shouldBe List(1, -1))
+        _ <- sleepUntil(targetTime + 1.nano)
+        _ <- events.map(_ shouldBe List(1, -1))
       } yield ()
     }
 
@@ -140,7 +144,10 @@ class FeatureToggledSpec extends AnyFreeSpec {
   }
 
   "race-conditions" - {
-    final class Env(implicit val ec: ExecutionContext)
+    final class Env(
+      implicit
+      val ec: ExecutionContext,
+    )
     val env = cats.effect.Resource {
       IO {
         val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
@@ -185,7 +192,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
       import env._
       for {
         counter <- Ref[IO].of(0)
-        events  <- Ref[IO].of(Queue.empty[Int])
+        events <- Ref[IO].of(Queue.empty[Int])
         resource = Resource[IO, Int] {
           val init = counter.modify(i => (i + 1, i + 1)).flatTap(i => events.update(_ enqueue i))
           init.map(i => i -> events.update(_ enqueue -i))
@@ -195,7 +202,14 @@ class FeatureToggledSpec extends AnyFreeSpec {
     }
   }
 
-  private def getTime(implicit rt: TestRuntime[IO]) = rt.getTimeSinceStart
+  private def getTime(
+    implicit
+    rt: TestRuntime[IO],
+  ) = rt.getTimeSinceStart
 
-  private def sleepUntil(dt: FiniteDuration)(implicit rt: TestRuntime[IO]) = rt.sleepUntil(dt)
+  private def sleepUntil(
+    dt: FiniteDuration,
+  )(implicit
+    rt: TestRuntime[IO],
+  ) = rt.sleepUntil(dt)
 }

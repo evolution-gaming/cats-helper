@@ -11,7 +11,10 @@ object TimerHelper {
 
   implicit class TimerObjOpsTimerHelper(val self: Temporal.type) extends AnyVal {
 
-    def empty[F[_]](implicit F: Concurrent[F]): Temporal[F] = new Temporal[F] {
+    def empty[F[_]](
+      implicit
+      F: Concurrent[F],
+    ): Temporal[F] = new Temporal[F] {
 
       val clock = Clock.empty[F]
 
@@ -23,7 +26,7 @@ object TimerHelper {
 
       def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B] = F.flatMap(fa)(f)
 
-      def tailRecM[A, B](a: A)(f: A => F[Either[A,B]]): F[B] = F.tailRecM(a)(f)
+      def tailRecM[A, B](a: A)(f: A => F[Either[A, B]]): F[B] = F.tailRecM(a)(f)
 
       def forceR[A, B](fa: F[A])(fb: F[B]): F[B] = F.forceR(fa)(fb)
 
@@ -35,15 +38,15 @@ object TimerHelper {
 
       def unique: F[Unique.Token] = F.unique
 
-      def start[A](fa: F[A]): F[Fiber[F,Throwable,A]] = F.start(fa)
+      def start[A](fa: F[A]): F[Fiber[F, Throwable, A]] = F.start(fa)
 
       def never[A]: F[A] = F.never
 
       def cede: F[Unit] = F.cede
 
-      def ref[A](a: A): F[Ref[F,A]] = F.ref(a)
+      def ref[A](a: A): F[Ref[F, A]] = F.ref(a)
 
-      def deferred[A]: F[Deferred[F,A]] = F.deferred
+      def deferred[A]: F[Deferred[F, A]] = F.deferred
 
       def monotonic: F[FiniteDuration] = clock.monotonic
 

@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
-import cats.{Foldable, Monoid, Parallel}
 import cats.data.{NonEmptyMap => Nem}
+import cats.{Foldable, Monoid, Parallel}
 import com.evolutiongaming.catshelper.Foldable1.implicits._
 
 object ParallelHelper {
@@ -9,7 +9,13 @@ object ParallelHelper {
   implicit class ParallelObjOps_ParallelHelper(val self: Parallel.type) extends AnyVal {
 
     @deprecated("use `parFoldMap1` instead", "3.2.0")
-    def parFoldMap[T[_]: Foldable, F[_], A, B: Monoid](ta: T[A])(f: A => F[B])(implicit P: Parallel[F]): F[B] = {
+    def parFoldMap[T[_]: Foldable, F[_], A, B: Monoid](
+      ta: T[A],
+    )(
+      f: A => F[B],
+    )(implicit
+      P: Parallel[F],
+    ): F[B] = {
       val M = Monoid[B]
       val A = P.applicative
       val zero = A.pure(M.empty)
@@ -20,7 +26,11 @@ object ParallelHelper {
     }
 
     @deprecated("use `parFold1` instead", "3.2.0")
-    def parFold[T[_]: Foldable, F[_], A: Monoid](tfa: T[F[A]])(implicit P: Parallel[F]): F[A] = {
+    def parFold[T[_]: Foldable, F[_], A: Monoid](
+      tfa: T[F[A]],
+    )(implicit
+      P: Parallel[F],
+    ): F[A] = {
       parFoldMap(tfa)(Predef.identity)
     }
 
@@ -37,11 +47,13 @@ object ParallelHelper {
     }
 
     def parFoldMap1[F[_], P[_], A, B](
-      fa: F[A])(
-      f: A => P[B])(implicit
+      fa: F[A],
+    )(
+      f: A => P[B],
+    )(implicit
       F: Foldable1[F],
       P: Parallel[P],
-      M: Monoid[B]
+      M: Monoid[B],
     ): P[B] = {
       val A = P.applicative
       val pb = fa.fold(A.pure(M.empty)) { case (pb, a) =>
@@ -53,10 +65,11 @@ object ParallelHelper {
     }
 
     def parFold1[F[_], P[_], A](
-      fa: F[P[A]])(implicit
+      fa: F[P[A]],
+    )(implicit
       F: Foldable1[F],
       P: Parallel[P],
-      M: Monoid[A]
+      M: Monoid[A],
     ): P[A] = {
       val A = P.applicative
       val pb = fa.fold(A.pure(M.empty)) { case (b, a) =>
@@ -66,20 +79,27 @@ object ParallelHelper {
     }
   }
 
-
   implicit class ParallelOps_ParallelHelper[T[_], A](val self: T[A]) extends AnyVal {
 
     @deprecated("use `parFoldMap1` instead", "3.2.0")
-    def parFoldMap[F[_], B: Monoid](f: A => F[B])(implicit F: Foldable[T], P: Parallel[F]): F[B] = {
+    def parFoldMap[F[_], B: Monoid](
+      f: A => F[B],
+    )(implicit
+      F: Foldable[T],
+      P: Parallel[F],
+    ): F[B] = {
       Parallel.parFoldMap(self)(f)
     }
   }
 
-
   implicit class ParallelFOps_ParallelHelper[T[_], F[_], A](val self: T[F[A]]) extends AnyVal {
 
     @deprecated("use `parFold1` instead", "3.2.0")
-    def parFold(implicit M: Monoid[A], F: Foldable[T], P: Parallel[F]): F[A] = {
+    def parFold(implicit
+      M: Monoid[A],
+      F: Foldable[T],
+      P: Parallel[F],
+    ): F[A] = {
       Parallel.parFold(self)
     }
   }
@@ -94,14 +114,22 @@ object ParallelHelper {
 
   implicit class OpsParallelHelper[F[_], A](val self: F[A]) extends AnyVal {
 
-    def parFoldMap1[P[_]: Parallel, B: Monoid](f: A => P[B])(implicit F: Foldable1[F]): P[B] = {
+    def parFoldMap1[P[_]: Parallel, B: Monoid](
+      f: A => P[B],
+    )(implicit
+      F: Foldable1[F],
+    ): P[B] = {
       Parallel.parFoldMap1(self)(f)
     }
   }
 
   implicit class POpsParallelHelper[F[_], P[_], A](val self: F[P[A]]) extends AnyVal {
 
-    def parFold1(implicit M: Monoid[A], F: Foldable1[F], P: Parallel[P]): P[A] = {
+    def parFold1(implicit
+      M: Monoid[A],
+      F: Foldable1[F],
+      P: Parallel[P],
+    ): P[A] = {
       Parallel.parFold1(self)
     }
   }

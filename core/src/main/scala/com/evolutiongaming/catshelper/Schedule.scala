@@ -10,8 +10,9 @@ object Schedule {
 
   def apply[F[_]: Temporal](
     initial: FiniteDuration,
-    interval: FiniteDuration)(
-    fa: F[Unit]
+    interval: FiniteDuration,
+  )(
+    fa: F[Unit],
   ): Resource[F, Unit] = {
 
     val schedule = for {

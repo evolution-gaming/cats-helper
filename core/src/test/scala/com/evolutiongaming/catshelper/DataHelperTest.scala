@@ -27,7 +27,8 @@ class DataHelperTest extends AnyFunSuite with Matchers {
     val expected = Nel.of(
       Nel.of(0, 1),
       Nel.of(2, 3),
-      Nel.of(4))
+      Nel.of(4),
+    )
     actual shouldEqual expected
   }
 

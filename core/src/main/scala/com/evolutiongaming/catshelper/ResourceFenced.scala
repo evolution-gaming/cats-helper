@@ -9,12 +9,12 @@ import cats.implicits._
 
 object ResourceFenced {
 
-  def apply[F[_] : Concurrent, A](resource: Resource[F, A]): Resource[F, A] = {
+  def apply[F[_]: Concurrent, A](resource: Resource[F, A]): Resource[F, A] = {
 
     val result = for {
-      ab           <- resource.allocated
-      (a, release)  = ab
-      released     <- LazyVal.of(release)
+      ab <- resource.allocated
+      (a, release) = ab
+      released <- LazyVal.of(release)
     } yield {
       (a, released.get)
     }

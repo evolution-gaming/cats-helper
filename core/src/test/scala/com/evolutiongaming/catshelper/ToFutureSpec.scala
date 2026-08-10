@@ -15,7 +15,7 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
   for {
     (name, value, expected) <- List(
       ("success", ().pure[IO], ().asRight[Throwable]),
-      ("failure", Error.raiseError[IO, Unit], Error.asLeft[Unit])
+      ("failure", Error.raiseError[IO, Unit], Error.asLeft[Unit]),
     )
   } {
     test(name) {

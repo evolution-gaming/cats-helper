@@ -19,7 +19,7 @@ object SerialKey {
 
   def of[F[_]: Concurrent: Runtime, K: Hash]: F[SerialKey[F, K]] = {
     for {
-      cores      <- Runtime[F].availableCores
+      cores <- Runtime[F].availableCores
       partitions <- Partitions.of[F, K, SerialKey[F, K]](cores, _ => of1)
     } yield {
       new SerialKey[F, K] {
@@ -41,7 +41,6 @@ object SerialKey {
     Ref[F]
       .of(Map.empty[K, Option[Task]])
       .map { ref =>
-
         def start(key: K, task: Task) = {
           task
             .tailRecM { task =>
@@ -50,8 +49,8 @@ object SerialKey {
                 a <- ref.modify { map =>
                   map.get(key) match {
                     case Some(Some(a)) => (map.updated(key, none), a.asLeft[Unit])
-                    case Some(None)    => (map - key, ().asRight[Task])
-                    case None          => (map, ().asRight[Task])
+                    case Some(None) => (map - key, ().asRight[Task])
+                    case None => (map, ().asRight[Task])
                   }
                 }
               } yield a
@@ -72,16 +71,17 @@ object SerialKey {
                 } yield {}
                 a <- ref.modify { map =>
                   map.get(key) match {
-                    case None          => (map.updated(key, none), start(key, task))
-                    case Some(None)    => (map.updated(key, task.some), void)
+                    case None => (map.updated(key, none), start(key, task))
+                    case Some(None) => (map.updated(key, task.some), void)
                     case Some(Some(a)) => (map.updated(key, a.productR(task).some), void)
                   }
                 }
                 _ <- a
-              } yield for {
-                a <- d.get
-                a <- a.liftTo[F]
-              } yield a
+              } yield
+                for {
+                  a <- d.get
+                  a <- a.liftTo[F]
+                } yield a
             }
           }
         }

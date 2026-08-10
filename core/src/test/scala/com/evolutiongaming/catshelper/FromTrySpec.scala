@@ -3,11 +3,11 @@ package com.evolutiongaming.catshelper
 import cats.effect.IO
 import cats.implicits._
 import com.evolutiongaming.catshelper.CatsHelper._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
 
 class FromTrySpec extends AnyFunSuite with Matchers {
 
@@ -17,15 +17,14 @@ class FromTrySpec extends AnyFunSuite with Matchers {
 
   for {
     (name, value, expected) <- List(
-      ("success", success(())         , ().pure[IO]),
-      ("failure", failure[Unit](Error), Error.raiseError[IO, Unit])
+      ("success", success(()), ().pure[IO]),
+      ("failure", failure[Unit](Error), Error.raiseError[IO, Unit]),
     )
   } {
     test(name) {
       value.fromTry[IO] shouldEqual expected
     }
   }
-
 
   private case object Error extends RuntimeException with NoStackTrace
 }

@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
-import cats.data.NonEmptyMap
 import cats.Monad
+import cats.data.NonEmptyMap
 import cats.effect.Sync
 import cats.effect.std.Console
 import cats.syntax.all.*
@@ -11,17 +11,19 @@ import org.slf4j.{Logger, MDC}
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 
-/** Named/prefixed logger instance.
-  * 
-  * Use [[LogOf]] to create the new instances of the class.
-  * 
-  * Avoid passing `Log` instances implicitly. Passing implicit instances around could "leak" a logger
-  * into an unrelated code, and create a confusion with wrongly attributed log messages.
-  * 
-  * @see [[LogOf]] for usage examples.
-  * @see [[https://slf4j.org/api/org/slf4j/Logger.html Logger]] for a typical
-  * underlying implementation.
-  */
+/**
+ * Named/prefixed logger instance.
+ *
+ * Use [[LogOf]] to create the new instances of the class.
+ *
+ * Avoid passing `Log` instances implicitly. Passing implicit instances around could "leak" a logger
+ * into an unrelated code, and create a confusion with wrongly attributed log messages.
+ *
+ * @see
+ *   [[LogOf]] for usage examples.
+ * @see
+ *   [[https://slf4j.org/api/org/slf4j/Logger.html Logger]] for a typical underlying implementation.
+ */
 trait Log[F[_]] {
 
   @inline def trace(msg: => String): F[Unit] = trace(msg, mdc = Log.Mdc.empty)
@@ -62,7 +64,7 @@ object Log {
       override def toString: String = "MDC()"
     }
     private final case class EagerContext(values: NonEmptyMap[String, String]) extends Mdc {
-      override def toString: String = s"MDC(${values.toSortedMap.mkString(", ")})"
+      override def toString: String = s"MDC(${ values.toSortedMap.mkString(", ") })"
     }
     private final class LazyContext(val getMdc: () => Mdc) extends Mdc {
 
@@ -95,7 +97,9 @@ object Log {
     object Eager {
       def apply(head: Record, tail: Record*): Mdc = EagerContext(NonEmptyMap.of(head, tail: _*))
 
-      def fromSeq(seq: Seq[Record]): Mdc = NonEmptyMap.fromMap(SortedMap(seq: _*)).fold(empty){ nem => EagerContext(nem) }
+      def fromSeq(seq: Seq[Record]): Mdc = NonEmptyMap.fromMap(SortedMap(seq: _*)).fold(empty) { nem =>
+        EagerContext(nem)
+      }
 
       def fromMap(map: Map[String, String]): Mdc = fromSeq(map.toSeq)
     }
@@ -104,18 +108,74 @@ object Log {
       def apply(v1: => Record): Mdc = LazyContext(Eager(v1))
       def apply(v1: => Record, v2: => Record): Mdc = LazyContext(Eager(v1, v2))
       def apply(v1: => Record, v2: => Record, v3: => Record): Mdc = LazyContext(Eager(v1, v2, v3))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record): Mdc = LazyContext(Eager(v1, v2, v3, v4))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record): Mdc =
+      def apply(
+        v1: => Record,
+        v2: => Record,
+        v3: => Record,
+        v4: => Record,
+      ): Mdc = LazyContext(Eager(v1, v2, v3, v4))
+      def apply(
+        v1: => Record,
+        v2: => Record,
+        v3: => Record,
+        v4: => Record,
+        v5: => Record,
+      ): Mdc =
         LazyContext(Eager(v1, v2, v3, v4, v5))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record): Mdc =
+      def apply(
+        v1: => Record,
+        v2: => Record,
+        v3: => Record,
+        v4: => Record,
+        v5: => Record,
+        v6: => Record,
+      ): Mdc =
         LazyContext(Eager(v1, v2, v3, v4, v5, v6))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record): Mdc =
+      def apply(
+        v1: => Record,
+        v2: => Record,
+        v3: => Record,
+        v4: => Record,
+        v5: => Record,
+        v6: => Record,
+        v7: => Record,
+      ): Mdc =
         LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record): Mdc =
+      def apply(
+        v1: => Record,
+        v2: => Record,
+        v3: => Record,
+        v4: => Record,
+        v5: => Record,
+        v6: => Record,
+        v7: => Record,
+        v8: => Record,
+      ): Mdc =
         LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record): Mdc =
+      def apply(
+        v1: => Record,
+        v2: => Record,
+        v3: => Record,
+        v4: => Record,
+        v5: => Record,
+        v6: => Record,
+        v7: => Record,
+        v8: => Record,
+        v9: => Record,
+      ): Mdc =
         LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8, v9))
-      def apply(v1: => Record, v2: => Record, v3: => Record, v4: => Record, v5: => Record, v6: => Record, v7: => Record, v8: => Record, v9: => Record, v10: => Record): Mdc =
+      def apply(
+        v1: => Record,
+        v2: => Record,
+        v3: => Record,
+        v4: => Record,
+        v5: => Record,
+        v6: => Record,
+        v7: => Record,
+        v8: => Record,
+        v9: => Record,
+        v10: => Record,
+      ): Mdc =
         LazyContext(Eager(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10))
 
       def fromSeq(seq: => Seq[Record]): Mdc = LazyContext(Eager.fromSeq(seq))
@@ -139,7 +199,7 @@ object Log {
     implicit final class MdcOps(val mdc: Mdc) extends AnyVal {
 
       def context: Option[NonEmptyMap[String, String]] = {
-        @tailrec  def contextInner(mdc: Mdc): Option[NonEmptyMap[String, String]] = mdc match {
+        @tailrec def contextInner(mdc: Mdc): Option[NonEmptyMap[String, String]] = mdc match {
           case Empty => None
           case EagerContext(values) => Some(values)
           case lc: LazyContext => contextInner(lc.getMdc())
@@ -150,9 +210,15 @@ object Log {
     }
   }
 
-  def apply[F[_]](implicit F: Log[F]): Log[F] = F
+  def apply[F[_]](
+    implicit
+    F: Log[F],
+  ): Log[F] = F
 
-  def summon[F[_]](implicit F: Log[F]): Log[F] = F
+  def summon[F[_]](
+    implicit
+    F: Log[F],
+  ): Log[F] = F
 
   def apply[F[_]: Sync](logger: Logger): Log[F] = new Log[F] {
 
@@ -245,22 +311,23 @@ object Log {
       }
       s"$level\t$name$mdcStr: $msg"
     }
-      
 
     override def trace(msg: => String, mdc: Mdc): F[Unit] = C.println(log("TRACE", msg, mdc))
-    
+
     override def debug(msg: => String, mdc: Mdc): F[Unit] = C.println(log("DEBUG", msg, mdc))
-    
+
     override def info(msg: => String, mdc: Mdc): F[Unit] = C.println(log("INFO", msg, mdc))
-    
+
     override def warn(msg: => String, mdc: Mdc): F[Unit] = C.println(log("WARN", msg, mdc))
-    
-    override def warn(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = C.println(log("WARN", msg, mdc)) >> C.printStackTrace(cause)
-    
+
+    override def warn(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = C.println(log("WARN", msg, mdc)) >>
+      C.printStackTrace(cause)
+
     override def error(msg: => String, mdc: Mdc): F[Unit] = C.errorln(log("ERRROR", msg, mdc))
-    
-    override def error(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = C.errorln(log("ERROR", msg, mdc)) >> C.printStackTrace(cause)
-    
+
+    override def error(msg: => String, cause: Throwable, mdc: Mdc): F[Unit] = C.errorln(log("ERROR", msg, mdc)) >>
+      C.printStackTrace(cause)
+
   }
 
   implicit class LogOps[F[_]](val self: Log[F]) extends AnyVal {

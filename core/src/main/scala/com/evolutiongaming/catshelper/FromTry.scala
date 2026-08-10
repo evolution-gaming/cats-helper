@@ -16,28 +16,32 @@ trait FromTry[F[_]] {
 
 object FromTry {
 
-  def apply[F[_]](implicit F: FromTry[F]): FromTry[F] = F
+  def apply[F[_]](
+    implicit
+    F: FromTry[F],
+  ): FromTry[F] = F
 
-  def summon[F[_]](implicit F: FromTry[F]): FromTry[F] = F
+  def summon[F[_]](
+    implicit
+    F: FromTry[F],
+  ): FromTry[F] = F
 
-
-  def lift[F[_]](implicit F: ApplicativeError[F, Throwable]): FromTry[F] = new FromTry[F] {
+  def lift[F[_]](
+    implicit
+    F: ApplicativeError[F, Throwable],
+  ): FromTry[F] = new FromTry[F] {
     def apply[A](fa: Try[A]) = F.fromTry(fa)
   }
 
-
   implicit val ioFromTry: FromTry[IO] = lift
-
 
   implicit val idFromTry: FromTry[Id] = new FromTry[Id] {
     def apply[A](fa: Try[A]) = fa.get
   }
 
-
   implicit val futureFromTry: FromTry[Future] = new FromTry[Future] {
     def apply[A](fa: Try[A]) = Future.fromTry(fa)
   }
-
 
   implicit val tryFromTry: FromTry[Try] = lift
 }
