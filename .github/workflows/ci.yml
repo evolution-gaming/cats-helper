@@ -1,43 +1,16 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ master ]
+  pull_request:
 
 jobs:
   test:
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        scala:
-          - 2.13.18
-          - 3.3.7
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: coursier/cache-action@v6
-
-      - name: scala
-        uses: olafurpg/setup-scala@v11
-        with:
-          java-version: 17
-
-      - name: build ${{ matrix.scala }}
-        run: sbt ++${{ matrix.scala }} clean coverage test
-
-      - name: test coverage
-        if: success()
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_FLAG_NAME: Scala ${{ matrix.scala }}
-        run: sbt ++${{ matrix.scala }} coverageReport coverageAggregate coveralls
-
-      - name: slack
-        uses: homoluctus/slatify@master
-        if: failure() && github.ref == 'refs/heads/master'
-        with:
-          type: ${{ job.status }}
-          job_name: Build
-          url: ${{ secrets.SLACK_WEBHOOK }}
+    uses: evolution-gaming/scala-github-actions/.github/workflows/ci.yml@dde27b9bd793d41d5aacf8fb74403c9de5da1146 # v6.3.0
+    with:
+      scala_versions: '["2.13.18", "3.3.7"]'
+      # TODO both gaps are pre-existing: `check` was stubbed to `show version`, so neither was
+      # actually enforced. Enable once sbt-version-policy and sbt-scalafmt are added.
+      version_policy_check: false
+      scalafmt_check: false
