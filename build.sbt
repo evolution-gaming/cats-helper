@@ -9,14 +9,14 @@ def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
 }
 
 inThisBuild(Seq(
-  homepage := Some(url("http://github.com/evolution-gaming/cats-helper")),
+  homepage := Some(uri("http://github.com/evolution-gaming/cats-helper")),
 
   organization := "com.evolutiongaming",
   organizationName := "Evolution",
-  organizationHomepage := Some(url("https://evolution.com")),
+  organizationHomepage := Some(uri("https://evolution.com")),
 
   startYear := Some(2019),
-  licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
+  licenses := Seq(("MIT", uri("https://opensource.org/licenses/MIT"))),
 
   crossScalaVersions := Seq("2.13.18", "3.3.8"),
 
@@ -39,13 +39,13 @@ val alias: Seq[sbt.Def.Setting[?]] =
 //  addCommandAlias("check", "all versionPolicyCheck Compile/doc") ++
   addCommandAlias("check", "all scalafmtCheckRepo Compile/doc") ++
     addCommandAlias("fmt", "+scalafmtRepo") ++
-    addCommandAlias("build", "+all compile test")
+    addCommandAlias("build", "+all compile testFull")
 
 lazy val root = project
   .in(file("."))
   .settings(
     commonSettings,
-    name := "cats-helper",
+    name := "cats-helper-root",
     publish / skip := true,
     publishArtifact := false,
   )
