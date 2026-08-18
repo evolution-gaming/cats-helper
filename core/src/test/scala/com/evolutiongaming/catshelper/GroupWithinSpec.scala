@@ -97,7 +97,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     inversions should be > 0
   }
 
-  "cancel the batch timer once the batch is consumed" ignore {
+  "cancel the batch timer once the batch is consumed" in {
     val settings = GroupWithin.Settings(delay = 1.day, size = 2)
     val program = GroupWithin[IO]
       .apply[Int](settings) { _ => IO.unit }
@@ -117,7 +117,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     test.unsafeRunSync()
   }
 
-  "enqueue at a constant cost for a large batch" ignore {
+  "enqueue at a constant cost for a large batch" in {
     val elements = 100000
     val settings = GroupWithin.Settings(delay = 1.day, size = elements + 1)
     val program = GroupWithin[IO]

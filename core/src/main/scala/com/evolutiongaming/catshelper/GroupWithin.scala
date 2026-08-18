@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.data.{NonEmptyList => Nel}
 import cats.effect.implicits._
-import cats.effect.kernel.Ref
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.std.Semaphore
 import cats.effect.{Clock, Concurrent, Resource, Temporal}
 import cats.implicits._
@@ -82,11 +82,23 @@ object GroupWithin {
         object S {
           def empty: S = Empty
           def stopped: S = Stopped
-          def full(as: Nel[A], timestamp: Long): S = Full(as, timestamp)
+          def full(a: A, timestamp: Long, closed: Deferred[F, Unit]): S = Full(Nel.of(a), 1, timestamp, closed)
 
           case object Empty extends S
           case object Stopped extends S
-          final case class Full(as: Nel[A], timestamp: Long) extends S
+
+          /**
+           * @param size
+           *   number of elements in `as`, counted so that enqueue does not traverse the batch
+           * @param closed
+           *   completed when the batch is closed by size or by release, which stops its timer
+           */
+          final case class Full(
+            as: Nel[A],
+            size: Int,
+            timestamp: Long,
+            closed: Deferred[F, Unit],
+          ) extends S
         }
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
@@ -100,16 +112,19 @@ object GroupWithin {
 
             def consume(as: Nel[A]) = semaphore.permit.use { _ => f(as.reverse) }
 
-            def startTimer(timestamp: Long) = {
-              val result = for {
-                _ <- Temporal[F].sleep(settings.delay)
-                a <- ref.modify {
+            def startTimer(timestamp: Long, closed: Deferred[F, Unit]) = {
+              val expire = ref
+                .modify {
                   case s: S.Full if s.timestamp == timestamp => (S.empty, consume(s.as))
                   case s => (s, void)
                 }
-                a <- a
-              } yield a
-              result
+                .flatten
+              Temporal[F]
+                .race(Temporal[F].sleep(settings.delay), closed.get)
+                .flatMap {
+                  case Left(_) => expire
+                  case Right(_) => void
+                }
                 .start
                 .void
             }
@@ -119,24 +134,26 @@ object GroupWithin {
               def apply(a: A) = {
                 Concurrent[F].uncancelable { _ =>
                   for {
-                    t <- Clock[F].nanos
-                    a <- ref.modify {
+                    timestamp <- Clock[F].nanos
+                    closed <- Deferred[F, Unit]
+                    action <- ref.modify {
                       case s: S.Full =>
                         val as = a :: s.as
-                        if (as.size >= settings.size) (S.empty, consume(as))
-                        else (s.copy(as = as), void)
-                      case S.Empty => (S.full(Nel.of(a), t), startTimer(t))
+                        val size = s.size + 1
+                        if (size >= settings.size) (S.empty, s.closed.complete(()) *> consume(as))
+                        else (s.copy(as = as, size = size), void)
+                      case S.Empty => (S.full(a, timestamp, closed), startTimer(timestamp, closed))
                       case S.Stopped => (S.stopped, void)
                     }
-                    a <- a
-                  } yield a
+                    _ <- action
+                  } yield {}
                 }
               }
             }
 
             val release = ref
               .modify {
-                case s: S.Full => (S.stopped, consume(s.as))
+                case s: S.Full => (S.stopped, s.closed.complete(()) *> consume(s.as))
                 case _ => (S.stopped, void)
               }
               .flatten
