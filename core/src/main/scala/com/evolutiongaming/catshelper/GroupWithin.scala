@@ -4,10 +4,9 @@ import cats.data.{NonEmptyList => Nel}
 import cats.effect.implicits._
 import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.std.Semaphore
-import cats.effect.{Clock, Concurrent, Resource, Temporal}
+import cats.effect.{Concurrent, Resource, Temporal}
 import cats.implicits._
 import cats.{Applicative, ~>}
-import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration._
 
@@ -16,8 +15,12 @@ import scala.concurrent.duration._
  *
  * A batch is closed when it reaches [[GroupWithin.Settings.size]] elements, or when
  * [[GroupWithin.Settings.delay]] passes after the first element of the batch, whichever happens
- * first. A pending batch is also closed when the resource is released. Handler calls are
- * serialised, so batches do not overlap, but the order of batches is not guaranteed.
+ * first. Handler calls are serialised, so batches do not overlap, but the order of batches is not
+ * guaranteed.
+ *
+ * Releasing the resource closes a pending batch, but it does not wait for delivery. A batch that
+ * the delay timer already closed is delivered by its own fiber and can arrive after release
+ * returns, or be lost if the process stops first.
  *
  * {{{
  * GroupWithin[IO]
@@ -66,8 +69,9 @@ object GroupWithin {
    * With `size <= 1` or `delay <= 0` there is nothing to batch, so the handler is called directly
    * per element and no state is allocated.
    *
-   * While batching, enqueue is uncancelable, so an accepted element is always part of a batch.
-   * After release, enqueue silently discards the element.
+   * While batching, enqueue is uncancelable, so an accepted element is always part of a batch. The
+   * handler runs inside that region, so an enqueue that closes a batch cannot be cancelled while
+   * the handler is blocked. After release, enqueue silently discards the element.
    */
   def apply[F[_]: Temporal]: GroupWithin[F] = {
 
@@ -82,7 +86,7 @@ object GroupWithin {
         object S {
           def empty: S = Empty
           def stopped: S = Stopped
-          def full(a: A, timestamp: Long, closed: Deferred[F, Unit]): S = Full(Nel.of(a), 1, timestamp, closed)
+          def full(a: A, closed: Deferred[F, Unit]): S = Full(Nel.of(a), 1, closed)
 
           case object Empty extends S
           case object Stopped extends S
@@ -91,14 +95,11 @@ object GroupWithin {
            * @param size
            *   number of elements in `as`, counted so that enqueue does not traverse the batch
            * @param closed
-           *   completed when the batch is closed by size or by release, which stops its timer
+           *   completed when the batch is closed by size or by release, which stops its timer, and
+           *   used as the identity of the batch so that a timer only closes the batch it was
+           *   started for
            */
-          final case class Full(
-            as: Nel[A],
-            size: Int,
-            timestamp: Long,
-            closed: Deferred[F, Unit],
-          ) extends S
+          final case class Full(as: Nel[A], size: Int, closed: Deferred[F, Unit]) extends S
         }
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
@@ -112,10 +113,10 @@ object GroupWithin {
 
             def consume(as: Nel[A]) = semaphore.permit.use { _ => f(as.reverse) }
 
-            def startTimer(timestamp: Long, closed: Deferred[F, Unit]) = {
+            def startTimer(closed: Deferred[F, Unit]) = {
               val expire = ref
                 .modify {
-                  case s: S.Full if s.timestamp == timestamp => (S.empty, consume(s.as))
+                  case s: S.Full if s.closed.eq(closed) => (S.empty, consume(s.as))
                   case s => (s, void)
                 }
                 .flatten
@@ -129,24 +130,39 @@ object GroupWithin {
                 .void
             }
 
+            def append(a: A, s: S.Full) = {
+              val as = a :: s.as
+              val size = s.size + 1
+              if (size >= settings.size) (S.empty, s.closed.complete(()) *> consume(as))
+              else (s.copy(as = as, size = size), void)
+            }
+
+            // An open batch already has its own `closed`, so the allocation happens only on the
+            // path that opens one. The state is read again after the allocation, because another
+            // fiber can open the batch in between.
+            def openBatch(a: A) = {
+              for {
+                closed <- Deferred[F, Unit]
+                action <- ref.modify {
+                  case S.Empty => (S.full(a, closed), startTimer(closed))
+                  case s: S.Full => append(a, s)
+                  case S.Stopped => (S.stopped, void)
+                }
+                _ <- action
+              } yield {}
+            }
+
             val enqueue = new Enqueue[F, A] {
 
               def apply(a: A) = {
                 Concurrent[F].uncancelable { _ =>
-                  for {
-                    timestamp <- Clock[F].nanos
-                    closed <- Deferred[F, Unit]
-                    action <- ref.modify {
-                      case s: S.Full =>
-                        val as = a :: s.as
-                        val size = s.size + 1
-                        if (size >= settings.size) (S.empty, s.closed.complete(()) *> consume(as))
-                        else (s.copy(as = as, size = size), void)
-                      case S.Empty => (S.full(a, timestamp, closed), startTimer(timestamp, closed))
+                  ref
+                    .modify {
+                      case s: S.Full => append(a, s)
+                      case S.Empty => (S.empty, openBatch(a))
                       case S.Stopped => (S.stopped, void)
                     }
-                    _ <- action
-                  } yield {}
+                    .flatten
                 }
               }
             }
