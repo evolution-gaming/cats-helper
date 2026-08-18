@@ -4,7 +4,6 @@ import cats.Id
 import cats.arrow.FunctionK
 import cats.data.{NonEmptyList => Nel}
 import cats.effect.kernel.{Deferred, Outcome, Ref}
-import cats.effect.std.CountDownLatch
 import cats.effect.testkit.TestControl
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Temporal}
@@ -47,9 +46,6 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
       inFlight <- Ref[IO].of(0)
       overlaps <- Ref[IO].of(0)
       delivered <- Ref[IO].of(List.empty[Int])
-      // Release does not wait for a batch the delay timer already closed, so the deliveries have
-      // to be awaited explicitly rather than read straight after `use` returns.
-      allDelivered <- CountDownLatch[IO](elements)
       handler = (batch: Nel[Int]) =>
         for {
           entered <- inFlight.updateAndGet { _ + 1 }
@@ -57,12 +53,10 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
           _ <- delivered.update { batch.toList ::: _ }
           _ <- IO.cede
           _ <- inFlight.update { _ - 1 }
-          _ <- allDelivered.release.replicateA_(batch.size)
         } yield {}
       _ <- GroupWithin[IO]
         .apply[Int](settings) { handler }
         .use { enqueue => (1 to elements).toList.parTraverse_ { enqueue.apply } }
-      _ <- allDelivered.await.timeout(30.seconds)
       overlaps <- overlaps.get
       delivered <- delivered.get
     } yield {
@@ -103,7 +97,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     inversions should be > 0
   }
 
-  "deliver a batch closed by the delay timer before release returns" ignore {
+  "deliver a batch closed by the delay timer before release returns" in {
     val settings = GroupWithin.Settings(delay = 10.millis, size = 100)
 
     val program = for {
