@@ -15,11 +15,10 @@ import scala.concurrent.duration._
  *
  * A batch is closed when it reaches [[GroupWithin.Settings.size]] elements, or when
  * [[GroupWithin.Settings.delay]] passes after the first element of the batch, whichever happens
- * first. Handler calls are serialised, so batches do not overlap, but the order of batches is not
- * guaranteed.
+ * first.
  *
- * Releasing the resource closes a pending batch and waits for every batch to be delivered,
- * including a batch that the delay timer already closed and handed to its own fiber.
+ * What is guaranteed around serialisation, cancellation and release depends on the implementation.
+ * Only the batching one gives any of it, see `GroupWithin.apply` and `GroupWithin.empty`.
  *
  * {{{
  * GroupWithin[IO]
@@ -53,6 +52,9 @@ object GroupWithin {
 
   /**
    * Does not batch, ignores the settings and calls the handler with one element at a time.
+   *
+   * The handler runs on the enqueueing fiber, so calls are not serialised. The resource holds no
+   * state, so release does nothing and enqueue keeps working after it.
    */
   def empty[F[_]]: GroupWithin[F] = new GroupWithin[F] {
 
@@ -66,11 +68,20 @@ object GroupWithin {
 
   /**
    * With `size <= 1` or `delay <= 0` there is nothing to batch, so the handler is called directly
-   * per element and no state is allocated.
+   * per element and no state is allocated. That path behaves like [[GroupWithin.empty]] and gives
+   * none of the guarantees below.
    *
-   * While batching, enqueue is uncancelable, so an accepted element is always part of a batch. The
-   * handler runs inside that region, so an enqueue that closes a batch cannot be cancelled while
-   * the handler is blocked. After release, enqueue silently discards the element.
+   * While batching:
+   *   - handler calls are serialised, so batches do not overlap, but the order of batches is not
+   *     guaranteed;
+   *   - enqueue is uncancelable, so an accepted element is always part of a batch. The handler runs
+   *     inside that region, so an enqueue that closes a batch cannot be cancelled while the handler
+   *     is blocked;
+   *   - after release, enqueue silently discards the element;
+   *   - release closes a pending batch and waits for every batch to be handed to the handler and
+   *     returned, including a batch the delay timer already took. The wait has no bound and runs in
+   *     a resource finalizer, so a handler that never returns blocks release. An error the handler
+   *     raises on the timer path is not reported to release.
    */
   def apply[F[_]: Temporal]: GroupWithin[F] = {
 
@@ -116,22 +127,16 @@ object GroupWithin {
             ref <- Ref[F].of(State(Batch.empty, 0))
           } yield {
 
-            def isStopped(batch: Batch) = {
-              batch match {
-                case Batch.Stopped => true
-                case _ => false
-              }
-            }
-
             // The caller counts the batch in while taking it out of the state, so the count is
             // dropped here, once the handler has returned.
             def consume(as: Nel[A]) = {
               val delivered = ref
                 .modify { state =>
                   val inFlight = state.inFlight - 1
-                  val signal =
-                    if (inFlight == 0 && isStopped(state.batch)) drained.complete(()).void
-                    else void
+                  val signal = state.batch match {
+                    case Batch.Stopped if inFlight == 0 => drained.complete(()).void
+                    case _ => void
+                  }
                   (state.copy(inFlight = inFlight), signal)
                 }
                 .flatten
@@ -146,12 +151,8 @@ object GroupWithin {
                   case state => (state, void)
                 }
                 .flatten
-              Temporal[F]
-                .race(Temporal[F].sleep(settings.delay), closed.get)
-                .flatMap {
-                  case Left(_) => expire
-                  case Right(_) => void
-                }
+              closed.get
+                .timeoutTo(settings.delay, expire)
                 .start
                 .void
             }
@@ -208,7 +209,7 @@ object GroupWithin {
               // A batch the delay timer already took is delivered by its own fiber, so release
               // waits for every consume that started before it, not only for its own.
               val awaitDelivery = ref.get.flatMap { state => drained.get.whenA(state.inFlight > 0) }
-              stop *> awaitDelivery
+              stop.guarantee(awaitDelivery)
             }
 
             (enqueue, release)

@@ -13,6 +13,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
 
 class GroupWithinSpec extends AnyFreeSpec with Matchers {
 
@@ -64,7 +65,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
       delivered.sorted shouldEqual (1 to elements).toList
     }
 
-    program.unsafeRunSync()
+    program.timeout(60.seconds).unsafeRunSync()
   }
 
   // Demonstrates that the order of batches is not guaranteed, as stated in the GroupWithin
@@ -72,10 +73,11 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
   // there is no async boundary between the two. A fiber that closes a later batch can therefore
   // reach the semaphore first, if the timer fiber is descheduled inside that window.
   //
-  // Ignored because it needs real parallelism, which no test can force. It reproduces in roughly
-  // one run in seven on a multi core machine, and never under TestControl, which is single
-  // threaded and always lets a ready fiber finish before a sleeping one wakes. Un-ignore it to
-  // observe the race.
+  // Ignored because it needs real parallelism, which no test can force. A single enqueue run hits
+  // the inversion in roughly one attempt in seven on a multi core machine, so the 1000 attempts
+  // below detect it nearly always there, and never under TestControl, which is single threaded and
+  // always lets a ready fiber finish before a sleeping one wakes. Un-ignore it to observe the
+  // race.
   "batches are not delivered in order" ignore {
     val settings = GroupWithin.Settings(delay = 1.micro, size = 2)
     val elements = 2000
@@ -111,7 +113,21 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
       observed <- delivered.get
     } yield observed
 
-    program.timeout(30.seconds).unsafeRunSync() shouldEqual List(1, 2)
+    // The batching shape is not the point and is not stable: if more than `delay` elapses between
+    // the two enqueues, the timer closes [1] on its own and [2] opens a second batch.
+    program.timeout(30.seconds).unsafeRunSync().sorted shouldEqual List(1, 2)
+  }
+
+  "report an error raised while release flushes the pending batch" in {
+    case object Error extends RuntimeException with NoStackTrace
+
+    val settings = GroupWithin.Settings(delay = 1.day, size = 100)
+    val program = GroupWithin[IO]
+      .apply[Int](settings) { _ => IO.raiseError[Unit](Error) }
+      .use { enqueue => enqueue(1) }
+      .attempt
+
+    program.timeout(30.seconds).unsafeRunSync() shouldEqual Error.asLeft
   }
 
   "cancel the batch timer once the batch is consumed" in {
