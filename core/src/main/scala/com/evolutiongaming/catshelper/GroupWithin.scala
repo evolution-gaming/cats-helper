@@ -11,16 +11,47 @@ import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration._
 
+/**
+ * Collects elements into batches and passes each batch to a handler.
+ *
+ * A batch is closed when it reaches [[GroupWithin.Settings.size]] elements, or when
+ * [[GroupWithin.Settings.delay]] passes after the first element of the batch, whichever happens
+ * first. A pending batch is also closed when the resource is released. Handler calls are
+ * serialised, so batches do not overlap, but the order of batches is not guaranteed.
+ *
+ * {{{
+ * GroupWithin[IO]
+ *   .apply[Int](GroupWithin.Settings(delay = 100.millis, size = 10)) { batch => store(batch) }
+ *   .use { enqueue => enqueue(1) *> enqueue(2) }
+ * }}}
+ */
 trait GroupWithin[F[_]] {
   import GroupWithin._
 
+  /**
+   * @param settings
+   *   batch size and delay
+   * @param f
+   *   handler for a closed batch, called serially
+   * @return
+   *   an [[GroupWithin.Enqueue]], releasing the resource flushes the pending batch
+   */
   def apply[A](settings: Settings)(f: Nel[A] => F[Unit]): Resource[F, Enqueue[F, A]]
 }
 
 object GroupWithin {
 
+  /**
+   * @param delay
+   *   time to wait after the first element of a batch before the batch is closed
+   * @param size
+   *   number of elements that closes a batch
+   */
   final case class Settings(delay: FiniteDuration, size: Int)
 
+  /**
+   * Does not batch, ignores the settings and calls the handler with one element at a time.
+   */
   def empty[F[_]]: GroupWithin[F] = new GroupWithin[F] {
 
     def apply[A](settings: Settings)(f: Nel[A] => F[Unit]): Resource[F, Enqueue[F, A]] = {
@@ -31,6 +62,13 @@ object GroupWithin {
     }
   }
 
+  /**
+   * With `size <= 1` or `delay <= 0` there is nothing to batch, so the handler is called directly
+   * per element and no state is allocated.
+   *
+   * While batching, enqueue is uncancelable, so an accepted element is always part of a batch.
+   * After release, enqueue silently discards the element.
+   */
   def apply[F[_]: Temporal]: GroupWithin[F] = {
 
     new GroupWithin[F] {
@@ -112,6 +150,9 @@ object GroupWithin {
     }
   }
 
+  /**
+   * Accepts one element into the current batch.
+   */
   trait Enqueue[F[_], A] {
 
     def apply(a: A): F[Unit]
