@@ -9,9 +9,10 @@ import cats.effect.{IO, SyncIO}
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import org.slf4j.{Logger, MDC}
+import org.slf4j.event.Level
+import org.slf4j.helpers.AbstractLogger
+import org.slf4j.{MDC, Marker}
 
-import java.lang.reflect.{InvocationHandler, Method, Proxy}
 import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicInteger
 import scala.jdk.CollectionConverters._
@@ -156,21 +157,7 @@ class LogSpec extends AnyFunSuite with Matchers {
   }
 
   test("logging does not disturb the caller MDC when the logger throws") {
-    val logger = Proxy
-      .newProxyInstance(
-        getClass.getClassLoader,
-        Array(classOf[Logger]),
-        new InvocationHandler {
-          def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
-            method.getName match {
-              case "isInfoEnabled" => java.lang.Boolean.TRUE
-              case "info" => throw Error
-              case _ => null
-            }
-          }
-        },
-      )
-      .asInstanceOf[Logger]
+    val logger = new StubLogger(levelsEnabled = true, onLog = () => throw Error)
 
     def contextMap = Option(MDC.getCopyOfContextMap).fold(Map.empty[String, String])(_.asScala.toMap)
 
@@ -217,7 +204,7 @@ class LogSpec extends AnyFunSuite with Matchers {
 
   test("Log.console labels errors as ERROR") {
     val result = for {
-      lines <- Ref[IO].of(List.empty[String])
+      linesRef <- Ref[IO].of(List.empty[String])
       _ <- {
         implicit val console: Console[IO] = new Console[IO] {
           def readLineWithCharset(charset: Charset) = IO.raiseError[String](new UnsupportedOperationException)
@@ -240,12 +227,12 @@ class LogSpec extends AnyFunSuite with Matchers {
             a: A,
           )(implicit
             show: Show[A],
-          ) = lines.update(show.show(a) :: _)
+          ) = linesRef.update(show.show(a) :: _)
         }
 
         Log.console[IO]("source").error("message")
       }
-      lines <- lines.get
+      lines <- linesRef.get
     } yield {
       lines should contain("ERROR\tsource: message")
     }
@@ -254,18 +241,7 @@ class LogSpec extends AnyFunSuite with Matchers {
   }
 
   test("withMdc does not force a lazy MDC when the level is disabled") {
-    val logger = Proxy
-      .newProxyInstance(
-        getClass.getClassLoader,
-        Array(classOf[Logger]),
-        new InvocationHandler {
-          def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
-            val name = method.getName
-            if (name.startsWith("is") && name.endsWith("Enabled")) java.lang.Boolean.FALSE else null
-          }
-        },
-      )
-      .asInstanceOf[Logger]
+    val logger = new StubLogger(levelsEnabled = false, onLog = () => ())
 
     val forced = new AtomicInteger(0)
     val log = Log[IO](logger).withMdc(Log.Mdc.Eager("source" -> "spec"))
@@ -287,6 +263,35 @@ class LogSpec extends AnyFunSuite with Matchers {
 }
 
 object LogSpec {
+
+  /**
+   * Reports every level as `levelsEnabled` and funnels every logging call into `onLog`, which is
+   * free to throw. `AbstractLogger` leaves the level check to the caller, matching what `Log.apply`
+   * does.
+   */
+  class StubLogger(levelsEnabled: Boolean, onLog: () => Unit) extends AbstractLogger {
+
+    protected def getFullyQualifiedCallerName: String = getClass.getName
+
+    protected def handleNormalizedLoggingCall(
+      level: Level,
+      marker: Marker,
+      messagePattern: String,
+      arguments: Array[Object],
+      throwable: Throwable,
+    ): Unit = onLog()
+
+    def isTraceEnabled: Boolean = levelsEnabled
+    def isTraceEnabled(marker: Marker): Boolean = levelsEnabled
+    def isDebugEnabled: Boolean = levelsEnabled
+    def isDebugEnabled(marker: Marker): Boolean = levelsEnabled
+    def isInfoEnabled: Boolean = levelsEnabled
+    def isInfoEnabled(marker: Marker): Boolean = levelsEnabled
+    def isWarnEnabled: Boolean = levelsEnabled
+    def isWarnEnabled(marker: Marker): Boolean = levelsEnabled
+    def isErrorEnabled: Boolean = levelsEnabled
+    def isErrorEnabled(marker: Marker): Boolean = levelsEnabled
+  }
 
   val logOf: LogOf[StateT] = {
     val logOf = new LogOf[StateT] {
