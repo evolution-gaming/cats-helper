@@ -155,7 +155,7 @@ class LogSpec extends AnyFunSuite with Matchers {
     io.unsafeRunSync() shouldEqual null
   }
 
-  ignore("logging does not disturb the caller MDC when the logger throws") {
+  test("logging does not disturb the caller MDC when the logger throws") {
     val logger = Proxy
       .newProxyInstance(
         getClass.getClassLoader,
@@ -215,7 +215,7 @@ class LogSpec extends AnyFunSuite with Matchers {
     io.unsafeRunSync()
   }
 
-  ignore("Log.console labels errors as ERROR") {
+  test("Log.console labels errors as ERROR") {
     val result = for {
       lines <- Ref[IO].of(List.empty[String])
       _ <- {
@@ -253,7 +253,7 @@ class LogSpec extends AnyFunSuite with Matchers {
     result.unsafeRunSync()
   }
 
-  ignore("withMdc does not force a lazy MDC when the level is disabled") {
+  test("withMdc does not force a lazy MDC when the level is disabled") {
     val logger = Proxy
       .newProxyInstance(
         getClass.getClassLoader,
@@ -276,7 +276,7 @@ class LogSpec extends AnyFunSuite with Matchers {
     forced.get() shouldEqual 0
   }
 
-  ignore("lazy and eager MDC with the same content are equal") {
+  test("lazy and eager MDC with the same content are equal") {
     val lazyMdc = Log.Mdc.Lazy("key" -> "value")
     val eagerMdc = Log.Mdc.Eager("key" -> "value")
 
