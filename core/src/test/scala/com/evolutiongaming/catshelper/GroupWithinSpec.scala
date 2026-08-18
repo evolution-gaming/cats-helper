@@ -1,8 +1,10 @@
 package com.evolutiongaming.catshelper
 
+import cats.Id
 import cats.arrow.FunctionK
 import cats.data.{NonEmptyList => Nel}
-import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Outcome, Ref}
+import cats.effect.testkit.TestControl
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Temporal}
 import cats.implicits._
@@ -34,6 +36,95 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
   "consume on release" in ioTest { env =>
     import env._
     `consume on release`[IO]
+  }
+
+  "handler calls never overlap" in {
+    val settings = GroupWithin.Settings(delay = 1.milli, size = 2)
+    val elements = 2000
+
+    val program = for {
+      inFlight <- Ref[IO].of(0)
+      overlaps <- Ref[IO].of(0)
+      delivered <- Ref[IO].of(List.empty[Int])
+      handler = (batch: Nel[Int]) =>
+        for {
+          entered <- inFlight.updateAndGet { _ + 1 }
+          _ <- overlaps.update { _ + 1 }.whenA(entered > 1)
+          _ <- delivered.update { batch.toList ::: _ }
+          _ <- IO.cede
+          _ <- inFlight.update { _ - 1 }
+        } yield {}
+      _ <- GroupWithin[IO]
+        .apply[Int](settings) { handler }
+        .use { enqueue => (1 to elements).toList.parTraverse_ { enqueue.apply } }
+      overlaps <- overlaps.get
+      delivered <- delivered.get
+    } yield {
+      overlaps shouldEqual 0
+      delivered.sorted shouldEqual (1 to elements).toList
+    }
+
+    program.unsafeRunSync()
+  }
+
+  // Demonstrates that the order of batches is not guaranteed, as stated in the GroupWithin
+  // scaladoc. A fiber takes its batch out of the Ref and only then acquires the semaphore, and
+  // there is no async boundary between the two. A fiber that closes a later batch can therefore
+  // reach the semaphore first, if the timer fiber is descheduled inside that window.
+  //
+  // Ignored because it needs real parallelism, which no test can force. It reproduces in roughly
+  // one run in seven on a multi core machine, and never under TestControl, which is single
+  // threaded and always lets a ready fiber finish before a sleeping one wakes. Un-ignore it to
+  // observe the race.
+  "batches are not delivered in order" ignore {
+    val settings = GroupWithin.Settings(delay = 1.micro, size = 2)
+    val elements = 2000
+    val attempts = 1000
+
+    val attempt = for {
+      delivered <- Ref[IO].of(List.empty[Int])
+      _ <- GroupWithin[IO]
+        .apply[Int](settings) { batch => delivered.update { batch.toList.reverse ::: _ } }
+        .use { enqueue => (1 to elements).toList.traverse_ { enqueue.apply } }
+      observed <- delivered.get
+    } yield observed.reverse
+
+    val inversions = (1 to attempts).toList
+      .traverse { _ => attempt.map { observed => observed != observed.sorted } }
+      .unsafeRunSync()
+      .count { identity }
+
+    inversions should be > 0
+  }
+
+  "cancel the batch timer once the batch is consumed" ignore {
+    val settings = GroupWithin.Settings(delay = 1.day, size = 2)
+    val program = GroupWithin[IO]
+      .apply[Int](settings) { _ => IO.unit }
+      .use { enqueue => enqueue(1) *> enqueue(2) }
+
+    val test = TestControl.execute(program).flatMap { control =>
+      for {
+        _ <- control.tick
+        outcome <- control.results
+        _ <- IO { outcome shouldEqual Outcome.succeeded[Id, Throwable, Unit](()).some }
+        nextInterval <- control.nextInterval
+      } yield {
+        nextInterval shouldEqual Duration.Zero
+      }
+    }
+
+    test.unsafeRunSync()
+  }
+
+  "enqueue at a constant cost for a large batch" ignore {
+    val elements = 100000
+    val settings = GroupWithin.Settings(delay = 1.day, size = elements + 1)
+    val program = GroupWithin[IO]
+      .apply[Int](settings) { _ => IO.unit }
+      .use { enqueue => (1 to elements).toList.traverse_ { enqueue.apply } }
+
+    program.timeout(10.seconds).unsafeRunSync()
   }
 
   private def `support settings = 0`[F[_]: Temporal] = {
