@@ -1,12 +1,20 @@
 package com.evolutiongaming.catshelper
 
 import cats.Id
+import cats.Show
 import cats.arrow.FunctionK
-import cats.effect.IO
+import cats.effect.kernel.Ref
+import cats.effect.std.Console
+import cats.effect.{IO, SyncIO}
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import org.slf4j.{Logger, MDC}
 
+import java.lang.reflect.{InvocationHandler, Method, Proxy}
+import java.nio.charset.Charset
+import java.util.concurrent.atomic.AtomicInteger
+import scala.jdk.CollectionConverters._
 import scala.util.control.NoStackTrace
 
 class LogSpec extends AnyFunSuite with Matchers {
@@ -147,6 +155,41 @@ class LogSpec extends AnyFunSuite with Matchers {
     io.unsafeRunSync() shouldEqual null
   }
 
+  ignore("logging does not disturb the caller MDC when the logger throws") {
+    val logger = Proxy
+      .newProxyInstance(
+        getClass.getClassLoader,
+        Array(classOf[Logger]),
+        new InvocationHandler {
+          def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
+            method.getName match {
+              case "isInfoEnabled" => java.lang.Boolean.TRUE
+              case "info" => throw Error
+              case _ => null
+            }
+          }
+        },
+      )
+      .asInstanceOf[Logger]
+
+    def contextMap = Option(MDC.getCopyOfContextMap).fold(Map.empty[String, String])(_.asScala.toMap)
+
+    // MDC is thread-local, so the logging must run on the thread that reads it back.
+    // `SyncIO` guarantees that, `IO.unsafeRunSync` would run on a compute worker instead.
+    val backup = MDC.getCopyOfContextMap
+    val (before, after) = try {
+      MDC.clear()
+      MDC.put("caller", "value")
+      val before = contextMap
+      Log[SyncIO](logger).info("message", Log.Mdc.Eager("logged" -> "value")).attempt.unsafeRunSync()
+      (before, contextMap)
+    } finally {
+      if (backup == null) MDC.clear() else MDC.setContextMap(backup)
+    }
+
+    after shouldEqual before
+  }
+
   test("LogOf.log") {
     implicit val instance = logOf
 
@@ -170,6 +213,76 @@ class LogSpec extends AnyFunSuite with Matchers {
       _ <- log.error("error msg", new RuntimeException("error exception"), mdc)
     } yield {}
     io.unsafeRunSync()
+  }
+
+  ignore("Log.console labels errors as ERROR") {
+    val result = for {
+      lines <- Ref[IO].of(List.empty[String])
+      _ <- {
+        implicit val console: Console[IO] = new Console[IO] {
+          def readLineWithCharset(charset: Charset) = IO.raiseError[String](new UnsupportedOperationException)
+          def print[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def println[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def error[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def errorln[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = lines.update(show.show(a) :: _)
+        }
+
+        Log.console[IO]("source").error("message")
+      }
+      lines <- lines.get
+    } yield {
+      lines should contain("ERROR\tsource: message")
+    }
+
+    result.unsafeRunSync()
+  }
+
+  ignore("withMdc does not force a lazy MDC when the level is disabled") {
+    val logger = Proxy
+      .newProxyInstance(
+        getClass.getClassLoader,
+        Array(classOf[Logger]),
+        new InvocationHandler {
+          def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
+            val name = method.getName
+            if (name.startsWith("is") && name.endsWith("Enabled")) java.lang.Boolean.FALSE else null
+          }
+        },
+      )
+      .asInstanceOf[Logger]
+
+    val forced = new AtomicInteger(0)
+    val log = Log[IO](logger).withMdc(Log.Mdc.Eager("source" -> "spec"))
+    val effect = log.trace("message", Log.Mdc.Lazy("key" -> { forced.incrementAndGet(); "value" }))
+
+    forced.get() shouldEqual 0
+    effect.unsafeRunSync()
+    forced.get() shouldEqual 0
+  }
+
+  ignore("lazy and eager MDC with the same content are equal") {
+    val lazyMdc = Log.Mdc.Lazy("key" -> "value")
+    val eagerMdc = Log.Mdc.Eager("key" -> "value")
+
+    lazyMdc.hashCode shouldEqual eagerMdc.hashCode
+    lazyMdc shouldEqual eagerMdc
+    eagerMdc shouldEqual lazyMdc
   }
 }
 
