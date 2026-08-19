@@ -17,8 +17,8 @@ import scala.concurrent.duration._
  * [[GroupWithin.Settings.delay]] passes after the first element of the batch, whichever happens
  * first.
  *
- * What is guaranteed around serialisation, cancellation and release depends on the implementation.
- * Only the batching one gives any of it, see `GroupWithin.apply` and `GroupWithin.empty`.
+ * The guarantees around serialisation, cancellation and release depend on the implementation. Only
+ * the batching one gives them, see [[GroupWithin.apply]] and [[GroupWithin.empty]].
  *
  * {{{
  * GroupWithin[IO]
@@ -43,6 +43,8 @@ trait GroupWithin[F[_]] {
 object GroupWithin {
 
   /**
+   * A batch is closed by whichever limit is reached first, it does not wait for both.
+   *
    * @param delay
    *   time to wait after the first element of a batch before the batch is closed
    * @param size
@@ -103,7 +105,7 @@ object GroupWithin {
 
           /**
            * @param size
-           *   number of elements in `as`, counted so that enqueue does not traverse the batch
+           *   always equal to `as.size`, counted so that enqueue does not traverse the batch
            * @param closed
            *   completed when the batch is closed by size or by release, which stops its timer, and
            *   used as the identity of the batch so that a timer only closes the batch it was
@@ -203,7 +205,8 @@ object GroupWithin {
                 .modify {
                   case State(batch: Batch.Full, inFlight) =>
                     (State(Batch.stopped, inFlight + 1), batch.closed.complete(()) *> consume(batch.as))
-                  case state => (state.copy(batch = Batch.stopped), void)
+                  case state =>
+                    (state.copy(batch = Batch.stopped), void)
                 }
                 .flatten
               // A batch the delay timer already took is delivered by its own fiber, so release

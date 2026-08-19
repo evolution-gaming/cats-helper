@@ -69,7 +69,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
   }
 
   // Demonstrates that the order of batches is not guaranteed, as stated in the GroupWithin
-  // scaladoc. A fiber takes its batch out of the Ref and only then acquires the semaphore, and
+  // Scaladoc. A fiber takes its batch out of the Ref and only then acquires the semaphore, and
   // there is no async boundary between the two. A fiber that closes a later batch can therefore
   // reach the semaphore first, if the timer fiber is descheduled inside that window.
   //
