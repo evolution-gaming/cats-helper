@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.kernel.Async
-import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Outcome, Ref}
 import cats.effect.{IO, Sync}
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
@@ -22,6 +22,21 @@ class SerialTest extends AsyncFunSuite with Matchers {
 
   test("asyncBoundary (nice to have)") {
     asyncBoundary[IO].run()
+  }
+
+  ignore("advance the queue after a task cancels") {
+    val result = for {
+      serial <- Serial.of[IO]
+      canceled <- serial(IO.canceled)
+      next <- serial(IO.pure(1))
+      value <- next
+      _ = value shouldEqual 1
+      fiber <- canceled.start
+      outcome <- fiber.join
+      _ = outcome should matchPattern { case Outcome.Canceled() => }
+    } yield {}
+
+    result.run()
   }
 
   private def serial[F[_]: Async] = {
