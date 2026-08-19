@@ -1,12 +1,21 @@
 package com.evolutiongaming.catshelper
 
 import cats.Id
+import cats.Show
 import cats.arrow.FunctionK
-import cats.effect.IO
+import cats.effect.kernel.Ref
+import cats.effect.std.Console
+import cats.effect.{IO, SyncIO}
 import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import org.slf4j.event.Level
+import org.slf4j.helpers.AbstractLogger
+import org.slf4j.{MDC, Marker}
 
+import java.nio.charset.Charset
+import java.util.concurrent.atomic.AtomicInteger
+import scala.jdk.CollectionConverters._
 import scala.util.control.NoStackTrace
 
 class LogSpec extends AnyFunSuite with Matchers {
@@ -147,6 +156,27 @@ class LogSpec extends AnyFunSuite with Matchers {
     io.unsafeRunSync() shouldEqual null
   }
 
+  test("logging does not disturb the caller MDC when the logger throws") {
+    val logger = new StubLogger(levelsEnabled = true, onLog = () => throw Error)
+
+    def contextMap = Option(MDC.getCopyOfContextMap).fold(Map.empty[String, String])(_.asScala.toMap)
+
+    // MDC is thread-local, so the logging must run on the thread that reads it back.
+    // `SyncIO` guarantees that, `IO.unsafeRunSync` would run on a compute worker instead.
+    val backup = MDC.getCopyOfContextMap
+    val (before, after) = try {
+      MDC.clear()
+      MDC.put("caller", "value")
+      val before = contextMap
+      Log[SyncIO](logger).info("message", Log.Mdc.Eager("logged" -> "value")).attempt.unsafeRunSync()
+      (before, contextMap)
+    } finally {
+      if (backup == null) MDC.clear() else MDC.setContextMap(backup)
+    }
+
+    after shouldEqual before
+  }
+
   test("LogOf.log") {
     implicit val instance = logOf
 
@@ -171,9 +201,97 @@ class LogSpec extends AnyFunSuite with Matchers {
     } yield {}
     io.unsafeRunSync()
   }
+
+  test("Log.console labels errors as ERROR") {
+    val result = for {
+      linesRef <- Ref[IO].of(List.empty[String])
+      _ <- {
+        implicit val console: Console[IO] = new Console[IO] {
+          def readLineWithCharset(charset: Charset) = IO.raiseError[String](new UnsupportedOperationException)
+          def print[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def println[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def error[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def errorln[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = linesRef.update(show.show(a) :: _)
+        }
+
+        Log.console[IO]("source").error("message")
+      }
+      lines <- linesRef.get
+    } yield {
+      lines should contain("ERROR\tsource: message")
+    }
+
+    result.unsafeRunSync()
+  }
+
+  test("withMdc does not force a lazy MDC when the level is disabled") {
+    val logger = new StubLogger(levelsEnabled = false, onLog = () => ())
+
+    val forced = new AtomicInteger(0)
+    val log = Log[IO](logger).withMdc(Log.Mdc.Eager("source" -> "spec"))
+    val effect = log.trace("message", Log.Mdc.Lazy("key" -> { forced.incrementAndGet(); "value" }))
+
+    forced.get() shouldEqual 0
+    effect.unsafeRunSync()
+    forced.get() shouldEqual 0
+  }
+
+  test("lazy and eager MDC with the same content are equal") {
+    val lazyMdc = Log.Mdc.Lazy("key" -> "value")
+    val eagerMdc = Log.Mdc.Eager("key" -> "value")
+
+    lazyMdc.hashCode shouldEqual eagerMdc.hashCode
+    lazyMdc shouldEqual eagerMdc
+    eagerMdc shouldEqual lazyMdc
+  }
 }
 
 object LogSpec {
+
+  /**
+   * Reports every level as `levelsEnabled` and funnels every logging call into `onLog`, which is
+   * free to throw. `AbstractLogger` leaves the level check to the caller, matching what `Log.apply`
+   * does.
+   */
+  class StubLogger(levelsEnabled: Boolean, onLog: () => Unit) extends AbstractLogger {
+
+    protected def getFullyQualifiedCallerName: String = getClass.getName
+
+    protected def handleNormalizedLoggingCall(
+      level: Level,
+      marker: Marker,
+      messagePattern: String,
+      arguments: Array[Object],
+      throwable: Throwable,
+    ): Unit = onLog()
+
+    def isTraceEnabled: Boolean = levelsEnabled
+    def isTraceEnabled(marker: Marker): Boolean = levelsEnabled
+    def isDebugEnabled: Boolean = levelsEnabled
+    def isDebugEnabled(marker: Marker): Boolean = levelsEnabled
+    def isInfoEnabled: Boolean = levelsEnabled
+    def isInfoEnabled(marker: Marker): Boolean = levelsEnabled
+    def isWarnEnabled: Boolean = levelsEnabled
+    def isWarnEnabled(marker: Marker): Boolean = levelsEnabled
+    def isErrorEnabled: Boolean = levelsEnabled
+    def isErrorEnabled(marker: Marker): Boolean = levelsEnabled
+  }
 
   val logOf: LogOf[StateT] = {
     val logOf = new LogOf[StateT] {
