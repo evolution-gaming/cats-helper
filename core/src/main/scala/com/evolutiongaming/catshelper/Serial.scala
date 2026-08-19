@@ -5,17 +5,34 @@ import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.syntax.all._
 import cats.syntax.all._
 
+/**
+ * Runs tasks strictly one after another, in submission order.
+ *
+ * Unlike a mutex-based approach the caller does not wait for its turn: `apply` only registers the
+ * task and returns. Tasks run on a background fiber, started on demand and released when the queue
+ * drains.
+ *
+ * Registration is uncancelable: once `apply` returns, the task runs even if the caller is canceled.
+ * Canceling the inner effect stops the waiting, not the task.
+ *
+ * See [[SerialKey]] for per-key serialization and [[SerialRef]] for serialized access to a value.
+ */
 trait Serial[F[_]] {
 
   /**
    * @return
-   *   outer F[_] is about adding `fa` to the queue, inner F[_] is about `fa` being completed
+   *   outer F[_] is about adding `fa` to the queue, inner F[_] is about `fa` being completed. If
+   *   `fa` fails, the inner F[_] raises its error and the queue continues with the next task.
    */
   def apply[A](fa: F[A]): F[F[A]]
 }
 
 object Serial {
 
+  /**
+   * Pending tasks are not stored in a collection: `S.Active(task)` chains them into a single
+   * `F[Unit]` via `productR`, so enqueue cost and state size stay constant.
+   */
   def of[F[_]: Async]: F[Serial[F]] = {
 
     sealed trait S
