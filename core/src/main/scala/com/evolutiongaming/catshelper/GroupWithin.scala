@@ -128,8 +128,7 @@ object GroupWithin {
             ref <- Ref[F].of((S.empty, 0))
           } yield {
 
-            def consume(as: Nel[A]) = semaphore.permit
-              .use { _ => f(as.reverse) }
+            def consume(as: Nel[A]) = semaphore.permit.use { _ => f(as.reverse) }
               .guarantee {
                 ref
                   .modify { case (s, inFlight) =>
