@@ -41,10 +41,7 @@ lazy val commonSettings = Seq(
 
 lazy val groupWithinLocalStateFilters = Seq(
   mimaBinaryIssueFilters ++= Seq(
-    ProblemFilters.exclude[MissingClassProblem]("com.evolutiongaming.catshelper.GroupWithin$S$3$Empty$"),
-    ProblemFilters.exclude[MissingClassProblem]("com.evolutiongaming.catshelper.GroupWithin$S$3$Full"),
-    ProblemFilters.exclude[MissingClassProblem]("com.evolutiongaming.catshelper.GroupWithin$S$3$Full$"),
-    ProblemFilters.exclude[MissingClassProblem]("com.evolutiongaming.catshelper.GroupWithin$S$3$Stopped$"),
+    ProblemFilters.exclude[Problem]("com.evolutiongaming.catshelper.GroupWithin#S#3#Full*"),
   ),
 )
 

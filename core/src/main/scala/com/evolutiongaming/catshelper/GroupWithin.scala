@@ -4,9 +4,10 @@ import cats.data.{NonEmptyList => Nel}
 import cats.effect.implicits._
 import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.std.Semaphore
-import cats.effect.{Concurrent, Resource, Temporal}
+import cats.effect.{Clock, Concurrent, Resource, Temporal}
 import cats.implicits._
 import cats.{Applicative, ~>}
+import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration._
 
@@ -93,31 +94,29 @@ object GroupWithin {
 
         val void = ().pure[F]
 
-        sealed trait Batch
+        sealed trait S
 
-        object Batch {
-          def empty: Batch = Empty
-          def stopped: Batch = Stopped
-          def full(a: A, closed: Deferred[F, Unit]): Batch = Full(Nel.of(a), 1, closed)
+        object S {
+          def empty: S = Empty
+          def stopped: S = Stopped
+          def full(a: A, timestamp: Long, closed: Deferred[F, Unit]): S = Full(Nel.of(a), 1, timestamp, closed)
 
-          case object Empty extends Batch
-          case object Stopped extends Batch
+          case object Empty extends S
+          case object Stopped extends S
 
           /**
            * @param size
            *   always equal to `as.size`, counted so that enqueue does not traverse the batch
            * @param closed
-           *   completed when the batch is closed by size or by release, which stops its timer, and
-           *   used as the identity of the batch so that a timer only closes the batch it was
-           *   started for
+           *   completed when the batch is closed by size or by release, which stops its timer
            */
-          final case class Full(as: Nel[A], size: Int, closed: Deferred[F, Unit]) extends Batch
+          final case class Full(
+            as: Nel[A],
+            size: Int,
+            timestamp: Long,
+            closed: Deferred[F, Unit],
+          ) extends S
         }
-
-        // `inFlight` is the number of batches handed to the handler but not delivered yet. It
-        // changes in the same step that takes the batch out of the state, so release can wait for
-        // every one of them, including a batch a timer fiber took but has not consumed yet.
-        final case class State(batch: Batch, inFlight: Int)
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
           val enqueue: Enqueue[F, A] = a => f(Nel.of(a))
@@ -126,94 +125,68 @@ object GroupWithin {
           val result = for {
             semaphore <- Semaphore[F](1)
             drained <- Deferred[F, Unit]
-            ref <- Ref[F].of(State(Batch.empty, 0))
+            ref <- Ref[F].of((S.empty, 0))
           } yield {
 
-            // The caller counts the batch in while taking it out of the state, so the count is
-            // dropped here, once the handler has returned.
-            def consume(as: Nel[A]) = {
-              val delivered = ref
-                .modify { state =>
-                  val inFlight = state.inFlight - 1
-                  val signal = state.batch match {
-                    case Batch.Stopped if inFlight == 0 => drained.complete(()).void
-                    case _ => void
+            def consume(as: Nel[A]) = semaphore.permit
+              .use { _ => f(as.reverse) }
+              .guarantee {
+                ref
+                  .modify { case (s, inFlight) =>
+                    val remaining = inFlight - 1
+                    val signal = s match {
+                      case S.Stopped if remaining == 0 => drained.complete(()).void
+                      case _ => void
+                    }
+                    ((s, remaining), signal)
                   }
-                  (state.copy(inFlight = inFlight), signal)
-                }
-                .flatten
-              semaphore.permit.use { _ => f(as.reverse) }.guarantee(delivered)
-            }
+                  .flatten
+              }
 
-            def startTimer(closed: Deferred[F, Unit]) = {
-              val expire = ref
-                .modify {
-                  case State(batch: Batch.Full, inFlight) if batch.closed.eq(closed) =>
-                    (State(Batch.empty, inFlight + 1), consume(batch.as))
-                  case state => (state, void)
+            def startTimer(timestamp: Long, closed: Deferred[F, Unit]) = {
+              val result = for {
+                _ <- Temporal[F].race(Temporal[F].sleep(settings.delay), closed.get)
+                a <- ref.modify {
+                  case (s: S.Full, inFlight) if s.timestamp == timestamp =>
+                    ((S.empty, inFlight + 1), consume(s.as))
+                  case s => (s, void)
                 }
-                .flatten
-              closed.get
-                .timeoutTo(settings.delay, expire)
+                a <- a
+              } yield a
+              result
                 .start
                 .void
-            }
-
-            def append(a: A, state: State, batch: Batch.Full) = {
-              val as = a :: batch.as
-              val size = batch.size + 1
-              if (size >= settings.size) {
-                (State(Batch.empty, state.inFlight + 1), batch.closed.complete(()) *> consume(as))
-              } else {
-                (state.copy(batch = batch.copy(as = as, size = size)), void)
-              }
-            }
-
-            // An open batch already has its own `closed`, so the allocation happens only on the
-            // path that opens one. The state is read again after the allocation, because another
-            // fiber can open the batch in between.
-            def openBatch(a: A) = {
-              for {
-                closed <- Deferred[F, Unit]
-                action <- ref.modify {
-                  case state @ State(Batch.Empty, _) =>
-                    (state.copy(batch = Batch.full(a, closed)), startTimer(closed))
-                  case state @ State(batch: Batch.Full, _) => append(a, state, batch)
-                  case state => (state, void)
-                }
-                _ <- action
-              } yield {}
             }
 
             val enqueue = new Enqueue[F, A] {
 
               def apply(a: A) = {
                 Concurrent[F].uncancelable { _ =>
-                  ref
-                    .modify {
-                      case state @ State(batch: Batch.Full, _) => append(a, state, batch)
-                      case state @ State(Batch.Empty, _) => (state, openBatch(a))
-                      case state => (state, void)
+                  for {
+                    t <- Clock[F].nanos
+                    closed <- Deferred[F, Unit]
+                    a <- ref.modify {
+                      case (s: S.Full, inFlight) =>
+                        val as = a :: s.as
+                        val size = s.size + 1
+                        if (size >= settings.size) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(as))
+                        else ((s.copy(as = as, size = size), inFlight), void)
+                      case (S.Empty, inFlight) => ((S.full(a, t, closed), inFlight), startTimer(t, closed))
+                      case (S.Stopped, inFlight) => ((S.stopped, inFlight), void)
                     }
-                    .flatten
+                    a <- a
+                  } yield a
                 }
               }
             }
 
-            val release = {
-              val stop = ref
-                .modify {
-                  case State(batch: Batch.Full, inFlight) =>
-                    (State(Batch.stopped, inFlight + 1), batch.closed.complete(()) *> consume(batch.as))
-                  case state =>
-                    (state.copy(batch = Batch.stopped), void)
-                }
-                .flatten
-              // A batch the delay timer already took is delivered by its own fiber, so release
-              // waits for every consume that started before it, not only for its own.
-              val awaitDelivery = ref.get.flatMap { state => drained.get.whenA(state.inFlight > 0) }
-              stop.guarantee(awaitDelivery)
-            }
+            val release = ref
+              .modify {
+                case (s: S.Full, inFlight) => ((S.stopped, inFlight + 1), s.closed.complete(()) *> consume(s.as))
+                case (_, inFlight) => ((S.stopped, inFlight), void)
+              }
+              .flatten
+              .guarantee { ref.get.flatMap { case (_, inFlight) => drained.get.whenA(inFlight > 0) } }
 
             (enqueue, release)
           }
@@ -224,9 +197,6 @@ object GroupWithin {
     }
   }
 
-  /**
-   * Accepts one element into the current batch.
-   */
   trait Enqueue[F[_], A] {
 
     def apply(a: A): F[Unit]
