@@ -130,6 +130,29 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     program.timeout(30.seconds).unsafeRunSync() shouldEqual Error.asLeft
   }
 
+  "not let a timer close a batch it was not started for" in {
+    val settings = GroupWithin.Settings(delay = 1.day, size = 2)
+
+    val program = for {
+      delivered <- Ref[IO].of(List.empty[List[Int]])
+      observed <- GroupWithin[IO]
+        .apply[Int](settings) { batch => delivered.update { batch.toList :: _ } }
+        .use { enqueue =>
+          for {
+            _ <- enqueue(1)
+            _ <- enqueue(2)
+            _ <- enqueue(3)
+            _ <- IO.cede.replicateA_(10)
+            observed <- delivered.get
+          } yield observed
+        }
+    } yield observed
+
+    // Under a simulated clock no time passes between the batches, so both get the same timestamp.
+    // Only the batch closed by size may be delivered, element 3 is still accumulating.
+    TestControl.executeEmbed(program).unsafeRunSync() shouldEqual List(List(1, 2))
+  }
+
   "cancel the batch timer once the batch is consumed" in {
     val settings = GroupWithin.Settings(delay = 1.day, size = 2)
     val program = GroupWithin[IO]

@@ -4,10 +4,9 @@ import cats.data.{NonEmptyList => Nel}
 import cats.effect.implicits._
 import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.std.Semaphore
-import cats.effect.{Clock, Concurrent, Resource, Temporal}
+import cats.effect.{Concurrent, Resource, Temporal}
 import cats.implicits._
 import cats.{Applicative, ~>}
-import com.evolutiongaming.catshelper.ClockHelper._
 
 import scala.concurrent.duration._
 
@@ -99,23 +98,27 @@ object GroupWithin {
         object S {
           def empty: S = Empty
           def stopped: S = Stopped
-          def full(a: A, timestamp: Long, closed: Deferred[F, Unit]): S = Full(Nel.of(a), 1, timestamp, closed)
+          def full(a: A, closed: Deferred[F, Unit]): S = Full(Nel.of(a), 1, closed)
 
           case object Empty extends S
           case object Stopped extends S
 
           /**
            * @param size
-           *   always equal to `as.size`, counted so that enqueue does not traverse the batch
+           *   number of elements in `as`, kept in step by `append` so that enqueue does not
+           *   traverse the batch
            * @param closed
-           *   completed when the batch is closed by size or by release, which stops its timer
+           *   completed when the batch is closed by size or by release, which stops its timer. Also
+           *   identifies the batch, so a timer only closes the batch it was started for
            */
           final case class Full(
             as: Nel[A],
             size: Int,
-            timestamp: Long,
             closed: Deferred[F, Unit],
-          ) extends S
+          ) extends S {
+            def append(a: A): Full = Full(a :: as, size + 1, closed)
+            def isFilled: Boolean = size >= settings.size
+          }
         }
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
@@ -130,23 +133,22 @@ object GroupWithin {
 
             def consume(as: Nel[A]) = semaphore.permit.use { _ => f(as.reverse) }
               .guarantee {
-                ref
-                  .modify { case (s, inFlight) =>
-                    val remaining = inFlight - 1
-                    val signal = s match {
-                      case S.Stopped if remaining == 0 => drained.complete(()).void
-                      case _ => void
-                    }
-                    ((s, remaining), signal)
+                ref.modify { case (s, inFlight) =>
+                  val remaining = inFlight - 1
+                  val signal = s match {
+                    case S.Stopped if remaining == 0 => drained.complete(()).void
+                    case _ => void
                   }
+                  ((s, remaining), signal)
+                }
                   .flatten
               }
 
-            def startTimer(timestamp: Long, closed: Deferred[F, Unit]) = {
+            def startTimer(closed: Deferred[F, Unit]) = {
               val result = for {
                 _ <- Temporal[F].race(Temporal[F].sleep(settings.delay), closed.get)
                 a <- ref.modify {
-                  case (s: S.Full, inFlight) if s.timestamp == timestamp =>
+                  case (s: S.Full, inFlight) if s.closed.eq(closed) =>
                     ((S.empty, inFlight + 1), consume(s.as))
                   case s => (s, void)
                 }
@@ -157,33 +159,44 @@ object GroupWithin {
                 .void
             }
 
+            // An open batch already has its own `closed`, so the allocation happens only on the
+            // path that opens one. The state is read again after the allocation, because another
+            // fiber can open the batch in between.
+            def openBatch(element: A): F[Unit] = {
+              for {
+                closed <- Deferred[F, Unit]
+                _ <- ref.modify {
+                  case (S.Empty, inFlight) => ((S.full(element, closed), inFlight), startTimer(closed))
+                  case (s: S.Full, inFlight) =>
+                    val full = s.append(element)
+                    if (full.isFilled) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(full.as))
+                    else ((full, inFlight), void)
+                  case (S.Stopped, inFlight) => ((S.stopped, inFlight), void)
+                }.flatten
+              } yield ()
+            }
+
             val enqueue = new Enqueue[F, A] {
 
               def apply(a: A) = {
                 Concurrent[F].uncancelable { _ =>
-                  for {
-                    t <- Clock[F].nanos
-                    closed <- Deferred[F, Unit]
-                    a <- ref.modify {
-                      case (s: S.Full, inFlight) =>
-                        val as = a :: s.as
-                        val size = s.size + 1
-                        if (size >= settings.size) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(as))
-                        else ((s.copy(as = as, size = size), inFlight), void)
-                      case (S.Empty, inFlight) => ((S.full(a, t, closed), inFlight), startTimer(t, closed))
-                      case (S.Stopped, inFlight) => ((S.stopped, inFlight), void)
-                    }
-                    a <- a
-                  } yield a
+                  ref.modify {
+                    case (s: S.Full, inFlight) =>
+                      val full = s.append(a)
+                      if (full.isFilled) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(full.as))
+                      else ((full, inFlight), void)
+                    case (S.Empty, inFlight) => ((S.empty, inFlight), openBatch(a))
+                    case (S.Stopped, inFlight) => ((S.stopped, inFlight), void)
+                  }
+                    .flatten
                 }
               }
             }
 
-            val release = ref
-              .modify {
-                case (s: S.Full, inFlight) => ((S.stopped, inFlight + 1), s.closed.complete(()) *> consume(s.as))
-                case (_, inFlight) => ((S.stopped, inFlight), void)
-              }
+            val release = ref.modify {
+              case (s: S.Full, inFlight) => ((S.stopped, inFlight + 1), s.closed.complete(()) *> consume(s.as))
+              case (_, inFlight) => ((S.stopped, inFlight), void)
+            }
               .flatten
               .guarantee { ref.get.flatMap { case (_, inFlight) => drained.get.whenA(inFlight > 0) } }
 
