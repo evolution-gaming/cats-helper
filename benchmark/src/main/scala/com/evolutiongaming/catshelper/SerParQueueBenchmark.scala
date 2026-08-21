@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 class SerParQueueBenchmark {
 
-  @Param(Array("1", "8", "64"))
+  @Param(Array("1", "8", "64", "256", "1024"))
   var keys: Int = 0
 
   // JMH drives state through mutable fields and lifecycle hooks, so `var` is required here.

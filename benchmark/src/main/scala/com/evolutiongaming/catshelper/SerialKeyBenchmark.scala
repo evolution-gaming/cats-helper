@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
+import cats.syntax.all._
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -9,12 +10,14 @@ import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
 
 /**
- * Cost of putting a task through [[SerialKey]], with the key count as the contention knob.
+ * Cost of putting a task through [[SerialKey]], across backing stores and contention levels.
  *
- * [[SerialKey.of]] hash-partitions keys into one [[SerialKey]] per available core, each holding its
- * own `Ref`, to spread contention. `keys = 1` puts every thread on one key and therefore on one
- * partition, which is the worst case. Larger key counts spread the load over more partitions.
- * Compare the two columns to see what the partitioning buys.
+ * `keys` is the contention knob. `keys = 1` puts every thread on one key, which is the worst case,
+ * larger counts spread the load.
+ *
+ * One operation enqueues `tasksPerOp` tasks and awaits them all. Enqueueing a single task per
+ * operation measures the handoff between the calling thread and the compute pool rather than the
+ * queue, which on this workload swamps the result with noise.
  *
  * To run: {{{sbt "benchmark/Jmh/run com.evolutiongaming.catshelper.SerialKeyBenchmark"}}}
  */
@@ -26,8 +29,10 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 class SerialKeyBenchmark {
 
-  @Param(Array("1", "8", "64"))
+  @Param(Array("1", "8", "64", "256", "1024"))
   var keys: Int = 0
+
+  private val tasksPerOp = 64
 
   // JMH drives state through mutable fields and lifecycle hooks, so `var` is required here.
   private var runtime: IORuntime = null
@@ -40,8 +45,11 @@ class SerialKeyBenchmark {
   }
 
   private def enqueueAndAwait(hole: Blackhole): Unit = {
-    val key = ThreadLocalRandom.current().nextInt(keys)
-    val result = serialKey(key) { IO.unit }.flatten
+    val random = ThreadLocalRandom.current()
+    val result = List
+      .fill(tasksPerOp) { random.nextInt(keys) }
+      .traverse { key => serialKey(key) { IO.unit } }
+      .flatMap { _.sequence_ }
     hole.consume(result.unsafeRunSync()(runtime))
   }
 
