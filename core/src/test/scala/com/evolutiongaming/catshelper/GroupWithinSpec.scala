@@ -174,7 +174,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
   }
 
   "enqueue at a constant cost for a large batch" in {
-    val elements = 100000
+    val elements = 100_000
     val settings = GroupWithin.Settings(delay = 1.day, size = elements + 1)
     val program = GroupWithin[IO]
       .apply[Int](settings) { _ => IO.unit }
