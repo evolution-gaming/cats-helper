@@ -127,6 +127,8 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     result.run()
   }
 
+  // Ignored: a canceled task wedges the queue for good. Both fixes considered so far cost more
+  // than the defect, see https://github.com/evolution-gaming/cats-helper/issues/404
   ignore("advance the queue after a task cancels") {
     val result = List(none[Int], 0.some).traverse_ { key =>
       for {

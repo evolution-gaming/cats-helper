@@ -56,6 +56,8 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
     result.run()
   }
 
+  // Ignored: a canceled task wedges the queue for good. Both fixes considered so far cost more
+  // than the defect, see https://github.com/evolution-gaming/cats-helper/issues/404
   ignore("advance a key after a task cancels") {
     val result = for {
       serial <- SerialKey.of[IO, String]
