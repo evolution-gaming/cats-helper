@@ -198,7 +198,7 @@ object GroupWithin {
               case (_, inFlight) => ((S.stopped, inFlight), void)
             }
               .flatten
-              .guarantee { ref.get.flatMap { case (_, inFlight) => drained.get.whenA(inFlight > 0) } }
+              .guarantee { ref.get.flatMap { case (_, inFlight) => Applicative[F].whenA(inFlight > 0)(drained.get) } }
 
             (enqueue, release)
           }

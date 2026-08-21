@@ -130,6 +130,18 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     program.timeout(30.seconds).unsafeRunSync() shouldEqual Error.asLeft
   }
 
+  "not hang release when the handler fails on the timer path" in {
+    case object Error extends RuntimeException with NoStackTrace
+
+    val settings = GroupWithin.Settings(delay = 10.millis, size = 100)
+    val program = GroupWithin[IO]
+      .apply[Int](settings) { _ => IO.raiseError[Unit](Error) }
+      .use { enqueue => enqueue(1) *> IO.sleep(200.millis) }
+      .attempt
+
+    program.timeout(10.seconds).unsafeRunSync() shouldEqual ().asRight
+  }
+
   "not let a timer close a batch it was not started for" in {
     val settings = GroupWithin.Settings(delay = 1.day, size = 2)
 
