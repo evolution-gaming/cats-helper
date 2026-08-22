@@ -44,11 +44,11 @@ object GroupWithin {
         object S {
           def empty: S = Empty
           def stopped: S = Stopped
-          def full(as: Nel[A], timestamp: Long): S = Full(as, timestamp)
+          def full(a: A, timestamp: Long): S = Full(Nel.of(a), timestamp, 1)
 
           case object Empty extends S
           case object Stopped extends S
-          final case class Full(as: Nel[A], timestamp: Long) extends S
+          final case class Full(as: Nel[A], timestamp: Long, count: Int) extends S
         }
 
         if (settings.size <= 1 || settings.delay <= 0.millis) {
@@ -85,9 +85,10 @@ object GroupWithin {
                     a <- ref.modify {
                       case s: S.Full =>
                         val as = a :: s.as
-                        if (as.size >= settings.size) (S.empty, consume(as))
-                        else (s.copy(as = as), void)
-                      case S.Empty => (S.full(Nel.of(a), t), startTimer(t))
+                        val count = s.count + 1
+                        if (count >= settings.size) (S.empty, consume(as))
+                        else (s.copy(as = as, count = count), void)
+                      case S.Empty => (S.full(a, t), startTimer(t))
                       case S.Stopped => (S.stopped, void)
                     }
                     a <- a

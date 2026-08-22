@@ -26,6 +26,11 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     `collect until size reached`[IO]
   }
 
+  "collect until size reached, size > 2" in ioTest { env =>
+    import env._
+    `collect until size reached, size > 2`[IO]
+  }
+
   "collect until deadline reached" in ioTest { env =>
     import env._
     `collect until deadline reached`[IO]
@@ -70,6 +75,27 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
       a <- ref.get
     } yield {
       a shouldEqual List(Nel.of(3, 4), Nel.of(1, 2))
+    }
+  }
+
+  private def `collect until size reached, size > 2`[F[_]: Temporal] = {
+    val settings = GroupWithin.Settings(delay = 1.minute, size = 3)
+    for {
+      ref <- Ref[F].of(List.empty[Nel[Int]])
+      groupWithin = GroupWithin[F].apply[Int](settings) { a => ref.update { a :: _ } }
+      _ <- groupWithin.use { enqueue =>
+        for {
+          _ <- enqueue(1)
+          _ <- enqueue(2)
+          _ <- enqueue(3)
+          _ <- enqueue(4)
+          _ <- enqueue(5)
+          _ <- enqueue(6)
+        } yield {}
+      }
+      a <- ref.get
+    } yield {
+      a shouldEqual List(Nel.of(4, 5, 6), Nel.of(1, 2, 3))
     }
   }
 

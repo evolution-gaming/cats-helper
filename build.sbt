@@ -1,4 +1,5 @@
 import Dependencies.*
+import com.typesafe.tools.mima.core.*
 import sbtversionpolicy.Compatibility.BinaryCompatible
 
 def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
@@ -80,6 +81,9 @@ lazy val core = project
       scalaVersion.value,
       if3 = Seq("-Ykind-projector:underscores", "-language:implicitConversions"),
       if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders"),
+    ),
+    mimaBinaryIssueFilters ++= Seq(
+      ProblemFilters.exclude[Problem]("com.evolutiongaming.catshelper.GroupWithin#S#3#Full*"),
     ),
   )
   .dependsOn(
