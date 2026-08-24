@@ -187,8 +187,10 @@ object GroupWithin {
                       val full = s.append(a)
                       if (full.isFilled) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(full.as))
                       else ((full, inFlight), void)
-                    case (S.Empty, inFlight) => ((S.empty, inFlight), openBatch(a))
-                    case (S.Stopped, inFlight) => ((S.stopped, inFlight), void)
+                    case (S.Empty, inFlight) =>
+                      ((S.empty, inFlight), openBatch(a))
+                    case (S.Stopped, inFlight) =>
+                      ((S.stopped, inFlight), void)
                   }
                     .flatten
                 }
