@@ -173,7 +173,7 @@ object GroupWithin {
                     if (full.isFilled) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(full.as))
                     else ((full, inFlight), void)
                   case (S.Stopped, inFlight) =>
-                    (S.stopped, inFlight), void)
+                    ((S.stopped, inFlight), void)
                 }.flatten
               } yield ()
             }
