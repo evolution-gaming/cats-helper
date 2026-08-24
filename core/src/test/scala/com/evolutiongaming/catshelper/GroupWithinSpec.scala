@@ -50,7 +50,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
       handler = (batch: Nel[Int]) =>
         for {
           entered <- inFlight.updateAndGet { _ + 1 }
-          _ <- overlaps.update { _ + 1 }.whenA(entered > 1)
+          _ <- IO.whenA(entered > 1) { overlaps.update { _ + 1 } }
           _ <- delivered.update { batch.toList ::: _ }
           _ <- IO.cede
           _ <- inFlight.update { _ - 1 }
