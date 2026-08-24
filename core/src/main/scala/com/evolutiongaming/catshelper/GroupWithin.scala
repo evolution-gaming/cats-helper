@@ -166,12 +166,14 @@ object GroupWithin {
               for {
                 closed <- Deferred[F, Unit]
                 _ <- ref.modify {
-                  case (S.Empty, inFlight) => ((S.full(element, closed), inFlight), startTimer(closed))
+                  case (S.Empty, inFlight) =>
+                    ((S.full(element, closed), inFlight), startTimer(closed))
                   case (s: S.Full, inFlight) =>
                     val full = s.append(element)
                     if (full.isFilled) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(full.as))
                     else ((full, inFlight), void)
-                  case (S.Stopped, inFlight) => ((S.stopped, inFlight), void)
+                  case (S.Stopped, inFlight) =>
+                    (S.stopped, inFlight), void)
                 }.flatten
               } yield ()
             }
