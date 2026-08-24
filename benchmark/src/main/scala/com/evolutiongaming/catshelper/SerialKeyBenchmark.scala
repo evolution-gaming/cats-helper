@@ -12,8 +12,8 @@ import java.util.concurrent.TimeUnit
 /**
  * Cost of putting a task through [[SerialKey]], across backing stores and contention levels.
  *
- * `keys` is the contention knob. `keys = 1` puts every thread on one key, which is the worst case,
- * larger counts spread the load.
+ * `keys` is the contention knob. `keys = 1` puts every thread on one key, larger counts spread the
+ * load over more of them. `implementation` picks between the two factories `SerialKey` offers.
  *
  * One operation enqueues `tasksPerOp` tasks and awaits them all. Enqueueing a single task per
  * operation measures the handoff between the calling thread and the compute pool rather than the
@@ -29,8 +29,11 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 class SerialKeyBenchmark {
 
-  @Param(Array("1", "8", "64", "256", "1024"))
+  @Param(Array("1", "8", "64", "1024", "100000"))
   var keys: Int = 0
+
+  @Param(Array("partitioned", "concurrentHashMap"))
+  var implementation: String = ""
 
   private val tasksPerOp = 64
 
@@ -41,7 +44,12 @@ class SerialKeyBenchmark {
   @Setup(Level.Trial)
   def setup(): Unit = {
     runtime = IORuntime.global
-    serialKey = SerialKey.of[IO, Int].unsafeRunSync()(runtime)
+    val of = implementation match {
+      case "partitioned" => SerialKey.of[IO, Int]
+      case "concurrentHashMap" => SerialKey.ofConcurrentHashMap[IO, Int]
+      case other => throw new IllegalArgumentException(s"unknown implementation $other")
+    }
+    serialKey = of.unsafeRunSync()(runtime)
   }
 
   private def enqueueAndAwait(hole: Blackhole): Unit = {

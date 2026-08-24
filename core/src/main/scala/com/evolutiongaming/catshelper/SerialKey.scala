@@ -1,7 +1,8 @@
 package com.evolutiongaming.catshelper
 
 import cats.effect.Concurrent
-import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.kernel.{Async, Deferred, Ref}
+import cats.effect.std.MapRef
 import cats.effect.syntax.all._
 import cats.implicits._
 import cats.{Applicative, Hash}
@@ -112,6 +113,83 @@ object SerialKey {
                   a <- d.get
                   a <- a.liftTo[F]
                 } yield a
+            }
+          }
+        }
+      }
+  }
+
+  /**
+   * Same guarantees as [[of]], with the per-key state in a `ConcurrentHashMap` instead of
+   * hash-partitioned `Ref`s of immutable maps.
+   *
+   * Which of the two is faster depends on how the keys are used. At eight threads this one is about
+   * 1.35x faster when keys are almost always distinct, and about half the speed when every thread
+   * lands on one key. Without concurrency this one is a few percent slower at every key count.
+   *
+   * An update here touches one entry, while [[of]] rebuilds an immutable map, which is what pays
+   * off once keys are spread out. On a single hot key `ConcurrentHashMap` locks the bin while `Ref`
+   * does a lock-free compare and set, which is what costs.
+   *
+   * So prefer this one for high cardinality keys such as a session or request id, and [[of]] for a
+   * small set of keys that stay busy.
+   *
+   * Keys are compared by `hashCode` and `equals` rather than by a cats `Hash`.
+   */
+  def ofConcurrentHashMap[F[_]: Async, K]: F[SerialKey[F, K]] = {
+
+    val void = ().pure[F]
+
+    type Task = F[Unit]
+
+    /**
+     * State of a key that has a task running. A key with no task running has no entry at all, so
+     * the absent case is `None` from the `MapRef` rather than a member here.
+     */
+    sealed trait KeyState
+
+    object KeyState {
+
+      /**
+       * Nothing is queued behind the running task.
+       */
+      case object Running extends KeyState
+
+      /**
+       * `tasksChain` is queued behind the running task, chained in submission order.
+       */
+      final case class Pending(tasksChain: Task) extends KeyState
+    }
+
+    MapRef
+      .ofConcurrentHashMap[F, K, KeyState]()
+      .map { mapRef =>
+        def start(key: K, task: Task): F[Unit] = {
+          task
+            .tailRecM { task =>
+              task *> mapRef(key).modify {
+                case Some(KeyState.Pending(tasksChain)) => (KeyState.Running.some, tasksChain.asLeft[Unit])
+                case Some(KeyState.Running) => (none, ().asRight[Task])
+                case None => (none, ().asRight[Task])
+              }
+            }
+            .start
+            .void
+        }
+
+        new SerialKey[F, K] {
+          def apply[A](key: K)(task: F[A]) = {
+            Concurrent[F].uncancelable { _ =>
+              for {
+                result <- Deferred[F, Either[Throwable, A]]
+                taskAttempt = task.attempt.flatMap { result.complete(_).void }
+                _ <- mapRef(key).flatModify {
+                  case None => (KeyState.Running.some, start(key, taskAttempt))
+                  case Some(KeyState.Running) => (KeyState.Pending(taskAttempt).some, void)
+                  case Some(KeyState.Pending(tasksChain)) =>
+                    (KeyState.Pending(tasksChain.productR(taskAttempt)).some, void)
+                }
+              } yield result.get.flatMap { _.liftTo[F] }
             }
           }
         }

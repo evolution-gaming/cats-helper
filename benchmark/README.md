@@ -30,7 +30,8 @@ reading anything into a difference:
 | Command | `sbt "benchmark/Jmh/run -f 1 -wi 5 -i 5 -w 2s -r 2s .*Benchmark.*"` |
 
 Throughput in ops/s, higher is better. One `SerialKeyBenchmark` operation covers 64 tasks, so its
-scores are not comparable with the other two suites.
+scores are not comparable with the other two suites, and its rows are for
+`implementation=partitioned`.
 
 | Suite | Benchmark | keys | tasks | Score |
 | --- | --- | ---: | ---: | ---: |
