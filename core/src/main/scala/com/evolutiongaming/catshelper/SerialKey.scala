@@ -13,6 +13,10 @@ import cats.{Applicative, Hash}
  * As in [[Serial]], the caller does not wait for its turn: `apply` only registers the task, and
  * registration is uncancelable. See [[SerParQueue]] when keyless tasks that order against all keys
  * are needed as well.
+ *
+ * A task that cancels itself stops the runner of its key before it advances the queue, so every
+ * task behind it on that key waits forever, see
+ * https://github.com/evolution-gaming/cats-helper/issues/404
  */
 trait SerialKey[F[_], -K] {
 

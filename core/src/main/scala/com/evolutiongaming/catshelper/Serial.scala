@@ -15,6 +15,9 @@ import cats.syntax.all._
  * Registration is uncancelable: once `apply` returns, the task runs even if the caller is canceled.
  * Canceling the inner effect stops the waiting, not the task.
  *
+ * A task that cancels itself stops the runner before it advances the queue, so every task behind it
+ * waits forever, see https://github.com/evolution-gaming/cats-helper/issues/404
+ *
  * See [[SerialKey]] for per-key serialization and [[SerialRef]] for serialized access to a value.
  */
 trait Serial[F[_]] {
@@ -30,8 +33,9 @@ trait Serial[F[_]] {
 object Serial {
 
   /**
-   * Pending tasks are not stored in a collection: `S.Active(task)` chains them into a single
-   * `F[Unit]` via `productR`, so enqueue cost and state size stay constant.
+   * Pending tasks are chained into a single `F[Unit]` via `productR` rather than held in a
+   * collection, so the runner claims the whole backlog in one `ref.modify` instead of one per task.
+   * Enqueue stays O(1). Memory grows with the backlog either way.
    */
   def of[F[_]: Async]: F[Serial[F]] = {
 
