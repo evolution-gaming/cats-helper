@@ -35,52 +35,52 @@ scores are not comparable with the other two suites.
 
 | Benchmark | tasks | Score |
 | --- | ---: | ---: |
-| `pipelined` | 1 | 96 508 ± 5 220 |
-| `pipelined` | 16 | 54 023 ± 1 812 |
-| `pipelined` | 256 | 7 458 ± 7 190 |
-| `sequential` | 1 | 86 605 ± 35 975 |
-| `sequential` | 16 | 37 816 ± 3 827 |
-| `sequential` | 256 | 3 105 ± 715 |
+| `pipelined` | 1 | 103 279 ± 2 096 |
+| `pipelined` | 16 | 56 270 ± 514 |
+| `pipelined` | 256 | 9 483 ± 213 |
+| `sequential` | 1 | 107 029 ± 3 921 |
+| `sequential` | 16 | 39 737 ± 751 |
+| `sequential` | 256 | 3 164 ± 51 |
 
 ### SerialKeyBenchmark
 
 | Benchmark | implementation | keys | Score |
 | --- | --- | ---: | ---: |
-| `singleThread` | `partitioned` | 1 | 23 947 ± 1 022 |
-| `singleThread` | `partitioned` | 8 | 22 043 ± 2 606 |
-| `singleThread` | `partitioned` | 64 | 17 829 ± 4 302 |
-| `singleThread` | `partitioned` | 1024 | 17 614 ± 3 646 |
-| `singleThread` | `partitioned` | 100000 | 17 550 ± 2 468 |
-| `singleThread` | `concurrentHashMap` | 1 | 21 794 ± 1 850 |
-| `singleThread` | `concurrentHashMap` | 8 | 18 783 ± 2 611 |
-| `singleThread` | `concurrentHashMap` | 64 | 17 872 ± 1 567 |
-| `singleThread` | `concurrentHashMap` | 1024 | 17 043 ± 2 191 |
-| `singleThread` | `concurrentHashMap` | 100000 | 15 626 ± 3 463 |
-| `eightThreads` | `partitioned` | 1 | 47 040 ± 9 770 |
-| `eightThreads` | `partitioned` | 8 | 68 526 ± 2 895 |
-| `eightThreads` | `partitioned` | 64 | 55 896 ± 6 863 |
-| `eightThreads` | `partitioned` | 1024 | 51 997 ± 7 414 |
-| `eightThreads` | `partitioned` | 100000 | 52 924 ± 5 862 |
-| `eightThreads` | `concurrentHashMap` | 1 | 23 518 ± 365 |
-| `eightThreads` | `concurrentHashMap` | 8 | 60 812 ± 1 341 |
-| `eightThreads` | `concurrentHashMap` | 64 | 59 884 ± 7 417 |
-| `eightThreads` | `concurrentHashMap` | 1024 | 63 851 ± 9 909 |
-| `eightThreads` | `concurrentHashMap` | 100000 | 65 669 ± 16 950 |
+| `singleThread` | `partitioned` | 1 | 25 601 ± 126 |
+| `singleThread` | `partitioned` | 8 | 22 984 ± 796 |
+| `singleThread` | `partitioned` | 64 | 20 294 ± 1 120 |
+| `singleThread` | `partitioned` | 1024 | 18 957 ± 816 |
+| `singleThread` | `partitioned` | 100000 | 19 340 ± 1 079 |
+| `singleThread` | `concurrentHashMap` | 1 | 22 591 ± 545 |
+| `singleThread` | `concurrentHashMap` | 8 | 20 846 ± 788 |
+| `singleThread` | `concurrentHashMap` | 64 | 18 714 ± 449 |
+| `singleThread` | `concurrentHashMap` | 1024 | 18 171 ± 1 512 |
+| `singleThread` | `concurrentHashMap` | 100000 | 18 546 ± 800 |
+| `eightThreads` | `partitioned` | 1 | 52 111 ± 847 |
+| `eightThreads` | `partitioned` | 8 | 71 944 ± 2 663 |
+| `eightThreads` | `partitioned` | 64 | 58 871 ± 3 718 |
+| `eightThreads` | `partitioned` | 1024 | 53 437 ± 5 839 |
+| `eightThreads` | `partitioned` | 100000 | 57 099 ± 5 584 |
+| `eightThreads` | `concurrentHashMap` | 1 | 23 805 ± 707 |
+| `eightThreads` | `concurrentHashMap` | 8 | 61 645 ± 1 607 |
+| `eightThreads` | `concurrentHashMap` | 64 | 62 234 ± 3 601 |
+| `eightThreads` | `concurrentHashMap` | 1024 | 65 154 ± 10 002 |
+| `eightThreads` | `concurrentHashMap` | 100000 | 72 369 ± 7 472 |
 
 ### SerParQueueBenchmark
 
 | Benchmark | keys | Score |
 | --- | ---: | ---: |
-| `keyed` | 1 | 269 360 ± 23 980 |
-| `keyed` | 8 | 273 713 ± 6 436 |
-| `keyed` | 64 | 283 340 ± 16 538 |
-| `keyed` | 256 | 275 698 ± 30 912 |
-| `keyed` | 1024 | 269 992 ± 79 635 |
-| `keyless` | 1 | 261 262 ± 8 141 |
-| `keyless` | 8 | 267 356 ± 10 629 |
-| `keyless` | 64 | 258 759 ± 9 000 |
-| `keyless` | 256 | 264 028 ± 8 576 |
-| `keyless` | 1024 | 218 094 ± 203 352 |
+| `keyed` | 1 | 262 039 ± 10 864 |
+| `keyed` | 8 | 278 905 ± 18 188 |
+| `keyed` | 64 | 276 485 ± 11 631 |
+| `keyed` | 256 | 275 357 ± 4 119 |
+| `keyed` | 1024 | 278 134 ± 7 996 |
+| `keyless` | 1 | 264 736 ± 14 070 |
+| `keyless` | 8 | 260 776 ± 4 472 |
+| `keyless` | 64 | 263 170 ± 3 920 |
+| `keyless` | 256 | 262 007 ± 7 791 |
+| `keyless` | 1024 | 263 735 ± 5 393 |
 
 Replace this table when the baseline moves. The before and after of a single change belong in the
 description of the pull request that makes it.
