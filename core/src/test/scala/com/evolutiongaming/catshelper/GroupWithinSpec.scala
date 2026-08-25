@@ -112,10 +112,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
         .use { enqueue => enqueue(1) *> enqueue(2) *> started.get }
       observed <- delivered.get
     } yield observed
-
-    // The batching shape is not the point and is not stable: if more than `delay` elapses between
-    // the two enqueues, the timer closes [1] on its own and [2] opens a second batch.
-    program.timeout(30.seconds).unsafeRunSync().sorted shouldEqual List(1, 2)
+    TestControl.executeEmbed(program).unsafeRunSync() shouldEqual List(1, 2)
   }
 
   "report an error raised while release flushes the pending batch" in {
@@ -127,7 +124,7 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
       .use { enqueue => enqueue(1) }
       .attempt
 
-    program.timeout(30.seconds).unsafeRunSync() shouldEqual Error.asLeft
+    TestControl.executeEmbed(program).unsafeRunSync() shouldEqual Error.asLeft
   }
 
   "not hang release when the handler fails on the timer path" in {
@@ -136,10 +133,10 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
     val settings = GroupWithin.Settings(delay = 10.millis, size = 100)
     val program = GroupWithin[IO]
       .apply[Int](settings) { _ => IO.raiseError[Unit](Error) }
-      .use { enqueue => enqueue(1) *> IO.sleep(200.millis) }
+      .use { enqueue => enqueue(1) *> IO.sleep(20.millis) }
       .attempt
 
-    program.timeout(10.seconds).unsafeRunSync() shouldEqual ().asRight
+    TestControl.executeEmbed(program).unsafeRunSync() shouldEqual ().asRight
   }
 
   "not let a timer close a batch it was not started for" in {
