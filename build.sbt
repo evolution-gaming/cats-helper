@@ -1,4 +1,5 @@
 import Dependencies.*
+import com.typesafe.tools.mima.core.*
 import sbtversionpolicy.Compatibility.BinaryCompatible
 
 def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
@@ -38,6 +39,12 @@ lazy val commonSettings = Seq(
   scalacOptsFailOnWarn := Some(false),
 )
 
+lazy val groupWithinLocalStateFilters = Seq(
+  mimaBinaryIssueFilters ++= Seq(
+    ProblemFilters.exclude[Problem]("com.evolutiongaming.catshelper.GroupWithin#S#3#Full*"),
+  ),
+)
+
 val alias: Seq[sbt.Def.Setting[?]] =
   addCommandAlias("check", "all scalafmtCheckRepo versionPolicyCheck Compile/doc") ++
     addCommandAlias("fmt", "+scalafmtRepo") ++
@@ -61,6 +68,7 @@ lazy val root = project
 lazy val core = project
   .settings(
     commonSettings,
+    groupWithinLocalStateFilters,
     // formerly this was a top-level module and thus it retains the old name
     name := "cats-helper",
     libraryDependencies ++= Seq(
