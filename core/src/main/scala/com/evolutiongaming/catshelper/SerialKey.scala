@@ -166,9 +166,12 @@ object SerialKey {
           task
             .tailRecM { task =>
               task *> mapRef(key).modify {
-                case Some(KeyState.Pending(tasksChain)) => (KeyState.Running.some, tasksChain.asLeft[Unit])
-                case Some(KeyState.Running) => (none, ().asRight[Task])
-                case None => (none, ().asRight[Task])
+                case Some(KeyState.Pending(tasksChain)) =>
+                  (KeyState.Running.some, tasksChain.asLeft[Unit])
+                case Some(KeyState.Running) =>
+                  (none, ().asRight[Task])
+                case None =>
+                  (none, ().asRight[Task])
               }
             }
             .start
@@ -182,8 +185,10 @@ object SerialKey {
                 result <- Deferred[F, Either[Throwable, A]]
                 taskAttempt = task.attempt.flatMap { result.complete(_).void }
                 _ <- mapRef(key).flatModify {
-                  case None => (KeyState.Running.some, start(key, taskAttempt))
-                  case Some(KeyState.Running) => (KeyState.Pending(taskAttempt).some, void)
+                  case None =>
+                    (KeyState.Running.some, start(key, taskAttempt))
+                  case Some(KeyState.Running) =>
+                    (KeyState.Pending(taskAttempt).some, void)
                   case Some(KeyState.Pending(tasksChain)) =>
                     (KeyState.Pending(tasksChain.productR(taskAttempt)).some, void)
                 }
