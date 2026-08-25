@@ -3,7 +3,7 @@ package com.evolutiongaming.catshelper
 import cats.Hash
 import cats.data.{NonEmptyList => Nel}
 import cats.effect.kernel.Async
-import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.kernel.{Deferred, Outcome, Ref}
 import cats.effect.syntax.all._
 import cats.effect.{Clock, Concurrent, IO, Sync, Temporal}
 import cats.syntax.all._
@@ -53,6 +53,23 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       b <- threadId
       _ <- IO { a shouldEqual b }
     } yield {}
+    result.run()
+  }
+
+  // Ignored: a canceled task wedges the queue for good. Both fixes considered so far cost more
+  // than the defect, see https://github.com/evolution-gaming/cats-helper/issues/404
+  ignore("advance a key after a task cancels") {
+    val result = for {
+      serial <- SerialKey.of[IO, String]
+      canceled <- serial("key")(IO.canceled)
+      next <- serial("key")(IO.pure(1))
+      value <- next
+      _ = value shouldEqual 1
+      fiber <- canceled.start
+      outcome <- fiber.join
+      _ = outcome should matchPattern { case Outcome.Canceled() => }
+    } yield {}
+
     result.run()
   }
 
