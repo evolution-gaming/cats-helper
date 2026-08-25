@@ -105,8 +105,8 @@ object GroupWithin {
 
           /**
            * @param size
-           *   number of elements in `as`, kept in step by `append` so that enqueue does not
-           *   traverse the batch
+           *   number of elements in `as`, kept in step by `add` so that enqueue does not traverse
+           *   the batch
            * @param closed
            *   completed when the batch is closed by size or by release, which stops its timer. Also
            *   identifies the batch, so a timer only closes the batch it was started for
@@ -116,7 +116,7 @@ object GroupWithin {
             size: Int,
             closed: Deferred[F, Unit],
           ) extends S {
-            def append(a: A): Full = Full(a :: as, size + 1, closed)
+            def add(a: A): Full = Full(a :: as, size + 1, closed)
             def isFilled: Boolean = size >= settings.size
           }
         }
@@ -169,7 +169,7 @@ object GroupWithin {
                   case (S.Empty, inFlight) =>
                     ((S.full(element, closed), inFlight), startTimer(closed))
                   case (s: S.Full, inFlight) =>
-                    val full = s.append(element)
+                    val full = s.add(element)
                     if (full.isFilled) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(full.as))
                     else ((full, inFlight), void)
                   case (S.Stopped, inFlight) =>
@@ -184,7 +184,7 @@ object GroupWithin {
                 Concurrent[F].uncancelable { _ =>
                   ref.modify {
                     case (s: S.Full, inFlight) =>
-                      val full = s.append(a)
+                      val full = s.add(a)
                       if (full.isFilled) ((S.empty, inFlight + 1), s.closed.complete(()) *> consume(full.as))
                       else ((full, inFlight), void)
                     case (S.Empty, inFlight) =>
