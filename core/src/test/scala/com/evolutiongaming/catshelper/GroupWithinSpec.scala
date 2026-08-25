@@ -175,6 +175,9 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
         _ <- IO { outcome shouldEqual Outcome.succeeded[Id, Throwable, Unit](()).some }
         nextInterval <- control.nextInterval
       } yield {
+        // `nextInterval` is the time until the next fiber becomes eligible to run, so it is zero
+        // only when nothing is scheduled. The program has already finished, so a timer left
+        // sleeping would report the rest of its delay, one day here.
         nextInterval shouldEqual Duration.Zero
       }
     }
@@ -189,6 +192,10 @@ class GroupWithinSpec extends AnyFreeSpec with Matchers {
       .apply[Int](settings) { _ => IO.unit }
       .use { enqueue => (1 to elements).toList.traverse_ { enqueue.apply } }
 
+    // The timeout is the assertion that a large batch is processed in a reasonable time. A size
+    // check that traverses the batch is O(n^2) and cannot finish this many elements inside the
+    // bound, counting the size instead finishes in well under a second, so 10 seconds is loose
+    // rather than tight. Any future performance assertions belong in the `benchmark` module.
     program.timeout(10.seconds).unsafeRunSync()
   }
 
