@@ -28,59 +28,65 @@ reading anything into a difference:
 | Scala | 2.13.18 |
 | Command | `sbt "benchmark/Jmh/run -f 1 -wi 5 -i 5 -w 2s -r 2s .*Benchmark.*"` |
 
-Throughput in ops/s, higher is better. One `SerialKeyBenchmark` operation covers 64 tasks, so its
-scores are not comparable with the other two suites.
+Throughput in ops/s, higher is better. One operation covers 64 tasks in `SerialKeyBenchmark`,
+`SerParQueueBenchmark` and `SerParQueueKeylessBenchmark`, and `tasks` tasks in `SerialBenchmark`,
+so scores are only comparable within a suite.
 
 ### SerialBenchmark
 
 | Benchmark | tasks | Score |
 | --- | ---: | ---: |
-| `pipelined` | 1 | 103 279 ± 2 096 |
-| `pipelined` | 16 | 56 270 ± 514 |
-| `pipelined` | 256 | 9 483 ± 213 |
-| `sequential` | 1 | 107 029 ± 3 921 |
-| `sequential` | 16 | 39 737 ± 751 |
-| `sequential` | 256 | 3 164 ± 51 |
+| `pipelined` | 1 | 86 990 ± 12 361 |
+| `pipelined` | 16 | 52 630 ± 10 047 |
+| `pipelined` | 256 | 8 765 ± 163 |
+| `sequential` | 1 | 93 134 ± 24 153 |
+| `sequential` | 16 | 38 073 ± 5 130 |
+| `sequential` | 256 | 3 100 ± 69 |
+
+The `tasks = 1` rows carry a wide error because one operation is a single task, so the measurement
+is dominated by the handoff between the calling thread and the compute pool. Read the 256 rows for
+a stable figure.
 
 ### SerialKeyBenchmark
 
 | Benchmark | implementation | keys | Score |
 | --- | --- | ---: | ---: |
-| `singleThread` | `partitioned` | 1 | 25 601 ± 126 |
-| `singleThread` | `partitioned` | 8 | 22 984 ± 796 |
-| `singleThread` | `partitioned` | 64 | 20 294 ± 1 120 |
-| `singleThread` | `partitioned` | 1024 | 18 957 ± 816 |
-| `singleThread` | `partitioned` | 100000 | 19 340 ± 1 079 |
-| `singleThread` | `concurrentHashMap` | 1 | 22 591 ± 545 |
-| `singleThread` | `concurrentHashMap` | 8 | 20 846 ± 788 |
-| `singleThread` | `concurrentHashMap` | 64 | 18 714 ± 449 |
-| `singleThread` | `concurrentHashMap` | 1024 | 18 171 ± 1 512 |
-| `singleThread` | `concurrentHashMap` | 100000 | 18 546 ± 800 |
-| `eightThreads` | `partitioned` | 1 | 52 111 ± 847 |
-| `eightThreads` | `partitioned` | 8 | 71 944 ± 2 663 |
-| `eightThreads` | `partitioned` | 64 | 58 871 ± 3 718 |
-| `eightThreads` | `partitioned` | 1024 | 53 437 ± 5 839 |
-| `eightThreads` | `partitioned` | 100000 | 57 099 ± 5 584 |
-| `eightThreads` | `concurrentHashMap` | 1 | 23 805 ± 707 |
-| `eightThreads` | `concurrentHashMap` | 8 | 61 645 ± 1 607 |
-| `eightThreads` | `concurrentHashMap` | 64 | 62 234 ± 3 601 |
-| `eightThreads` | `concurrentHashMap` | 1024 | 65 154 ± 10 002 |
-| `eightThreads` | `concurrentHashMap` | 100000 | 72 369 ± 7 472 |
+| `singleThread` | `partitioned` | 1 | 25 022 ± 440 |
+| `singleThread` | `partitioned` | 8 | 23 354 ± 205 |
+| `singleThread` | `partitioned` | 64 | 20 453 ± 1 048 |
+| `singleThread` | `partitioned` | 1024 | 19 365 ± 469 |
+| `singleThread` | `partitioned` | 100000 | 18 759 ± 988 |
+| `singleThread` | `concurrentHashMap` | 1 | 22 915 ± 239 |
+| `singleThread` | `concurrentHashMap` | 8 | 21 788 ± 788 |
+| `singleThread` | `concurrentHashMap` | 64 | 18 438 ± 536 |
+| `singleThread` | `concurrentHashMap` | 1024 | 18 662 ± 889 |
+| `singleThread` | `concurrentHashMap` | 100000 | 18 675 ± 346 |
+| `eightThreads` | `partitioned` | 1 | 53 054 ± 1 509 |
+| `eightThreads` | `partitioned` | 8 | 73 448 ± 2 815 |
+| `eightThreads` | `partitioned` | 64 | 61 513 ± 2 997 |
+| `eightThreads` | `partitioned` | 1024 | 54 878 ± 2 855 |
+| `eightThreads` | `partitioned` | 100000 | 57 109 ± 7 931 |
+| `eightThreads` | `concurrentHashMap` | 1 | 23 814 ± 265 |
+| `eightThreads` | `concurrentHashMap` | 8 | 62 344 ± 1 928 |
+| `eightThreads` | `concurrentHashMap` | 64 | 63 100 ± 2 733 |
+| `eightThreads` | `concurrentHashMap` | 1024 | 66 238 ± 5 096 |
+| `eightThreads` | `concurrentHashMap` | 100000 | 72 660 ± 8 971 |
 
 ### SerParQueueBenchmark
 
 | Benchmark | keys | Score |
 | --- | ---: | ---: |
-| `keyed` | 1 | 262 039 ± 10 864 |
-| `keyed` | 8 | 278 905 ± 18 188 |
-| `keyed` | 64 | 276 485 ± 11 631 |
-| `keyed` | 256 | 275 357 ± 4 119 |
-| `keyed` | 1024 | 278 134 ± 7 996 |
-| `keyless` | 1 | 264 736 ± 14 070 |
-| `keyless` | 8 | 260 776 ± 4 472 |
-| `keyless` | 64 | 263 170 ± 3 920 |
-| `keyless` | 256 | 262 007 ± 7 791 |
-| `keyless` | 1024 | 263 735 ± 5 393 |
+| `keyed` | 1 | 53 873 ± 4 647 |
+| `keyed` | 8 | 40 759 ± 2 542 |
+| `keyed` | 64 | 29 588 ± 1 185 |
+| `keyed` | 256 | 22 670 ± 378 |
+| `keyed` | 1024 | 21 189 ± 566 |
+
+### SerParQueueKeylessBenchmark
+
+| Benchmark | Score |
+| --- | ---: |
+| `keyless` | 53 441 ± 1 124 |
 
 Replace this table when the baseline moves. The before and after of a single change belong in the
 description of the pull request that makes it.

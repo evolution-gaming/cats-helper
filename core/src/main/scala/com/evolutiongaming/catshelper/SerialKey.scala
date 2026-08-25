@@ -123,16 +123,14 @@ object SerialKey {
    * Same guarantees as [[of]], with the per-key state in a `ConcurrentHashMap` instead of
    * hash-partitioned `Ref`s of immutable maps.
    *
-   * Which of the two is faster depends on how the keys are used. At eight threads this one is about
-   * 1.35x faster when keys are almost always distinct, and about half the speed when every thread
-   * lands on one key. Without concurrency this one is a few percent slower at every key count.
-   *
-   * An update here touches one entry, while [[of]] rebuilds an immutable map, which is what pays
-   * off once keys are spread out. On a single hot key `ConcurrentHashMap` locks the bin while `Ref`
-   * does a lock-free compare and set, which is what costs.
+   * Which of the two is faster depends on how the keys are used, and neither wins everywhere. An
+   * update here touches one entry, while [[of]] rebuilds an immutable map, which pays off once keys
+   * are spread out. On a single hot key `ConcurrentHashMap` locks the bin while `Ref` does a
+   * lock-free compare and set.
    *
    * So prefer this one for high cardinality keys such as a session or request id, and [[of]] for a
-   * small set of keys that stay busy.
+   * small set of keys that stay busy. `SerialKeyBenchmark` measures both, see `benchmark/README.md`
+   * for the figures.
    *
    * Keys are compared by `hashCode` and `equals` rather than by a cats `Hash`.
    */

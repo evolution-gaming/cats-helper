@@ -6,20 +6,18 @@ import cats.syntax.all._
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
 
 /**
- * Cost of putting a keyed task through [[SerParQueue]], which orders against tasks of the same key.
+ * Cost of putting a keyless task through [[SerParQueue]], which orders against every other task.
  *
- * The keyless case has no key to vary, so it lives in [[SerParQueueKeylessBenchmark]] rather than
- * repeating once per `keys` value here.
+ * Separate from [[SerParQueueBenchmark]] because a keyless task has no key, so a `keys` parameter
+ * would only repeat the same measurement.
  *
- * One operation enqueues `tasksPerOp` tasks and awaits them all. Enqueueing a single task per
- * operation measures the handoff between the calling thread and the compute pool rather than the
- * queue, which on this workload swamps the result.
+ * One operation enqueues `tasksPerOp` tasks and awaits them all, for the reason given in
+ * [[SerParQueueBenchmark]].
  *
- * To run: {{{sbt "benchmark/Jmh/run com.evolutiongaming.catshelper.SerParQueueBenchmark"}}}
+ * To run: {{{sbt "benchmark/Jmh/run com.evolutiongaming.catshelper.SerParQueueKeylessBenchmark"}}}
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -27,10 +25,7 @@ import java.util.concurrent.TimeUnit
 @Fork(1)
 @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
-class SerParQueueBenchmark {
-
-  @Param(Array("1", "8", "64", "256", "1024"))
-  var keys: Int = 0
+class SerParQueueKeylessBenchmark {
 
   private val tasksPerOp = 64
 
@@ -46,11 +41,10 @@ class SerParQueueBenchmark {
 
   @Benchmark
   @Threads(8)
-  def keyed(hole: Blackhole): Unit = {
-    val random = ThreadLocalRandom.current()
+  def keyless(hole: Blackhole): Unit = {
     val result = List
-      .fill(tasksPerOp) { random.nextInt(keys) }
-      .traverse { key => queue(key.some) { IO.unit } }
+      .fill(tasksPerOp) { queue(none[Int]) { IO.unit } }
+      .sequence
       .flatMap { _.sequence_ }
     hole.consume(result.unsafeRunSync()(runtime))
   }
