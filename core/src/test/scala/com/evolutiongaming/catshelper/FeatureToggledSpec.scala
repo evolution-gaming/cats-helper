@@ -145,7 +145,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
       import s._, env._
 
       for {
-        _ <- access.use(_ => sleepUntil(gracePeriod + 1.minute)).start
+        holder <- access.use(_ => sleepUntil(gracePeriod + 1.minute)).start
 
         _ <- IO.sleep(1.nano)
         _ <- toggle(false)
@@ -158,6 +158,12 @@ class FeatureToggledSpec extends AnyFreeSpec {
         // And gets forcefully terminated after.
         _ <- sleepUntil(t + gracePeriod + 1.nano)
         _ <- events.map(_ shouldBe List(1, -1))
+
+        // A forcefully terminated client must still be able to finish its work.
+        _ <- holder.join.flatMap {
+          case Succeeded(_) => IO.unit
+          case other => fail(s"Expected outcome Succeeded but was $other")
+        }
       } yield ()
     }
 
