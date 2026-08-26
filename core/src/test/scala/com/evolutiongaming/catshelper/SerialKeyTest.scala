@@ -30,11 +30,11 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       val tasks = 200
       val result = for {
         serial <- serialKey
-        order <- Ref[IO].of(List.empty[Int])
-        awaits <- (1 to tasks).toList.traverse { index => serial("key") { order.update { index :: _ } } }
+        order <- Ref[IO].of(Vector.empty[Int])
+        awaits <- (1 to tasks).toList.traverse { index => serial("key") { order.update { _ :+ index } } }
         _ <- awaits.sequence_
         observed <- order.get
-        _ <- IO { observed.reverse shouldEqual (1 to tasks).toList }
+        _ <- IO { observed shouldEqual (1 to tasks).toVector }
       } yield {}
       result.run()
     }
