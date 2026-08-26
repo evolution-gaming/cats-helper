@@ -13,7 +13,6 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers._
 
 import scala.collection.immutable.Queue
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class FeatureToggledSpec extends AnyFreeSpec {
@@ -240,53 +239,40 @@ class FeatureToggledSpec extends AnyFreeSpec {
   }
 
   "race-conditions" - {
-    final class Env(
-      implicit
-      val ec: ExecutionContext,
-    )
-    val env = cats.effect.Resource {
-      IO {
-        val tp = java.util.concurrent.Executors.newFixedThreadPool(32)
-        val ec = scala.concurrent.ExecutionContext.fromExecutor(tp)
-        val env = new Env()(ec)
-        env -> IO { tp.shutdown() }
-      }
-    }
-
     "don't get stuck after multiple concurrent uses" in {
-      env
-        .use { _ =>
-          for {
-            seed <- Ref[IO].of(1)
-            flag <- Ref[IO].of(true)
-            _ <- FeatureToggled.polling(seed.get.toResource, flag.get, 1.milli).use { access =>
-              // Polling instead of sleeping for a fixed time: a loaded CI machine can need more than
-              // a few milliseconds to catch up, and that must not fail the test.
-              def awaitValue(expected: Option[Int]): IO[Unit] = {
-                access.use(IO.pure).flatMap {
-                  case value if value == expected => IO.unit
-                  case _ => IO.sleep(1.milli) *> awaitValue(expected)
-                }
-              }
+      val scenario = for {
+        seed <- Ref[IO].of(1)
+        flag <- Ref[IO].of(true)
 
-              for {
-                _ <- {
-                  val one = access.use(_ => IO.cede)
-                  val loop = List.fill(1000)(one).sequence_
-                  List.fill(8)(loop).parSequence_
-                }
-                _ <- flag.set(false)
-                _ <- awaitValue(None)
-
-                _ <- seed.set(2)
-                _ <- flag.set(true)
-                _ <- awaitValue(Some(2))
-              } yield ()
+        _ <- FeatureToggled.polling(seed.get.toResource, flag.get, 1.milli).use { access =>
+          // Polling instead of sleeping for a fixed time: a loaded CI machine can need more than
+          // a few milliseconds to catch up, and that must not fail the test.
+          def awaitValue(expected: Option[Int]): IO[Unit] = {
+            access.use(IO.pure).flatMap {
+              case value if value == expected => IO.unit
+              case _ => IO.sleep(1.milli) *> awaitValue(expected)
             }
+          }
+
+          for {
+            _ <- {
+              val one = access.use(_ => IO.cede)
+              val loop = List.fill(1000)(one).sequence_
+              List.fill(8)(loop).parSequence_
+            }
+
+            _ <- flag.set(false)
+            _ <- awaitValue(None)
+
+            _ <- seed.set(2)
+            _ <- flag.set(true)
+            _ <- awaitValue(Some(2))
           } yield ()
         }
-        // `unsafeRunTimed` reports a hang as `None` instead of failing, so the result must be checked.
-        .unsafeRunTimed(10.seconds) shouldBe Some(())
+      } yield ()
+
+      // `unsafeRunTimed` reports a hang as `None` instead of failing, so the result must be checked.
+      scenario.unsafeRunTimed(10.seconds) shouldBe Some(())
     }
 
     "never hand out a resource that is already being released" ignore {
