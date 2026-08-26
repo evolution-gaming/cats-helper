@@ -198,80 +198,86 @@ class FeatureToggledSpec extends AnyFreeSpec {
       } yield ()
     }
 
-    "expose the same resource again when the toggle goes back on while draining" ignore manualScope {
-      case (scope, access, toggle) =>
-        import scope._, env._
+    "expose the same resource again when the toggle goes back on while draining" in pendingUntilFixed {
+      manualScope {
+        case (scope, access, toggle) =>
+          import scope._, env._
 
-        for {
-          // Keeps the resource in use, so that the toggle-off starts draining instead of
-          // releasing the resource right away.
-          holder <- access.use(_ => sleepUntil(10.seconds)).start
+          for {
+            // Keeps the resource in use, so that the toggle-off starts draining instead of
+            // releasing the resource right away.
+            holder <- access.use(_ => sleepUntil(10.seconds)).start
 
-          _ <- IO.sleep(1.nano)
-          _ <- toggle(false)
-          _ <- IO.sleep(1.second)
-          _ <- toggle(true)
-          _ <- IO.sleep(1.nano)
+            _ <- IO.sleep(1.nano)
+            _ <- toggle(false)
+            _ <- IO.sleep(1.second)
+            _ <- toggle(true)
+            _ <- IO.sleep(1.nano)
 
-          // The resource was never released, so it must be available again.
-          _ <- access.use(IO.pure).map(_ shouldBe Some(1))
-          _ <- events.map(_ shouldBe List(1))
+            // The resource was never released, so it must be available again.
+            _ <- access.use(IO.pure).map(_ shouldBe Some(1))
+            _ <- events.map(_ shouldBe List(1))
 
-          _ <- holder.joinWithNever
-        } yield ()
+            _ <- holder.joinWithNever
+          } yield ()
+      }
     }
   }
 
   "failure handling" - {
-    "keep trying after the base resource fails to acquire" ignore ioTest { env =>
-      import env._
+    "keep trying after the base resource fails to acquire" in pendingUntilFixed {
+      ioTest { env =>
+        import env._
 
-      for {
-        attempts <- Ref[IO].of(0)
-        // The first attempt to bring the resource up fails, the following ones succeed.
-        resource = Resource.eval(attempts.updateAndGet(_ + 1)).flatMap {
-          case 1 => Resource.eval(IO.raiseError[Int](new RuntimeException("cannot acquire")))
-          case attempt => Resource.pure[IO, Int](attempt)
-        }
-        flag <- Ref[IO].of(true)
+        for {
+          attempts <- Ref[IO].of(0)
+          // The first attempt to bring the resource up fails, the following ones succeed.
+          resource = Resource.eval(attempts.updateAndGet(_ + 1)).flatMap {
+            case 1 => Resource.eval(IO.raiseError[Int](new RuntimeException("cannot acquire")))
+            case attempt => Resource.pure[IO, Int](attempt)
+          }
+          flag <- Ref[IO].of(true)
 
-        _ <- FeatureToggled.polling(resource, flag.get, 1.second).use { access =>
-          for {
-            // The very first poll fails to bring the resource up.
-            _ <- IO.sleep(1.nano)
-            _ <- access.use(IO.pure).map(_ shouldBe None)
+          _ <- FeatureToggled.polling(resource, flag.get, 1.second).use { access =>
+            for {
+              // The very first poll fails to bring the resource up.
+              _ <- IO.sleep(1.nano)
+              _ <- access.use(IO.pure).map(_ shouldBe None)
 
-            // The next poll must try again.
-            _ <- IO.sleep(1.second)
-            _ <- access.use(IO.pure).map(_ shouldBe Some(2))
-          } yield ()
-        }
-      } yield ()
+              // The next poll must try again.
+              _ <- IO.sleep(1.second)
+              _ <- access.use(IO.pure).map(_ shouldBe Some(2))
+            } yield ()
+          }
+        } yield ()
+      }
     }
 
-    "keep polling after a failed read of the flag" ignore ioTest { env =>
-      import env._
+    "keep polling after a failed read of the flag" in pendingUntilFixed {
+      ioTest { env =>
+        import env._
 
-      for {
-        reads <- Ref[IO].of(0)
-        // The first read of the flag fails, the following ones report "on".
-        enabled = reads.updateAndGet(_ + 1).flatMap {
-          case 1 => IO.raiseError[Boolean](new RuntimeException("cannot read the flag"))
-          case _ => IO.pure(true)
-        }
+        for {
+          reads <- Ref[IO].of(0)
+          // The first read of the flag fails, the following ones report "on".
+          enabled = reads.updateAndGet(_ + 1).flatMap {
+            case 1 => IO.raiseError[Boolean](new RuntimeException("cannot read the flag"))
+            case _ => IO.pure(true)
+          }
 
-        _ <- FeatureToggled.polling(Resource.pure[IO, Int](1), enabled, 1.second).use { access =>
-          for {
-            // Nothing to see yet: the only poll so far has failed.
-            _ <- IO.sleep(1.nano)
-            _ <- access.use(IO.pure).map(_ shouldBe None)
+          _ <- FeatureToggled.polling(Resource.pure[IO, Int](1), enabled, 1.second).use { access =>
+            for {
+              // Nothing to see yet: the only poll so far has failed.
+              _ <- IO.sleep(1.nano)
+              _ <- access.use(IO.pure).map(_ shouldBe None)
 
-            // A failed poll must not stop the polling.
-            _ <- IO.sleep(1.second)
-            _ <- access.use(IO.pure).map(_ shouldBe Some(1))
-          } yield ()
-        }
-      } yield ()
+              // A failed poll must not stop the polling.
+              _ <- IO.sleep(1.second)
+              _ <- access.use(IO.pure).map(_ shouldBe Some(1))
+            } yield ()
+          }
+        } yield ()
+      }
     }
   }
 
@@ -312,8 +318,9 @@ class FeatureToggledSpec extends AnyFreeSpec {
       scenario.unsafeRunTimed(10.seconds) shouldBe Some(())
     }
 
-    "never hand out a resource that is already being released" ignore {
+    "never hand out a resource that is already being released" in pendingUntilFixed {
       val rounds = 10000
+      val clientsPerRound = 4
 
       val scenario = for {
         toggleRef <- Deferred[IO, Boolean => IO[Unit]]
@@ -328,10 +335,13 @@ class FeatureToggledSpec extends AnyFreeSpec {
             case Some(alive) => IO.cede *> alive.get.map(_ shouldBe true)
             case None => IO.unit
           }
+          val clients = List.fill(clientsPerRound)(user).parSequence_
 
           toggleRef.get.flatMap { toggle =>
-            // A client and a toggle-off racing each other, over and over again.
-            List.fill(rounds)(toggle(true) *> (user, toggle(false)).parTupled.void).sequence_
+            /* Clients and a toggle-off racing each other, over and over again. Real threads are
+             * required here: a simulated scheduler always registers the client before it runs the
+             * toggle-off, so the gap this test aims at never opens. */
+            List.fill(rounds)(toggle(true) *> (clients, toggle(false)).parTupled.void).sequence_
           }
         }
       } yield ()
