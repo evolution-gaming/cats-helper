@@ -168,9 +168,7 @@ object SerialKey {
               task *> mapRef(key).modify {
                 case Some(KeyState.Pending(tasksChain)) =>
                   (KeyState.Running.some, tasksChain.asLeft[Unit])
-                case Some(KeyState.Running) =>
-                  (none, ().asRight[Task])
-                case None =>
+                case _ =>
                   (none, ().asRight[Task])
               }
             }

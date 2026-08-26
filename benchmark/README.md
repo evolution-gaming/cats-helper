@@ -13,7 +13,7 @@ sbt "benchmark/Jmh/run -prof gc SerialBenchmark.pipelined"                  # al
 duration, `-p name=value` pins a `@Param`, `-rf json -rff out.json` saves results. These override
 the annotations on the class.
 
-Each suite says in its own scaladoc what it measures and why.
+Each suite says in its own Scaladoc what it measures and why.
 
 ## Baseline
 
