@@ -260,6 +260,15 @@ class FeatureToggledSpec extends AnyFreeSpec {
             seed <- Ref[IO].of(1)
             flag <- Ref[IO].of(true)
             _ <- FeatureToggled.polling(seed.get.toResource, flag.get, 1.milli).use { access =>
+              // Polling instead of sleeping for a fixed time: a loaded CI machine can need more than
+              // a few milliseconds to catch up, and that must not fail the test.
+              def awaitValue(expected: Option[Int]): IO[Unit] = {
+                access.use(IO.pure).flatMap {
+                  case value if value == expected => IO.unit
+                  case _ => IO.sleep(1.milli) *> awaitValue(expected)
+                }
+              }
+
               for {
                 _ <- {
                   val one = access.use(_ => IO.cede)
@@ -267,11 +276,11 @@ class FeatureToggledSpec extends AnyFreeSpec {
                   List.fill(8)(loop).parSequence_
                 }
                 _ <- flag.set(false)
-                _ <- IO.sleep(100.millis)
+                _ <- awaitValue(None)
+
                 _ <- seed.set(2)
                 _ <- flag.set(true)
-                _ <- IO.sleep(10.millis)
-                _ <- access.use(i => IO { i shouldBe Some(2) })
+                _ <- awaitValue(Some(2))
               } yield ()
             }
           } yield ()
