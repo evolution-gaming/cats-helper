@@ -2,7 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.implicits._
 import cats.effect.kernel.Outcome.Succeeded
-import cats.effect.kernel.Ref
+import cats.effect.kernel.{Deferred, Ref}
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource, std}
 import cats.implicits._
@@ -92,6 +92,26 @@ class FeatureToggledSpec extends AnyFreeSpec {
       } yield ()
     }
 
+    /* Same as `localScope`, but hands the toggle function itself over to a test, so that the
+     * toggle can be flipped with no scheduling in between. */
+    def manualScope(body: LocalScope => IO[Unit]): Unit = scope { scope =>
+      import scope._, env._
+
+      for {
+        toggleRef <- Deferred[IO, Boolean => IO[Unit]]
+        ftr = FeatureToggled.of(baseResource, gracePeriod)(toggle => toggleRef.complete(toggle) *> IO.never)
+
+        _ <- ftr.use { access =>
+          for {
+            toggle <- toggleRef.get
+            _ <- toggle(true)
+            _ <- IO.sleep(1.nano)
+            _ <- body.apply((scope, access, toggle))
+          } yield ()
+        }
+      } yield ()
+    }
+
     "keeps resource alive while in use" in localScope { ls =>
       val (s, access, toggle) = ls
       import s._, env._
@@ -141,6 +161,82 @@ class FeatureToggledSpec extends AnyFreeSpec {
         _ <- events.map(_ shouldBe List(1, -1))
       } yield ()
     }
+
+    "expose the same resource again when the toggle goes back on while draining" ignore manualScope {
+      case (scope, access, toggle) =>
+        import scope._, env._
+
+        for {
+          // Keeps the resource in use, so that the toggle-off starts draining instead of
+          // releasing the resource right away.
+          holder <- access.use(_ => sleepUntil(10.seconds)).start
+
+          _ <- IO.sleep(1.nano)
+          _ <- toggle(false)
+          _ <- IO.sleep(1.second)
+          _ <- toggle(true)
+          _ <- IO.sleep(1.nano)
+
+          // The resource was never released, so it must be available again.
+          _ <- access.use(IO.pure).map(_ shouldBe Some(1))
+          _ <- events.map(_ shouldBe List(1))
+
+          _ <- holder.joinWithNever
+        } yield ()
+    }
+  }
+
+  "failure handling" - {
+    "keep trying after the base resource fails to acquire" ignore ioTest { env =>
+      import env._
+
+      for {
+        attempts <- Ref[IO].of(0)
+        // The first attempt to bring the resource up fails, the following ones succeed.
+        resource = Resource.eval(attempts.updateAndGet(_ + 1)).flatMap {
+          case 1 => Resource.eval(IO.raiseError[Int](new RuntimeException("cannot acquire")))
+          case n => Resource.pure[IO, Int](n)
+        }
+        flag <- Ref[IO].of(true)
+
+        _ <- FeatureToggled.polling(resource, flag.get, 1.second).use { access =>
+          for {
+            // The very first poll fails to bring the resource up.
+            _ <- IO.sleep(1.nano)
+            _ <- access.use(IO.pure).map(_ shouldBe None)
+
+            // The next poll must try again.
+            _ <- IO.sleep(1.second)
+            _ <- access.use(IO.pure).map(_ shouldBe Some(2))
+          } yield ()
+        }
+      } yield ()
+    }
+
+    "keep polling after a failed read of the flag" ignore ioTest { env =>
+      import env._
+
+      for {
+        reads <- Ref[IO].of(0)
+        // The first read of the flag fails, the following ones report "on".
+        enabled = reads.updateAndGet(_ + 1).flatMap {
+          case 1 => IO.raiseError[Boolean](new RuntimeException("cannot read the flag"))
+          case _ => IO.pure(true)
+        }
+
+        _ <- FeatureToggled.polling(Resource.pure[IO, Int](1), enabled, 1.second).use { access =>
+          for {
+            // Nothing to see yet: the only poll so far has failed.
+            _ <- IO.sleep(1.nano)
+            _ <- access.use(IO.pure).map(_ shouldBe None)
+
+            // A failed poll must not stop the polling.
+            _ <- IO.sleep(1.second)
+            _ <- access.use(IO.pure).map(_ shouldBe Some(1))
+          } yield ()
+        }
+      } yield ()
+    }
   }
 
   "race-conditions" - {
@@ -178,6 +274,33 @@ class FeatureToggledSpec extends AnyFreeSpec {
           } yield ()
         }
         .unsafeRunTimed(10.seconds)
+    }
+
+    "never hand out a resource that is already being released" ignore {
+      val rounds = 10000
+
+      val scenario = for {
+        toggleRef <- Deferred[IO, Boolean => IO[Unit]]
+        // The resource reports whether it is still alive.
+        resource = Resource.make(Ref[IO].of(true))(_.set(false))
+        ftr = FeatureToggled.of(resource, 1.minute)(toggle => toggleRef.complete(toggle) *> IO.never)
+
+        _ <- ftr.use { access =>
+          // A client that got the resource must be able to use it: the grace period is far from
+          // being over, so nobody is allowed to release it in the meantime.
+          val user = access.use {
+            case Some(alive) => IO.cede *> alive.get.map(_ shouldBe true)
+            case None => IO.unit
+          }
+
+          toggleRef.get.flatMap { toggle =>
+            // A client and a toggle-off racing each other, over and over again.
+            List.fill(rounds)(toggle(true) *> (user, toggle(false)).parTupled.void).sequence_
+          }
+        }
+      } yield ()
+
+      scenario.unsafeRunTimed(10.seconds)
     }
   }
 
