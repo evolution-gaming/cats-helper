@@ -167,6 +167,37 @@ class FeatureToggledSpec extends AnyFreeSpec {
       } yield ()
     }
 
+    "release of the outer resource waits for the users, but no longer than the grace period" in scope { scope =>
+      import scope._, env._
+
+      for {
+        toggleRef <- Deferred[IO, Boolean => IO[Unit]]
+        ftr = FeatureToggled.of(baseResource, gracePeriod)(toggle => toggleRef.complete(toggle) *> IO.never)
+        letGo <- Deferred[IO, Unit]
+
+        startedAt <- getTime
+        // The client outlives the outer resource on purpose: it is the only way to observe how
+        // long the release waits for the clients that are still around.
+        holder <- ftr.use { access =>
+          for {
+            toggle <- toggleRef.get
+            _ <- toggle(true)
+            _ <- IO.sleep(1.nano)
+            holder <- access.use(_ => letGo.get).start
+            _ <- IO.sleep(1.nano)
+          } yield holder
+        }
+        releasedAt <- getTime
+
+        // The resource is gone, and waiting for it took the whole grace period.
+        _ <- events.map(_ shouldBe List(1, -1))
+        _ = (releasedAt - startedAt) should be >= gracePeriod
+
+        _ <- letGo.complete(())
+        _ <- holder.joinWithNever
+      } yield ()
+    }
+
     "expose the same resource again when the toggle goes back on while draining" ignore manualScope {
       case (scope, access, toggle) =>
         import scope._, env._
