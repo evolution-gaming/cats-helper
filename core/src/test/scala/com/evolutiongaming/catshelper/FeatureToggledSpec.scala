@@ -285,7 +285,8 @@ class FeatureToggledSpec extends AnyFreeSpec {
             }
           } yield ()
         }
-        .unsafeRunTimed(10.seconds)
+        // `unsafeRunTimed` reports a hang as `None` instead of failing, so the result must be checked.
+        .unsafeRunTimed(10.seconds) shouldBe Some(())
     }
 
     "never hand out a resource that is already being released" ignore {
@@ -312,7 +313,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
         }
       } yield ()
 
-      scenario.unsafeRunTimed(10.seconds)
+      scenario.unsafeRunTimed(10.seconds) shouldBe Some(())
     }
   }
 
