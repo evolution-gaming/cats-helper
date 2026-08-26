@@ -18,53 +18,53 @@ import scala.concurrent.duration._
 class FeatureToggledSpec extends AnyFreeSpec {
   implicit val ioRuntime: IORuntime = IORuntime.global
 
-  "end-to-end polling" in scope { s =>
-    import s._, env._
+  "end-to-end polling" in scope { scope =>
+    import scope._, env._
 
-    val d = 10.seconds
+    val pollInterval = 10.seconds
     for {
       flag <- Ref[IO].of(false)
-      ftr = FeatureToggled.polling(baseResource, flag.get, d)
+      ftr = FeatureToggled.polling(baseResource, flag.get, pollInterval)
 
       _ <- ftr.use { access =>
         def expect(
           fetchResult: Option[Int],
-          es: List[Int],
+          expectedEvents: List[Int],
         )(implicit
           pos: Position,
         ): IO[Unit] = {
           // Polling events first to make sure they are independent from access
-          (events, access.use(IO.pure)).tupled.map(_ shouldBe ((es, fetchResult))).void
+          (events, access.use(IO.pure)).tupled.map(_ shouldBe ((expectedEvents, fetchResult))).void
         }
 
         for {
-          t0 <- getTime
+          startTime <- getTime
 
           // We started in "off" state so there nothing after the first poll.
-          _ <- sleepUntil(t0 + 1.nano)
+          _ <- sleepUntil(startTime + 1.nano)
           _ <- expect(None, List())
 
           // We're "on" but the poll is yet to come in 1 ns.
           _ <- flag.set(true)
-          _ <- sleepUntil(t0 + d - 1.nano)
+          _ <- sleepUntil(startTime + pollInterval - 1.nano)
           _ <- expect(None, List())
 
           // And after the poll we're up.
-          _ <- sleepUntil(t0 + d + 1.nano)
+          _ <- sleepUntil(startTime + pollInterval + 1.nano)
           _ <- expect(Some(1), List(1))
 
           // Still up after a few polls.
-          _ <- sleepUntil(t0 + d + d - 1.nano)
+          _ <- sleepUntil(startTime + pollInterval * 2 - 1.nano)
           _ <- expect(Some(1), List(1))
 
-          // Going down.
+          // Toggling off must release the resource on the next poll.
           _ <- flag.set(false)
-          _ <- sleepUntil(t0 + d + d + 1.nano)
+          _ <- sleepUntil(startTime + pollInterval * 2 + 1.nano)
           _ <- expect(None, List(1, -1))
 
-          // And up again.
+          // And up again, with a brand new resource.
           _ <- flag.set(true)
-          _ <- sleepUntil(t0 + d + d + d + 1.nano)
+          _ <- sleepUntil(startTime + pollInterval * 3 + 1.nano)
           _ <- expect(Some(2), List(1, -1, 2))
         } yield ()
       }
@@ -78,15 +78,15 @@ class FeatureToggledSpec extends AnyFreeSpec {
     val gracePeriod = 1.minute
     type LocalScope = (Scope, Resource[IO, Option[Int]], Boolean => IO[Unit])
 
-    def localScope(f: LocalScope => IO[Unit]): Unit = scope { s =>
-      import s._, env._
+    def localScope(body: LocalScope => IO[Unit]): Unit = scope { scope =>
+      import scope._, env._
 
       for {
         toggle <- std.Queue.bounded[IO, Boolean](1).flatTap(_.offer(true))
         ftr = FeatureToggled.of(baseResource, gracePeriod)(toggle.take.flatMap(_).foreverM)
 
         _ <- ftr.use { access =>
-          IO.sleep(1.nano) *> f((s, access, toggle.offer(_)))
+          IO.sleep(1.nano) *> body.apply((scope, access, toggle.offer(_)))
         }
       } yield ()
     }
@@ -111,60 +111,60 @@ class FeatureToggledSpec extends AnyFreeSpec {
       } yield ()
     }
 
-    "keeps resource alive while in use" in localScope { ls =>
-      val (s, access, toggle) = ls
-      import s._, env._
+    "keeps resource alive while in use" in localScope {
+      case (scope, access, toggle) =>
+        import scope._, env._
 
-      val targetTime = 1.second
-      for {
-        f1 <- access.use(_ => sleepUntil(targetTime) *> events).start
+        val targetTime = 1.second
+        for {
+          holder <- access.use(_ => sleepUntil(targetTime) *> events).start
 
-        _ <- IO.sleep(1.nano)
-        _ <- toggle(false)
+          _ <- IO.sleep(1.nano)
+          _ <- toggle(false)
 
-        // Resource must become immediately unavailable for new access.
-        _ <- IO.sleep(1.nano)
-        _ <- access.use(IO.pure).timeout(1.nano).map(_ shouldBe None)
+          // Resource must become immediately unavailable for new access.
+          _ <- IO.sleep(1.nano)
+          _ <- access.use(IO.pure).timeout(1.nano).map(_ shouldBe None)
 
-        // But must be still alive while it's in use.
-        _ <- sleepUntil(targetTime - 1.nano)
-        _ <- events.map(_ shouldBe List(1))
-        _ <- f1.join.flatMap {
-          case Succeeded(value) => value.map(_ shouldBe List(1))
-          case x => fail(s"Expected outcome Succeeded but was $x")
-        }
+          // But must be still alive while it's in use.
+          _ <- sleepUntil(targetTime - 1.nano)
+          _ <- events.map(_ shouldBe List(1))
+          _ <- holder.join.flatMap {
+            case Succeeded(value) => value.map(_ shouldBe List(1))
+            case other => fail(s"Expected outcome Succeeded but was $other")
+          }
 
-        // Finally it goes down as soon as there is no usages.
-        _ <- sleepUntil(targetTime + 1.nano)
-        _ <- events.map(_ shouldBe List(1, -1))
-      } yield ()
+          // Finally it goes down as soon as there is no usages.
+          _ <- sleepUntil(targetTime + 1.nano)
+          _ <- events.map(_ shouldBe List(1, -1))
+        } yield ()
     }
 
-    "terminate resource in-use after grace period" in localScope { ls =>
-      val (s, access, toggle) = ls
-      import s._, env._
+    "terminate resource in-use after grace period" in localScope {
+      case (scope, access, toggle) =>
+        import scope._, env._
 
-      for {
-        holder <- access.use(_ => sleepUntil(gracePeriod + 1.minute)).start
+        for {
+          holder <- access.use(_ => sleepUntil(gracePeriod + 1.minute)).start
 
-        _ <- IO.sleep(1.nano)
-        _ <- toggle(false)
+          _ <- IO.sleep(1.nano)
+          _ <- toggle(false)
 
-        // Resource in-use stays alive during grace period.
-        t <- getTime
-        _ <- sleepUntil(t + gracePeriod - 1.nano)
-        _ <- events.map(_ shouldBe List(1))
+          // Resource in-use stays alive during grace period.
+          toggledOffAt <- getTime
+          _ <- sleepUntil(toggledOffAt + gracePeriod - 1.nano)
+          _ <- events.map(_ shouldBe List(1))
 
-        // And gets forcefully terminated after.
-        _ <- sleepUntil(t + gracePeriod + 1.nano)
-        _ <- events.map(_ shouldBe List(1, -1))
+          // And gets forcefully terminated after.
+          _ <- sleepUntil(toggledOffAt + gracePeriod + 1.nano)
+          _ <- events.map(_ shouldBe List(1, -1))
 
-        // A forcefully terminated client must still be able to finish its work.
-        _ <- holder.join.flatMap {
-          case Succeeded(_) => IO.unit
-          case other => fail(s"Expected outcome Succeeded but was $other")
-        }
-      } yield ()
+          // A forcefully terminated client must still be able to finish its work.
+          _ <- holder.join.flatMap {
+            case Succeeded(_) => IO.unit
+            case other => fail(s"Expected outcome Succeeded but was $other")
+          }
+        } yield ()
     }
 
     "release of the outer resource waits for the users, but no longer than the grace period" in scope { scope =>
@@ -231,7 +231,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
         // The first attempt to bring the resource up fails, the following ones succeed.
         resource = Resource.eval(attempts.updateAndGet(_ + 1)).flatMap {
           case 1 => Resource.eval(IO.raiseError[Int](new RuntimeException("cannot acquire")))
-          case n => Resource.pure[IO, Int](n)
+          case attempt => Resource.pure[IO, Int](attempt)
         }
         flag <- Ref[IO].of(true)
 
@@ -293,9 +293,9 @@ class FeatureToggledSpec extends AnyFreeSpec {
 
           for {
             _ <- {
-              val one = access.use(_ => IO.cede)
-              val loop = List.fill(1000)(one).sequence_
-              List.fill(8)(loop).parSequence_
+              val useOnce = access.use(_ => IO.cede)
+              val sequentialUses = List.fill(1000)(useOnce).sequence_
+              List.fill(8)(sequentialUses).parSequence_
             }
 
             _ <- flag.set(false)
@@ -353,8 +353,8 @@ class FeatureToggledSpec extends AnyFreeSpec {
         counter <- Ref[IO].of(0)
         events <- Ref[IO].of(Queue.empty[Int])
         resource = Resource[IO, Int] {
-          val init = counter.modify(i => (i + 1, i + 1)).flatTap(i => events.update(_ enqueue i))
-          init.map(i => i -> events.update(_ enqueue -i))
+          val init = counter.modify(count => (count + 1, count + 1)).flatTap(count => events.update(_ enqueue count))
+          init.map(count => count -> events.update(_ enqueue -count))
         }
         _ <- body(Scope(env, resource, events.get.map(_.toList)))
       } yield ()
@@ -363,12 +363,12 @@ class FeatureToggledSpec extends AnyFreeSpec {
 
   private def getTime(
     implicit
-    rt: TestRuntime[IO],
-  ) = rt.getTimeSinceStart
+    testRuntime: TestRuntime[IO],
+  ) = testRuntime.getTimeSinceStart
 
   private def sleepUntil(
-    dt: FiniteDuration,
+    deadline: FiniteDuration,
   )(implicit
-    rt: TestRuntime[IO],
-  ) = rt.sleepUntil(dt)
+    testRuntime: TestRuntime[IO],
+  ) = testRuntime.sleepUntil(deadline)
 }
