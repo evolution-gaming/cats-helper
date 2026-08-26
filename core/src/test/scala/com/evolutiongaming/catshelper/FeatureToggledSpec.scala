@@ -259,18 +259,21 @@ class FeatureToggledSpec extends AnyFreeSpec {
           for {
             seed <- Ref[IO].of(1)
             flag <- Ref[IO].of(true)
-            r <- FeatureToggled.polling(seed.get.toResource, flag.get, 1.milli).allocated.map(_._1)
-            _ <- {
-              val one = r.use(_ => IO.cede)
-              val loop = List.fill(1000)(one).sequence_
-              List.fill(8)(loop).parSequence_
+            _ <- FeatureToggled.polling(seed.get.toResource, flag.get, 1.milli).use { access =>
+              for {
+                _ <- {
+                  val one = access.use(_ => IO.cede)
+                  val loop = List.fill(1000)(one).sequence_
+                  List.fill(8)(loop).parSequence_
+                }
+                _ <- flag.set(false)
+                _ <- IO.sleep(100.millis)
+                _ <- seed.set(2)
+                _ <- flag.set(true)
+                _ <- IO.sleep(10.millis)
+                _ <- access.use(i => IO { i shouldBe Some(2) })
+              } yield ()
             }
-            _ <- flag.set(false)
-            _ <- IO.sleep(100.millis)
-            _ <- seed.set(2)
-            _ <- flag.set(true)
-            _ <- IO.sleep(10.millis)
-            _ <- r.use(i => IO { i shouldBe Some(2) })
           } yield ()
         }
         .unsafeRunTimed(10.seconds)
