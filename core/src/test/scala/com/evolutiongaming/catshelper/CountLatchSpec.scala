@@ -2,6 +2,7 @@ package com.evolutiongaming.catshelper
 
 import cats.effect.IO
 import cats.effect.std.Queue
+import cats.effect.testkit.TestControl
 import cats.effect.unsafe.IORuntime
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -21,7 +22,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
     } yield {
       done shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
   test("init with 1") {
@@ -34,7 +35,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       blocked shouldBe true
       done shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
   test("init with 0 and acquire") {
@@ -50,7 +51,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       blocked shouldBe true
       done1 shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
   test("init with 1 and acquire") {
@@ -67,7 +68,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       blocked1 shouldBe true
       done shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
   test("init with 0 and acquire 2") {
@@ -84,7 +85,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       done0 shouldBe true
       done1 shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
   test("ignore acquire -2") {
@@ -97,7 +98,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       done0 shouldBe true
       done1 shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
   test("concurrent acquire & release") {
@@ -115,7 +116,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
     } yield {
       done shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
 }
