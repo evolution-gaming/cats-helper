@@ -1,4 +1,5 @@
 import Dependencies.*
+import com.typesafe.tools.mima.core.*
 import sbtversionpolicy.Compatibility.BinaryCompatible
 
 def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
