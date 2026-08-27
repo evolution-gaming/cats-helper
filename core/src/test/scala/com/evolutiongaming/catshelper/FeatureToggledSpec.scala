@@ -18,6 +18,8 @@ import scala.concurrent.duration._
 class FeatureToggledSpec extends AnyFreeSpec {
   implicit val ioRuntime: IORuntime = IORuntime.global
 
+  private val issueUrl = "https://github.com/evolution-gaming/cats-helper/issues"
+
   "end-to-end polling" in scope { scope =>
     import scope._, env._
 
@@ -198,7 +200,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
       } yield ()
     }
 
-    "expose the same resource again when the toggle goes back on while draining" in pendingUntilFixed {
+    s"expose the same resource again when the toggle goes back on while draining ($issueUrl/417)" in pendingUntilFixed {
       manualScope {
         case (scope, access, toggle) =>
           import scope._, env._
@@ -234,7 +236,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
       case Right(None) => fail("the failure was swallowed: no error and no resource")
     }
 
-    "don't swallow a failure to acquire the base resource" in pendingUntilFixed {
+    s"don't swallow a failure to acquire the base resource ($issueUrl/418)" in pendingUntilFixed {
       ioTest { env =>
         import env._
 
@@ -261,7 +263,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
       }
     }
 
-    "don't swallow a failure to read the flag" in pendingUntilFixed {
+    s"don't swallow a failure to read the flag ($issueUrl/419)" in pendingUntilFixed {
       ioTest { env =>
         import env._
 
@@ -325,7 +327,7 @@ class FeatureToggledSpec extends AnyFreeSpec {
       scenario.unsafeRunTimed(10.seconds) shouldBe Some(())
     }
 
-    "never hand out a resource that is already being released" in pendingUntilFixed {
+    s"never hand out a resource that is already being released ($issueUrl/416)" in pendingUntilFixed {
       val rounds = 10000
       val clientsPerRound = 4
 
