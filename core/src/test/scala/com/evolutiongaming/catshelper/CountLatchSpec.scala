@@ -114,7 +114,7 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
       blocked1 shouldBe true
       done shouldBe true
     }
-    io.unsafeRunSync()
+    TestControl.executeEmbed(io).unsafeRunSync()
   }
 
   test("concurrent acquire & release") {
