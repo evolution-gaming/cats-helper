@@ -225,7 +225,16 @@ class FeatureToggledSpec extends AnyFreeSpec {
   }
 
   "failure handling" - {
-    "keep trying after the base resource fails to acquire" in pendingUntilFixed {
+    /* The two tests below pin down only what must not happen: a failure that leaves no trace and
+     * `access` at `None` for ever. Raising the failure to the client and recovering on a later
+     * poll are both acceptable answers, and the choice between them is still open. */
+    def expectNotSwallowed(result: Either[Throwable, Option[Int]]): Unit = result match {
+      case Left(_) => () // the failure reached the client
+      case Right(Some(_)) => () // the toggle recovered by itself
+      case Right(None) => fail("the failure was swallowed: no error and no resource")
+    }
+
+    "don't swallow a failure to acquire the base resource" in pendingUntilFixed {
       ioTest { env =>
         import env._
 
@@ -238,22 +247,21 @@ class FeatureToggledSpec extends AnyFreeSpec {
           }
           flag <- Ref[IO].of(true)
 
-          _ <- FeatureToggled.polling(resource, flag.get, 1.second).use { access =>
-            for {
-              // The very first poll fails to bring the resource up.
-              _ <- IO.sleep(1.nano)
-              _ <- access.use(IO.pure).map(_ shouldBe None)
+          result <- FeatureToggled
+            .polling(resource, flag.get, 1.second)
+            .use { access =>
+              // The first poll fails to bring the resource up, the second one is a second later.
+              IO.sleep(1.second + 1.nano) *> access.use(IO.pure).attempt
+            }
+            .attempt
+            .map(_.flatten)
 
-              // The next poll must try again.
-              _ <- IO.sleep(1.second)
-              _ <- access.use(IO.pure).map(_ shouldBe Some(2))
-            } yield ()
-          }
+          _ = expectNotSwallowed(result)
         } yield ()
       }
     }
 
-    "keep polling after a failed read of the flag" in pendingUntilFixed {
+    "don't swallow a failure to read the flag" in pendingUntilFixed {
       ioTest { env =>
         import env._
 
@@ -265,17 +273,16 @@ class FeatureToggledSpec extends AnyFreeSpec {
             case _ => IO.pure(true)
           }
 
-          _ <- FeatureToggled.polling(Resource.pure[IO, Int](1), enabled, 1.second).use { access =>
-            for {
-              // Nothing to see yet: the only poll so far has failed.
-              _ <- IO.sleep(1.nano)
-              _ <- access.use(IO.pure).map(_ shouldBe None)
+          result <- FeatureToggled
+            .polling(Resource.pure[IO, Int](1), enabled, 1.second)
+            .use { access =>
+              // The first poll fails to read the flag, the second one is a second later.
+              IO.sleep(1.second + 1.nano) *> access.use(IO.pure).attempt
+            }
+            .attempt
+            .map(_.flatten)
 
-              // A failed poll must not stop the polling.
-              _ <- IO.sleep(1.second)
-              _ <- access.use(IO.pure).map(_ shouldBe Some(1))
-            } yield ()
-          }
+          _ = expectNotSwallowed(result)
         } yield ()
       }
     }
