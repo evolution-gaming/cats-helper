@@ -77,8 +77,7 @@ object CountLatch {
       val F = Async[F]
 
       override def acquire(n: Int): F[Unit] =
-        if (n < 1) F.unit
-        else
+        F.whenA(n >= 1) {
           state.access
             .flatMap {
               case (state, set) =>
@@ -93,17 +92,18 @@ object CountLatch {
             .iterateUntil(identity)
             .void
             .uncancelable
+        }
 
       override def release(n: Int): F[Unit] =
-        state
-          .modify {
-            case Done => Done -> F.unit
-            case Awaiting(l, await) =>
-              if (l > n) Awaiting(l - n, await) -> F.unit
-              else Done -> await.complete(()).void
-          }
-          .flatten
-          .uncancelable
+        F.whenA(n >= 1) {
+          state
+            .flatModify {
+              case Done => Done -> F.unit
+              case Awaiting(l, await) =>
+                if (l > n) Awaiting(l - n, await) -> F.unit
+                else Done -> await.complete(()).void
+            }
+        }
 
       override def await(): F[Unit] =
         state.get.flatMap {
