@@ -101,6 +101,22 @@ class CountLatchSpec extends AnyFunSuite with Matchers {
     TestControl.executeEmbed(io).unsafeRunSync()
   }
 
+  test("ignore release -2") {
+    val io = for {
+      latch <- CountLatch[IO](1)
+      blocked0 <- latch.blocked
+      _ <- latch.release(-2)
+      blocked1 <- latch.blocked
+      _ <- latch.release()
+      done <- latch.done
+    } yield {
+      blocked0 shouldBe true
+      blocked1 shouldBe true
+      done shouldBe true
+    }
+    io.unsafeRunSync()
+  }
+
   test("concurrent acquire & release") {
     val times = 100
     val io = for {
