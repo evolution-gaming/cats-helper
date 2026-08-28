@@ -1,7 +1,8 @@
 package com.evolutiongaming.catshelper
 
 import cats.Parallel
-import cats.effect.kernel.{Deferred, Ref}
+import cats.effect.kernel.Async
+import cats.effect.kernel.{Deferred, Outcome, Ref}
 import cats.effect.syntax.all._
 import cats.effect.{Clock, Concurrent, IO, Sync, Temporal}
 import cats.syntax.all._
@@ -12,7 +13,6 @@ import org.scalatest.matchers.should.Matchers
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
-import cats.effect.kernel.Async
 
 class SerParQueueTest extends AsyncFunSuite with Matchers {
   import SerParQueueTest._
@@ -21,17 +21,17 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
 
   test("run in parallel for different keys & serially for same") {
     val result = for {
-      q  <- Queue.of[IO, String, Int]
+      q <- Queue.of[IO, String, Int]
       da <- Deferred[IO, Int]
-      _  <- q.start("a".some) { da.get }
-      a  <- q("a".some) { 1.pure[IO] }
+      _ <- q.start("a".some) { da.get }
+      a <- q("a".some) { 1.pure[IO] }
 
       db <- Deferred[IO, Int]
-      _  <- q.start("b".some) { db.get }
-      b  <- q("b".some) { 1.pure[IO] }
-      _  <- db.complete(0)
-      b  <- b
-      _  <- IO { b shouldEqual 1 }
+      _ <- q.start("b".some) { db.get }
+      b <- q("b".some) { 1.pure[IO] }
+      _ <- db.complete(0)
+      b <- b
+      _ <- IO { b shouldEqual 1 }
 
       _ <- da.complete(0)
       a <- a
@@ -47,8 +47,8 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
 
   test("run in parallel keyfull in between of keyless") {
     val result = for {
-      q   <- Queue.of[IO, String, Int]
-      da  <- Deferred[IO, Int]
+      q <- Queue.of[IO, String, Int]
+      da <- Deferred[IO, Int]
       db0 <- Deferred[IO, Unit]
       db1 <- Deferred[IO, Int]
       dc0 <- Deferred[IO, Unit]
@@ -84,31 +84,31 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
 
   test("run mixed") {
     val result = for {
-      q  <- Queue.of[IO, String, Int]
+      q <- Queue.of[IO, String, Int]
       d0 <- Deferred[IO, Int]
-      _  <- q("a".some) { d0.get }
-      _  <- q("b".some) { 0.pure[IO] }
-      _  <- q("b".some) { 1.pure[IO] }
-      _  <- q("c".some) { 0.pure[IO] }
-      _  <- q("c".some) { 1.pure[IO] }
-      _  <- q("a".some) { 1.pure[IO] }
-      _  <- q(none) { 0.pure[IO] }
-      _  <- q(none) { 1.pure[IO] }
-      _  <- q("b".some) { 2.pure[IO] }
-      b  <- q("b".some) { 3.pure[IO] }
-      _  <- q("c".some) { 2.pure[IO] }
-      c  <- q("c".some) { 3.pure[IO] }
+      _ <- q("a".some) { d0.get }
+      _ <- q("b".some) { 0.pure[IO] }
+      _ <- q("b".some) { 1.pure[IO] }
+      _ <- q("c".some) { 0.pure[IO] }
+      _ <- q("c".some) { 1.pure[IO] }
+      _ <- q("a".some) { 1.pure[IO] }
+      _ <- q(none) { 0.pure[IO] }
+      _ <- q(none) { 1.pure[IO] }
+      _ <- q("b".some) { 2.pure[IO] }
+      b <- q("b".some) { 3.pure[IO] }
+      _ <- q("c".some) { 2.pure[IO] }
+      c <- q("c".some) { 3.pure[IO] }
 
-      _  <- d0.complete(0)
-      _  <- b
-      _  <- c
+      _ <- d0.complete(0)
+      _ <- b
+      _ <- c
       rs <- q.records
       _ <- IO {
         rs shouldEqual List(
           Record.par(("a", List(0, 1)), ("b", List(0, 1)), ("c", List(0, 1))),
           Record.ser(0),
           Record.ser(1),
-          Record.par(("b", List(2, 3)), ("c", List(2, 3)))
+          Record.par(("b", List(2, 3)), ("c", List(2, 3))),
         )
       }
     } yield {}
@@ -127,9 +127,28 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     result.run()
   }
 
+  // Ignored: a canceled task wedges the queue for good. Both fixes considered so far cost more
+  // than the defect, see https://github.com/evolution-gaming/cats-helper/issues/404
+  ignore("advance the queue after a task cancels") {
+    val result = List(none[Int], 0.some).traverse_ { key =>
+      for {
+        queue <- SerParQueue.of[IO, Int]
+        canceled <- queue(key)(IO.canceled)
+        next <- queue(key)(IO.pure(1))
+        value <- next
+        _ = value shouldEqual 1
+        fiber <- canceled.start
+        outcome <- fiber.join
+        _ = outcome should matchPattern { case Outcome.Canceled() => }
+      } yield {}
+    }
+
+    result.run()
+  }
+
   test("run many") {
     val tasks = 1000
-    val keys  = 10
+    val keys = 10
 
     val duration = {
       val ms = Clock[IO].monotonic.map(_.toMillis)
@@ -138,9 +157,9 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
 
     val result = for {
       logOf <- LogOf.slf4j[IO]
-      log   <- logOf(SerParQueueTest.getClass)
-      q     <- SerParQueue.of[IO, Int]
-      d     <- duration
+      log <- logOf(SerParQueueTest.getClass)
+      q <- SerParQueue.of[IO, Int]
+      d <- duration
       a <- 0
         .iterateForeverM { a =>
           for {
@@ -168,7 +187,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
             }
         }
       d <- d
-      _ <- IO { log.info(s"took ${d.toMillis}ms for $keys parallel streams with $tasks each") }
+      _ <- IO { log.info(s"took ${ d.toMillis }ms for $keys parallel streams with $tasks each") }
       _ <- IO { a.distinct shouldEqual List(tasks) }
     } yield {}
     result.run(1.minute)
@@ -185,7 +204,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key, "a")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key, "a")) }
+        _ <- IO { rs shouldEqual List(Record(key, "a")) }
       } yield {}
       result.run()
     }
@@ -201,7 +220,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { a shouldEqual error.asLeft }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key, "a")) }
+        _ <- IO { rs shouldEqual List(Record(key, "a")) }
       } yield {}
       result.run()
     }
@@ -223,7 +242,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key, "b")) }
+        _ <- IO { rs shouldEqual List(Record(key, "b")) }
       } yield {}
       result.run()
     }
@@ -239,7 +258,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key, "a")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key, "a")) }
+        _ <- IO { rs shouldEqual List(Record(key, "a")) }
       } yield {}
       result.run()
     }
@@ -247,7 +266,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     test(s"$key: start, add, add, finish, fail, run") {
       val expected = key match {
         case Some(key) => List(Record.par((key, List("a", "c"))))
-        case None      => List(Record.ser("a"), Record.ser("c"))
+        case None => List(Record.ser("a"), Record.ser("c"))
       }
       val result = for {
         q <- Queue.of[IO, Int, String]
@@ -270,7 +289,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -278,7 +297,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     test(s"$key: run, run") {
       val expected = key match {
         case Some(key) => List(Record.par((key, List("a", "b"))))
-        case None      => List(Record.ser("a"), Record.ser("b"))
+        case None => List(Record.ser("a"), Record.ser("b"))
       }
       val result = for {
         q <- Queue.of[IO, Int, String]
@@ -287,7 +306,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key, "b")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -295,7 +314,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     test(s"$key: add, add, run, run") {
       val expected = key match {
         case Some(key) => List(Record.par((key, List("a", "b"))))
-        case None      => List(Record.ser("a"), Record.ser("b"))
+        case None => List(Record.ser("a"), Record.ser("b"))
       }
       val result = for {
         q <- Queue.of[IO, Int, String]
@@ -313,7 +332,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -321,7 +340,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     test(s"$key: start, add, finish, run") {
       val expected = key match {
         case Some(key) => List(Record.par((key, List("a", "b"))))
-        case None      => List(Record.ser("a"), Record.ser("b"))
+        case None => List(Record.ser("a"), Record.ser("b"))
       }
       val result = for {
         q <- Queue.of[IO, Int, String]
@@ -340,7 +359,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -348,7 +367,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     test(s"$key: add, add, add, run, run, run") {
       val expected = key match {
         case Some(key) => List(Record.par((key, List("a", "b", "c"))))
-        case None      => List(Record.ser("a"), Record.ser("b"), Record.ser("c"))
+        case None => List(Record.ser("a"), Record.ser("b"), Record.ser("c"))
       }
 
       val result = for {
@@ -373,7 +392,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -381,7 +400,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
     test(s"$key: start, add, add, finish, run, run") {
       val expected = key match {
         case Some(key) => List(Record.par((key, List("a", "b", "c"))))
-        case None      => List(Record.ser("a"), Record.ser("b"), Record.ser("c"))
+        case None => List(Record.ser("a"), Record.ser("b"), Record.ser("c"))
       }
 
       val result = for {
@@ -402,7 +421,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -420,7 +439,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key1, "b")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b")) }
+        _ <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b")) }
       } yield {}
       result.run()
     }
@@ -443,7 +462,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b")) }
+        _ <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b")) }
       } yield {}
       result.run()
     }
@@ -466,7 +485,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { b shouldEqual "b" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b")) }
+        _ <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b")) }
       } yield {}
       result.run()
     }
@@ -475,7 +494,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         val records = key1 match {
           case Some(key) => Record.par((key, List("b", "c"))) :: Nil
-          case None      => Record.ser("b") :: Record.ser("c") :: Nil
+          case None => Record.ser("b") :: Record.ser("c") :: Nil
         }
         Record(key0, "a") :: records
       }
@@ -487,7 +506,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key1, "c")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -496,7 +515,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         val records = key1 match {
           case Some(key) => Record.par((key, List("b", "c"))) :: Nil
-          case None      => Record.ser("b") :: Record.ser("c") :: Nil
+          case None => Record.ser("b") :: Record.ser("c") :: Nil
         }
         Record(key0, "a") :: records
       }
@@ -523,7 +542,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -533,7 +552,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         val records = key1 match {
           case Some(key) => Record.par((key, List("b", "c"))) :: Nil
-          case None      => Record.ser("b") :: Record.ser("c") :: Nil
+          case None => Record.ser("b") :: Record.ser("c") :: Nil
         }
         Record(key0, "a") :: records
       }
@@ -561,7 +580,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -570,7 +589,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         val records = key0 match {
           case Some(key) => Record.par((key, List("a", "b"))) :: Nil
-          case None      => Record.ser("a") :: Record.ser("b") :: Nil
+          case None => Record.ser("a") :: Record.ser("b") :: Nil
         }
         records :+ Record(key1, "c")
       }
@@ -582,7 +601,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key1, "c")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -591,7 +610,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         val records = key0 match {
           case Some(key) => Record.par((key, List("a", "b"))) :: Nil
-          case None      => Record.ser("a") :: Record.ser("b") :: Nil
+          case None => Record.ser("a") :: Record.ser("b") :: Nil
         }
         records :+ Record(key1, "c")
       }
@@ -618,7 +637,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -628,7 +647,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         val records = key0 match {
           case Some(key) => Record.par((key, List("a", "b"))) :: Nil
-          case None      => Record.ser("a") :: Record.ser("b") :: Nil
+          case None => Record.ser("a") :: Record.ser("b") :: Nil
         }
         records :+ Record(key1, "c")
       }
@@ -656,7 +675,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -685,7 +704,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b"), Record(key0, "c")) }
+        _ <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b"), Record(key0, "c")) }
       } yield {}
       result.run()
     }
@@ -714,7 +733,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { c shouldEqual "c" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b"), Record(key0, "c")) }
+        _ <- IO { rs shouldEqual List(Record(key0, "a"), Record(key1, "b"), Record(key0, "c")) }
       } yield {}
       result.run()
     }
@@ -723,7 +742,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         def records(key: Option[Int], values: String*) = key match {
           case Some(key) => Record.par((key, values.toList)) :: Nil
-          case None      => values.toList.map { value => Record.ser(value) }
+          case None => values.toList.map { value => Record.ser(value) }
         }
         records(key0, "a", "b", "c") ++ records(key1, "d", "e", "f") ++ records(key0, "g", "h", "i")
       }
@@ -744,7 +763,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- q.run(key0, "i")
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -753,7 +772,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         def records(key: Option[Int], values: String*) = key match {
           case Some(key) => Record.par((key, values.toList)) :: Nil
-          case None      => values.toList.map { value => Record.ser(value) }
+          case None => values.toList.map { value => Record.ser(value) }
         }
         records(key0, "a", "b", "c") ++ records(key1, "d", "e", "f") ++ records(key0, "g", "h", "i")
       }
@@ -789,7 +808,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { i shouldEqual "i" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -798,7 +817,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       val expected = {
         def records(key: Option[Int], values: String*) = key match {
           case Some(key) => Record.par((key, values.toList)) :: Nil
-          case None      => values.toList.map { value => Record.ser(value) }
+          case None => values.toList.map { value => Record.ser(value) }
         }
         records(key0, "a", "b", "c") ++ records(key1, "d", "e", "f") ++ records(key0, "g", "h", "i")
       }
@@ -834,7 +853,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
         _ <- IO { i shouldEqual "i" }
 
         rs <- q.records
-        _  <- IO { rs shouldEqual expected }
+        _ <- IO { rs shouldEqual expected }
       } yield {}
       result.run()
     }
@@ -907,7 +926,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
             _ <- q.run(key3, "d")
 
             rs <- q.records
-            _  <- IO { rs shouldEqual expected }
+            _ <- IO { rs shouldEqual expected }
           } yield {}
           result.run()
         }
@@ -939,7 +958,7 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
             _ <- IO { e shouldEqual "d" }
 
             rs <- q.records
-            _  <- IO { rs shouldEqual expected }
+            _ <- IO { rs shouldEqual expected }
           } yield {}
           result.run()
         }
@@ -971,11 +990,11 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
             _ <- IO { e shouldEqual "d" }
 
             rs <- q.records
-            _  <- IO { rs shouldEqual expected }
+            _ <- IO { rs shouldEqual expected }
           } yield {}
           result.run()
         }
-    }
+    },
   )
 
   test("par, ser, par") {
@@ -986,10 +1005,10 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       q <- Queue.of[IO, Int, String]
 
       d0 <- Deferred[IO, String]
-      _  <- q.start(none) { d0.get }
+      _ <- q.start(none) { d0.get }
 
       d1 <- Deferred[IO, String]
-      b  <- q(0.some) { d1.get }
+      b <- q(0.some) { d1.get }
 
       c <- q(1.some) { "c".pure[IO] }
 
@@ -1010,14 +1029,17 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
       _ <- IO { e shouldEqual "e" }
 
       rs <- q.records
-      _  <- IO { rs shouldEqual expected }
+      _ <- IO { rs shouldEqual expected }
     } yield {}
     result.run()
   }
 
   private implicit class Ops[F[_], A](val self: F[A]) {
 
-    def unfinished(implicit async: Async[F]): F[Unit] = {
+    def unfinished(
+      implicit
+      async: Async[F],
+    ): F[Unit] = {
       for {
         a <- self.timeout(10.millis).attempt
         _ <- Sync[F].delay { a should matchPattern { case Left(_: TimeoutException) => () } }
@@ -1027,7 +1049,12 @@ class SerParQueueTest extends AsyncFunSuite with Matchers {
 
   private implicit class QueueOps[F[_], K, A](val self: Queue[F, K, A]) {
 
-    def run(key: Option[K], a: A)(implicit F: Sync[F]): F[A] = {
+    def run(
+      key: Option[K],
+      a: A,
+    )(implicit
+      F: Sync[F],
+    ): F[A] = {
       for {
         b <- self(key) { a.pure[F] }
         b <- b
@@ -1045,7 +1072,7 @@ object SerParQueueTest {
 
     def apply[K, V](key: Option[K], value: V): Record[K, V] = key match {
       case Some(key) => par((key, List(value)))
-      case None      => ser(value)
+      case None => ser(value)
     }
 
     def par[K, V](values: (K, List[V])*): Record[K, V] = Par(Map(values: _*))
@@ -1078,9 +1105,10 @@ object SerParQueueTest {
               } { key =>
                 ref.update {
                   case (r: Record.Par[K, V]) :: rs =>
-                    val values = value :: r
-                      .values
-                      .getOrElse(key, List.empty)
+                    val values = value ::
+                      r
+                        .values
+                        .getOrElse(key, List.empty)
                     val map = r
                       .values
                       .updated(key, values)
@@ -1097,7 +1125,7 @@ object SerParQueueTest {
                 .map { records =>
                   records.foldLeft(List.empty[Record[K, V]]) {
                     case (as, a: Record.Ser[V]) => a :: as
-                    case (as, Record.Par(vs))   => Record.Par(vs.map { case (k, v) => k -> v.reverse }) :: as
+                    case (as, Record.Par(vs)) => Record.Par(vs.map { case (k, v) => k -> v.reverse }) :: as
                   }
                 }
             }
@@ -1117,7 +1145,7 @@ object SerParQueueTest {
 
     def of[F[_]: Async: Parallel, K, A]: F[Queue[F, K, A]] = {
       for {
-        queue    <- SerParQueue.of[F, K]
+        queue <- SerParQueue.of[F, K]
         records0 <- Records.of[F, K, A]
       } yield {
         new Queue[F, K, A] {
@@ -1131,7 +1159,13 @@ object SerParQueueTest {
 
     implicit class QueueOpsSerParQueueTest[F[_], K, A](val self: Queue[F, K, A]) extends AnyVal {
 
-      def start(key: Option[K])(task: F[A])(implicit F: Concurrent[F]): F[F[A]] = {
+      def start(
+        key: Option[K],
+      )(
+        task: F[A],
+      )(implicit
+        F: Concurrent[F],
+      ): F[F[A]] = {
         for {
           d <- Deferred[F, Unit]
           a <- self(key) { d.complete(()) *> task }

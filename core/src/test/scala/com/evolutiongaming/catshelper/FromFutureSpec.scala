@@ -3,21 +3,21 @@ package com.evolutiongaming.catshelper
 import cats.effect.{IO, Sync}
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
 import scala.util.control.NoStackTrace
-import org.scalatest.funsuite.AsyncFunSuite
-import org.scalatest.matchers.should.Matchers
 
 class FromFutureSpec extends AsyncFunSuite with Matchers {
 
   for {
     (name, future, expected) <- List(
-      ("successful completed", () => Future.successful(()),  ().asRight[Throwable]),
-      ("successful running",   () => Future { () },          ().asRight[Throwable]),
-      ("failed completed",     () => Future.failed(Error),   Error.asLeft[Unit]),
-      ("failed running",       () => Future { throw Error }, Error.asLeft[Unit]),
-      ("failed to return",     () => throw Error,            Error.asLeft[Unit]),
+      ("successful completed", () => Future.successful(()), ().asRight[Throwable]),
+      ("successful running", () => Future { () }, ().asRight[Throwable]),
+      ("failed completed", () => Future.failed(Error), Error.asLeft[Unit]),
+      ("failed running", () => Future { throw Error }, Error.asLeft[Unit]),
+      ("failed to return", () => throw Error, Error.asLeft[Unit]),
     )
   } yield {
     test(name) {
@@ -25,9 +25,9 @@ class FromFutureSpec extends AsyncFunSuite with Matchers {
     }
   }
 
-  private def testF[F[_] : Sync : FromFuture](
+  private def testF[F[_]: Sync: FromFuture](
     future: () => Future[Unit],
-    expected: Either[Throwable, Unit]
+    expected: Either[Throwable, Unit],
   ) = {
     val fa = FromFuture.defer[F](future())
     for {

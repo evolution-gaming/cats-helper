@@ -17,9 +17,7 @@ class ResourceCounterSpec extends AnyFreeSpec with Matchers {
     for {
       allocations <- Ref.of[IO, Int](0)
       releases <- Ref.of[IO, Int](0)
-      source = Resource.make[IO, Unit](allocations.update(_ + 1))(
-        _ => releases.update(_ + 1)
-      )
+      source = Resource.make[IO, Unit](allocations.update(_ + 1))(_ => releases.update(_ + 1))
 
       counter <- ResourceCounter.of(source)
 
@@ -50,9 +48,7 @@ class ResourceCounterSpec extends AnyFreeSpec with Matchers {
       for {
         allocations <- Ref.of[IO, Int](0)
         releases <- Ref.of[IO, Int](0)
-        source = Resource.make[IO, Unit](allocations.update(_ + 1))(
-          _ => releases.update(_ + 1)
-        )
+        source = Resource.make[IO, Unit](allocations.update(_ + 1))(_ => releases.update(_ + 1))
 
         counter <- ResourceCounter.of(source)
         barrier <- CountDownLatch[IO](n)
@@ -83,9 +79,7 @@ class ResourceCounterSpec extends AnyFreeSpec with Matchers {
       for {
         allocations <- Ref.of[IO, Int](0)
         releases <- Ref.of[IO, Int](0)
-        source = Resource.make[IO, Unit](allocations.update(_ + 1))(
-          _ => releases.update(_ + 1)
-        )
+        source = Resource.make[IO, Unit](allocations.update(_ + 1))(_ => releases.update(_ + 1))
 
         counter <- ResourceCounter.of(source)
 

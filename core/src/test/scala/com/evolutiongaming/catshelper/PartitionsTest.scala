@@ -26,7 +26,6 @@ class PartitionsTest extends AnyWordSpec with Matchers {
     }
   }
 
-
   "const" should {
 
     val partitions = Partitions.const[Int, String]("0")

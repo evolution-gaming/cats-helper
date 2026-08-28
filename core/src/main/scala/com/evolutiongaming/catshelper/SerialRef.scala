@@ -6,12 +6,13 @@ import cats.effect.std.Semaphore
 import cats.implicits._
 import cats.~>
 
-/** Similar to [[cats.effect.std.AtomicCell]].
-  * 
-  * [[SerialRef]] was created when [[cats.effect.std.AtomicCell]] did not exist
-  * yet, and is kept for backwards compatibility purposes and ability to use
-  * the same code for both Cats Effect 2 and Cats Effect 3.
-  */
+/**
+ * Similar to [[cats.effect.std.AtomicCell]].
+ *
+ * [[SerialRef]] was created when [[cats.effect.std.AtomicCell]] did not exist yet, and is kept for
+ * backwards compatibility purposes and ability to use the same code for both Cats Effect 2 and Cats
+ * Effect 3.
+ */
 trait SerialRef[F[_], A] {
 
   def get: F[A]
@@ -23,10 +24,12 @@ trait SerialRef[F[_], A] {
 
 object SerialRef { self =>
 
-  def apply[F[_]](implicit F: Concurrent[F]): Apply[F] = new Apply(F)
+  def apply[F[_]](
+    implicit
+    F: Concurrent[F],
+  ): Apply[F] = new Apply(F)
 
-
-  def of[F[_] : Concurrent, A](value: A): F[SerialRef[F, A]] = {
+  def of[F[_]: Concurrent, A](value: A): F[SerialRef[F, A]] = {
     for {
       s <- Semaphore[F](1)
       r <- Ref[F].of(value)
@@ -38,10 +41,10 @@ object SerialRef { self =>
         def modify[B](f: A => F[(A, B)]) = {
           s.permit.use { _ =>
             for {
-              a      <- r.get
-              ab     <- f(a)
-              (a, b)  = ab
-              _      <- r.set(a)
+              a <- r.get
+              ab <- f(a)
+              (a, b) = ab
+              _ <- r.set(a)
             } yield b
           }
         }
@@ -59,12 +62,10 @@ object SerialRef { self =>
     }
   }
 
-
   class Apply[F[_]](val F: Concurrent[F]) extends AnyVal {
-    
+
     def of[A](value: A): F[SerialRef[F, A]] = self.of[F, A](value)(F)
   }
-
 
   implicit class SerialRefOps[F[_], A](val self: SerialRef[F, A]) extends AnyVal {
 

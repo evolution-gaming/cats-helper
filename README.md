@@ -187,6 +187,27 @@ ftService.use { access =>
 }
 ```
 
+## Logback module
+
+### Separate module
+
+The logback module lives in a separate `cats-helper-logback' module to avoid dependency on a logback in case the user chooses a different logging backend. This is important to avoid the problem of multiple bindings when mapping the logging framework with SLF4J.
+
+### LogOfFromLogback
+
+#### Motivation
+Direct logback usage required to overcome limitations of SLF4J MDC API.
+SLF4J MDC API heavily rely on [[ThreadLocal]], example: ch.qos.logback.classic.util.LogbackMDCAdapter
+Logback' [[LoggingEvent]] allow setting MDC directly as Java map that should have performance benefits compared with SLF4J/Logback implementation.
+
+#### CAUTION!
+Please be aware that using other version of logback (than used in `cats-helper-logback`) might bring '''RUNTIME ERRORS''' or '''MISSING LOGS''' in case of binary incompatibility between them.
+Suggested approach is in using exactly same logback version as used in `cats-helper-logback` (among all others available through transitive dependencies)
+
+#### SLF4J compatibility
+In some cases it may be necessary to allocate the logback instance manually as well as using the SLF4J API in the end user code. However, if multiple LoggerContexts are instantiated at the same time, this could lead to unexpected behaviour, such as the RollingFileAppender writing to multiple files instead of one.
+To cover such cases, the internal implementation of `LogOfFromLogback` uses the SLF4J API to instantiate the logback context, so that later use of the SLF4J API will pick up the same context instance created by `LogOfFromLogback`.
+
 ## PureTest
 
 This helper lives in a separate `cats-helper-testkit` module. It is makes testing `F[_]`-based code easier.

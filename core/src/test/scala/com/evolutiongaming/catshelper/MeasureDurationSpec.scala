@@ -1,16 +1,16 @@
 package com.evolutiongaming.catshelper
 
 import cats.data.StateT
-import cats.effect.{Clock, IO}
-import cats.{Applicative, Id, Monad}
-import cats.syntax.either._
-import cats.syntax.applicative._
-import cats.syntax.applicativeError._
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
-import com.evolutiongaming.catshelper.syntax.measureDuration._
 import cats.effect.Ref
 import cats.effect.unsafe.implicits.global
+import cats.effect.{Clock, IO}
+import cats.syntax.applicative._
+import cats.syntax.applicativeError._
+import cats.syntax.either._
+import cats.{Applicative, Id, Monad}
+import com.evolutiongaming.catshelper.syntax.measureDuration._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
 
@@ -42,7 +42,7 @@ class MeasureDurationSpec extends AnyFunSuite with Matchers {
       .sleep(3.seconds)
       .measuredCase(
         time => StateT.modify[Either[Throwable, _], State](old => State(time +: old.timestamps)),
-        _ => StateT.modify[Either[Throwable, _], State](old => State(-1.nano +: old.timestamps))
+        _ => StateT.modify[Either[Throwable, _], State](old => State(-1.nano +: old.timestamps)),
       )
 
     test.runS(State(List(0.nano, 0.nano))) shouldEqual State(3.seconds :: Nil).asRight[Throwable]
@@ -53,7 +53,7 @@ class MeasureDurationSpec extends AnyFunSuite with Matchers {
       ref <- StateT.liftF(Ref.of[IO, List[FiniteDuration]](List.empty))
       _ <- StateT.liftF[IO, State, Unit](IO.raiseError(new RuntimeException("test"))).measuredCase(
         _ => StateT.liftF(ref.update(1.day :: _)),
-        time => StateT.liftF(ref.update(time :: _))
+        time => StateT.liftF(ref.update(time :: _)),
       ).attempt
       time <- StateT.liftF(ref.get)
     } yield time
@@ -86,10 +86,13 @@ object MeasureDurationSpec {
   }
 
   object Sleep {
-    def apply[F[_]](implicit ev: Sleep[F]): Sleep[F] = ev
+    def apply[F[_]](
+      implicit
+      ev: Sleep[F],
+    ): Sleep[F] = ev
   }
 
-  implicit def sleep[F[_]: Applicative]: Sleep[StateT[F, State, _]] ={
+  implicit def sleep[F[_]: Applicative]: Sleep[StateT[F, State, _]] = {
     new Sleep[StateT[F, State, _]] {
       override def sleep(duration: FiniteDuration): StateT[F, State, Unit] =
         StateT.modify { state =>
@@ -98,7 +101,7 @@ object MeasureDurationSpec {
     }
   }
 
-  implicit def clock[F[_] : Monad]: Clock[StateT[F, State, _]] =
+  implicit def clock[F[_]: Monad]: Clock[StateT[F, State, _]] =
     new Clock[StateT[F, State, _]] {
       override def realTime: StateT[F, State, FiniteDuration] =
         StateT { state =>

@@ -13,8 +13,10 @@ trait Blocking[F[_]] {
 
 object Blocking {
 
-  def summon[F[_]](implicit F: Blocking[F]): Blocking[F] = F
-
+  def summon[F[_]](
+    implicit
+    F: Blocking[F],
+  ): Blocking[F] = F
 
   def empty[F[_]]: Blocking[F] = new Blocking[F] {
     def apply[A](fa: F[A]) = fa
@@ -24,22 +26,22 @@ object Blocking {
     def apply[A](fa: F[A]) = Async[F].evalOn(fa, executor)
   }
 
-
   object implicits {
 
     implicit class OpsBlocking[F[_], A](val self: F[A]) extends AnyVal {
 
-      def blocking(implicit blocking: Blocking[F]): F[A] = blocking(self)
+      def blocking(
+        implicit
+        blocking: Blocking[F],
+      ): F[A] = blocking(self)
     }
   }
-
 
   implicit class BlockingOps[F[_]](val self: Blocking[F]) extends AnyVal {
 
     def mapK[G[_]](fg: F ~> G, gf: G ~> F): Blocking[G] = new Blocking[G] {
       def apply[A](fa: G[A]) = fg(self(gf(fa)))
     }
-
 
     def functionK: FunctionK[F, F] = new FunctionK[F, F] {
       def apply[A](fa: F[A]) = self(fa)

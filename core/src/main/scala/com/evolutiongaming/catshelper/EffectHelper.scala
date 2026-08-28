@@ -1,9 +1,9 @@
 package com.evolutiongaming.catshelper
 
+import cats.effect.implicits._
 import cats.effect.kernel.{Deferred, Fiber}
 import cats.effect.{Concurrent, MonadCancel}
 import cats.implicits._
-import cats.effect.implicits._
 
 import scala.concurrent.Future
 import scala.util.Try
@@ -25,7 +25,6 @@ object EffectHelper {
     }
   }
 
-
   implicit class BracketOpsEffectHelper[F[_], E](val self: MonadCancel[F, E]) extends AnyVal {
 
     def redeem[A, B](fa: F[A])(recover: E => B, map: A => B): F[B] = {
@@ -38,7 +37,6 @@ object EffectHelper {
       self.handleErrorWith(fb)(recover)
     }
   }
-
 
   @deprecated("use ConcurrentOpsEffectHelper instead", "1.0.0")
   class EffectHelperConcurrentOps[F[_]](val self: Concurrent[F]) extends AnyVal {
@@ -55,12 +53,11 @@ object EffectHelper {
 
       for {
         started <- Deferred[F, Unit]
-        fiber   <- faOf(started).start
-        _       <- started.get
+        fiber <- faOf(started).start
+        _ <- started.get
       } yield fiber
     }
   }
-
 
   implicit class ConcurrentOpsEffectHelper[F[_]](val self: Concurrent[F]) extends AnyVal {
 
@@ -76,58 +73,90 @@ object EffectHelper {
 
       for {
         started <- Deferred[F, Unit]
-        fiber   <- faOf(started).start
-        _       <- started.get
+        fiber <- faOf(started).start
+        _ <- started.get
       } yield fiber
     }
   }
 
-
   @deprecated("use FOpsEffectHelper instead", "1.0.0")
   class EffectHelperFOps[F[_], A](val self: F[A]) extends AnyVal {
 
-    def redeem[B, E](recover: E => B, map: A => B)(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+    def redeem[B, E](
+      recover: E => B,
+      map: A => B,
+    )(implicit
+      monadCancel: MonadCancel[F, E],
+    ): F[B] = {
       monadCancel.redeem(self)(recover, map)
     }
 
-    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+    def redeemWith[B, E](
+      recover: E => F[B],
+      flatMap: A => F[B],
+    )(implicit
+      monadCancel: MonadCancel[F, E],
+    ): F[B] = {
       monadCancel.redeemWith(self)(recover, flatMap)
     }
 
+    def startEnsure(
+      implicit
+      F: Concurrent[F],
+    ): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
 
-    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
+    def toTry(
+      implicit
+      F: ToTry[F],
+    ): Try[A] = F.apply(self)
 
-
-    def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
-
-
-    def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
+    def toFuture(
+      implicit
+      F: ToFuture[F],
+    ): Future[A] = F.apply(self)
   }
-
 
   implicit class FOpsEffectHelper[F[_], A](val self: F[A]) extends AnyVal {
 
-    def redeem[B, E](recover: E => B, map: A => B)(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+    def redeem[B, E](
+      recover: E => B,
+      map: A => B,
+    )(implicit
+      monadCancel: MonadCancel[F, E],
+    ): F[B] = {
       monadCancel.redeem(self)(recover, map)
     }
 
-    def redeemWith[B, E](recover: E => F[B], flatMap: A => F[B])(implicit monadCancel: MonadCancel[F, E]): F[B] = {
+    def redeemWith[B, E](
+      recover: E => F[B],
+      flatMap: A => F[B],
+    )(implicit
+      monadCancel: MonadCancel[F, E],
+    ): F[B] = {
       monadCancel.redeemWith(self)(recover, flatMap)
     }
 
+    def startEnsure(
+      implicit
+      F: Concurrent[F],
+    ): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
 
-    def startEnsure(implicit F: Concurrent[F]): F[Fiber[F, Throwable, A]] = F.startEnsure(self)
+    def toTry(
+      implicit
+      F: ToTry[F],
+    ): Try[A] = F.apply(self)
 
-
-    def toTry(implicit F: ToTry[F]): Try[A] = F.apply(self)
-
-
-    def toFuture(implicit F: ToFuture[F]): Future[A] = F.apply(self)
+    def toFuture(
+      implicit
+      F: ToFuture[F],
+    ): Future[A] = F.apply(self)
   }
-
 
   implicit class EffectHelperTryOps[A](val self: Try[A]) extends AnyVal {
 
-    def fromTry[F[_]](implicit fromTry: FromTry[F]): F[A] = fromTry(self)
+    def fromTry[F[_]](
+      implicit
+      fromTry: FromTry[F],
+    ): F[A] = fromTry(self)
   }
 }

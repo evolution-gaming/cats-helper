@@ -1,12 +1,12 @@
 package com.evolutiongaming.catshelper
 
-import java.time.Instant
-
 import cats.Id
 import cats.effect.Clock
 import com.evolutiongaming.catshelper.ClockHelper._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+
+import java.time.Instant
 
 class ClockHelperSpec extends AnyFunSuite with Matchers {
 

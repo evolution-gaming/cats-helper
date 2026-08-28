@@ -1,13 +1,22 @@
 package com.evolutiongaming.catshelper
 
 import cats.Id
+import cats.Show
 import cats.arrow.FunctionK
-import cats.effect.IO
-
-import scala.util.control.NoStackTrace
+import cats.effect.kernel.Ref
+import cats.effect.std.Console
+import cats.effect.{IO, SyncIO}
+import com.evolutiongaming.catshelper.IOSuite._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import com.evolutiongaming.catshelper.IOSuite._
+import org.slf4j.event.Level
+import org.slf4j.helpers.AbstractLogger
+import org.slf4j.{MDC, Marker}
+
+import java.nio.charset.Charset
+import java.util.concurrent.atomic.AtomicInteger
+import scala.jdk.CollectionConverters._
+import scala.util.control.NoStackTrace
 
 class LogSpec extends AnyFunSuite with Matchers {
 
@@ -17,16 +26,15 @@ class LogSpec extends AnyFunSuite with Matchers {
 
     val stateT = for {
       log0 <- logOf("source")
-      log   = log0.prefixed(">").mapK(FunctionK.id)
-      _    <- log.trace("trace")
-      _    <- log.debug("debug")
-      _    <- log.info("info")
-      _    <- log.warn("warn")
-      _    <- log.warn("warn", Error)
-      _    <- log.error("error")
-      _    <- log.error("error", Error)
+      log = log0.prefixed(">").mapK(FunctionK.id)
+      _ <- log.trace("trace")
+      _ <- log.debug("debug")
+      _ <- log.info("info")
+      _ <- log.warn("warn")
+      _ <- log.warn("warn", Error)
+      _ <- log.error("error")
+      _ <- log.error("error", Error)
     } yield {}
-
 
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
@@ -37,7 +45,8 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Info("> info"),
       Action.Debug("> debug"),
       Action.Trace("> trace"),
-      Action.OfStr("source")))
+      Action.OfStr("source"),
+    ))
   }
 
   test("trace, debug, info, warn, error with MDC") {
@@ -46,16 +55,15 @@ class LogSpec extends AnyFunSuite with Matchers {
 
     val stateT = for {
       log0 <- logOf("source")
-      log   = log0.prefixed(">").mapK(FunctionK.id)
-      _    <- log.trace("trace", Log.Mdc.Lazy(mdc))
-      _    <- log.debug("debug", Log.Mdc.Lazy(mdc))
-      _    <- log.info("info", Log.Mdc.Lazy(mdc))
-      _    <- log.warn("warn", Log.Mdc.Lazy(mdc))
-      _    <- log.warn("warn", Error, Log.Mdc.Lazy(mdc))
-      _    <- log.error("error", Log.Mdc.Lazy(mdc))
-      _    <- log.error("error", Error, Log.Mdc.Lazy(mdc))
+      log = log0.prefixed(">").mapK(FunctionK.id)
+      _ <- log.trace("trace", Log.Mdc.Lazy(mdc))
+      _ <- log.debug("debug", Log.Mdc.Lazy(mdc))
+      _ <- log.info("info", Log.Mdc.Lazy(mdc))
+      _ <- log.warn("warn", Log.Mdc.Lazy(mdc))
+      _ <- log.warn("warn", Error, Log.Mdc.Lazy(mdc))
+      _ <- log.error("error", Log.Mdc.Lazy(mdc))
+      _ <- log.error("error", Error, Log.Mdc.Lazy(mdc))
     } yield {}
-
 
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
@@ -66,7 +74,8 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Info("> info", Log.Mdc.Lazy(mdc)),
       Action.Debug("> debug", Log.Mdc.Lazy(mdc)),
       Action.Trace("> trace", Log.Mdc.Lazy(mdc)),
-      Action.OfStr("source")))
+      Action.OfStr("source"),
+    ))
   }
 
   test("trace, debug, info, warn, error with preset MDC") {
@@ -94,7 +103,8 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Info("info", mdc),
       Action.Debug("debug", mdc),
       Action.Trace("trace", mdc),
-      Action.OfStr("source")))
+      Action.OfStr("source"),
+    ))
   }
 
   test("preset MDC override by in-place MDC") {
@@ -116,7 +126,7 @@ class LogSpec extends AnyFunSuite with Matchers {
       Action.Error0("error", mdc0),
       Action.Info("info", mdc1),
       Action.Warn0("warn", mdc0),
-      Action.OfStr("source")
+      Action.OfStr("source"),
     ))
   }
 
@@ -131,7 +141,7 @@ class LogSpec extends AnyFunSuite with Matchers {
     val (state, _) = stateT.run(State(Nil))
     state shouldEqual State(List(
       Action.Info("info", Log.Mdc.Eager("info" -> "value", "preset" -> "value")),
-      Action.OfStr("source")
+      Action.OfStr("source"),
     ))
   }
 
@@ -144,6 +154,27 @@ class LogSpec extends AnyFunSuite with Matchers {
     } yield org.slf4j.MDC.getCopyOfContextMap
 
     io.unsafeRunSync() shouldEqual null
+  }
+
+  test("logging does not disturb the caller MDC when the logger throws") {
+    val logger = new StubLogger(levelsEnabled = true, onLog = () => throw Error)
+
+    def contextMap = Option(MDC.getCopyOfContextMap).fold(Map.empty[String, String])(_.asScala.toMap)
+
+    // MDC is thread-local, so the logging must run on the thread that reads it back.
+    // `SyncIO` guarantees that, `IO.unsafeRunSync` would run on a compute worker instead.
+    val backup = MDC.getCopyOfContextMap
+    val (before, after) = try {
+      MDC.clear()
+      MDC.put("caller", "value")
+      val before = contextMap
+      Log[SyncIO](logger).info("message", Log.Mdc.Eager("logged" -> "value")).attempt.unsafeRunSync()
+      (before, contextMap)
+    } finally {
+      if (backup == null) MDC.clear() else MDC.setContextMap(backup)
+    }
+
+    after shouldEqual before
   }
 
   test("LogOf.log") {
@@ -170,9 +201,97 @@ class LogSpec extends AnyFunSuite with Matchers {
     } yield {}
     io.unsafeRunSync()
   }
+
+  test("Log.console labels errors as ERROR") {
+    val result = for {
+      linesRef <- Ref[IO].of(List.empty[String])
+      _ <- {
+        implicit val console: Console[IO] = new Console[IO] {
+          def readLineWithCharset(charset: Charset) = IO.raiseError[String](new UnsupportedOperationException)
+          def print[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def println[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def error[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = IO.unit
+          def errorln[A](
+            a: A,
+          )(implicit
+            show: Show[A],
+          ) = linesRef.update(show.show(a) :: _)
+        }
+
+        Log.console[IO]("source").error("message")
+      }
+      lines <- linesRef.get
+    } yield {
+      lines should contain("ERROR\tsource: message")
+    }
+
+    result.unsafeRunSync()
+  }
+
+  test("withMdc does not force a lazy MDC when the level is disabled") {
+    val logger = new StubLogger(levelsEnabled = false, onLog = () => ())
+
+    val forced = new AtomicInteger(0)
+    val log = Log[IO](logger).withMdc(Log.Mdc.Eager("source" -> "spec"))
+    val effect = log.trace("message", Log.Mdc.Lazy("key" -> { forced.incrementAndGet(); "value" }))
+
+    forced.get() shouldEqual 0
+    effect.unsafeRunSync()
+    forced.get() shouldEqual 0
+  }
+
+  test("lazy and eager MDC with the same content are equal") {
+    val lazyMdc = Log.Mdc.Lazy("key" -> "value")
+    val eagerMdc = Log.Mdc.Eager("key" -> "value")
+
+    lazyMdc.hashCode shouldEqual eagerMdc.hashCode
+    lazyMdc shouldEqual eagerMdc
+    eagerMdc shouldEqual lazyMdc
+  }
 }
 
 object LogSpec {
+
+  /**
+   * Reports every level as `levelsEnabled` and funnels every logging call into `onLog`, which is
+   * free to throw. `AbstractLogger` leaves the level check to the caller, matching what `Log.apply`
+   * does.
+   */
+  class StubLogger(levelsEnabled: Boolean, onLog: () => Unit) extends AbstractLogger {
+
+    protected def getFullyQualifiedCallerName: String = getClass.getName
+
+    protected def handleNormalizedLoggingCall(
+      level: Level,
+      marker: Marker,
+      messagePattern: String,
+      arguments: Array[Object],
+      throwable: Throwable,
+    ): Unit = onLog()
+
+    def isTraceEnabled: Boolean = levelsEnabled
+    def isTraceEnabled(marker: Marker): Boolean = levelsEnabled
+    def isDebugEnabled: Boolean = levelsEnabled
+    def isDebugEnabled(marker: Marker): Boolean = levelsEnabled
+    def isInfoEnabled: Boolean = levelsEnabled
+    def isInfoEnabled(marker: Marker): Boolean = levelsEnabled
+    def isWarnEnabled: Boolean = levelsEnabled
+    def isWarnEnabled(marker: Marker): Boolean = levelsEnabled
+    def isErrorEnabled: Boolean = levelsEnabled
+    def isErrorEnabled(marker: Marker): Boolean = levelsEnabled
+  }
 
   val logOf: LogOf[StateT] = {
     val logOf = new LogOf[StateT] {
@@ -251,19 +370,16 @@ object LogSpec {
     log.mapK(FunctionK.id)
   }
 
-
   final case class State(actions: List[Action]) {
 
     def add(action: Action): State = copy(actions = action :: actions)
   }
-
 
   type StateT[A] = cats.data.StateT[Id, State, A]
 
   object StateT {
     def apply[A](f: State => (State, A)): StateT[A] = cats.data.StateT[Id, State, A](f)
   }
-
 
   sealed trait Action
 

@@ -21,9 +21,15 @@ trait Runtime[F[_]] {
 
 object Runtime {
 
-  def apply[F[_]](implicit F: Runtime[F]): Runtime[F] = F
+  def apply[F[_]](
+    implicit
+    F: Runtime[F],
+  ): Runtime[F] = F
 
-  def summon[F[_]](implicit F: Runtime[F]): Runtime[F] = F
+  def summon[F[_]](
+    implicit
+    F: Runtime[F],
+  ): Runtime[F] = F
 
   def empty[F[_]: Applicative]: Runtime[F] = new Runtime[F] {
 
@@ -38,8 +44,7 @@ object Runtime {
     def gc = ().pure[F]
   }
 
-
-  def apply[F[_] : Sync](runtime: RuntimeJ): Runtime[F] = new Runtime[F] {
+  def apply[F[_]: Sync](runtime: RuntimeJ): Runtime[F] = new Runtime[F] {
 
     val availableCores = Sync[F].delay { runtime.availableProcessors() }
 
@@ -52,9 +57,7 @@ object Runtime {
     val gc = Sync[F].delay { runtime.gc() }
   }
 
-
-  implicit def lift[F[_] : Sync]: Runtime[F] = apply(RuntimeJ.getRuntime)
-
+  implicit def lift[F[_]: Sync]: Runtime[F] = apply(RuntimeJ.getRuntime)
 
   implicit class RuntimeOps[F[_]](val self: Runtime[F]) extends AnyVal {
 

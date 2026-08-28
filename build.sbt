@@ -1,4 +1,6 @@
-import Dependencies._
+import Dependencies.*
+import com.typesafe.tools.mima.core.*
+import sbtversionpolicy.Compatibility.BinaryCompatible
 
 def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
   CrossVersion.partialVersion(scalaVersion) match {
@@ -9,16 +11,16 @@ def crossSettings[T](scalaVersion: String, if3: Seq[T], if2: Seq[T]) = {
 }
 
 inThisBuild(Seq(
-  homepage := Some(url("http://github.com/evolution-gaming/cats-helper")),
+  homepage := Some(uri("http://github.com/evolution-gaming/cats-helper")),
 
   organization := "com.evolutiongaming",
   organizationName := "Evolution",
-  organizationHomepage := Some(url("https://evolution.com")),
+  organizationHomepage := Some(uri("https://evolution.com")),
 
   startYear := Some(2019),
-  licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT"))),
+  licenses := Seq(("MIT", uri("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.15", "3.3.3"),
+  crossScalaVersions := Seq("2.13.18", "3.3.8"),
 
   versionScheme := Some("semver-spec"),
 
@@ -27,25 +29,26 @@ inThisBuild(Seq(
   publishTo := Some(Resolver.evolutionReleases),
 
   autoAPIMappings := true,
+
+  versionPolicyIntention := BinaryCompatible,
 ))
 
 // Settings that can't be defined on a higher level go here.
 // Usually such settings have defaults defined by some plugin in its `projectSettings`.
 lazy val commonSettings = Seq(
-  releaseCrossBuild := true,
   scalacOptsFailOnWarn := Some(false),
 )
 
 val alias: Seq[sbt.Def.Setting[?]] =
-//  addCommandAlias("check", "all versionPolicyCheck Compile/doc") ++
-  addCommandAlias("check", "show version") ++
-    addCommandAlias("build", "+all compile test")
+  addCommandAlias("check", "all scalafmtCheckRepo versionPolicyCheck Compile/doc") ++
+    addCommandAlias("fmt", "+scalafmtRepo") ++
+    addCommandAlias("build", "+all compile testFull")
 
 lazy val root = project
   .in(file("."))
   .settings(
     commonSettings,
-    name := "cats-helper",
+    name := "cats-helper-root",
     publish / skip := true,
     publishArtifact := false,
   )
@@ -72,16 +75,34 @@ lazy val core = project
     libraryDependencies ++= crossSettings(
       scalaVersion.value,
       if3 = Nil,
-      if2 = List(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full))
+      if2 = List(compilerPlugin(("org.typelevel" % "kind-projector" % "0.13.4").cross(CrossVersion.full))),
     ),
     scalacOptions ++= crossSettings(
       scalaVersion.value,
       if3 = Seq("-Ykind-projector:underscores", "-language:implicitConversions"),
-      if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders")
+      if2 = List("-Xsource:3", "-P:kind-projector:underscore-placeholders"),
     ),
   )
   .dependsOn(
     testkit % Test,
+  )
+
+// Not aggregated, so `sbt test` and CI never run it. See benchmark/README.md.
+lazy val benchmark = project
+  .enablePlugins(JmhPlugin)
+  .settings(
+    commonSettings,
+    name := "cats-helper-benchmark",
+    publish / skip := true,
+    publishArtifact := false,
+    crossScalaVersions := Seq("2.13.18"),
+    scalacOptions ++= Seq("-Xsource:3"),
+    libraryDependencies ++= Seq(
+      compilerPlugin(("org.typelevel" % "kind-projector" % "0.13.4").cross(CrossVersion.full)),
+    ),
+  )
+  .dependsOn(
+    core,
   )
 
 lazy val logback = project
@@ -91,7 +112,7 @@ lazy val logback = project
     libraryDependencies ++= Seq(
       Logback.classic,
       scalatest % Test,
-    )
+    ),
   )
   .dependsOn(
     core,

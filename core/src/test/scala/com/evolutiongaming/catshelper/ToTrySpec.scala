@@ -10,6 +10,9 @@ import scala.util.control.NoStackTrace
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import scala.util.control.NoStackTrace
+import scala.util.{Failure, Success, Try}
+
 class ToTrySpec extends AnyFunSuite with Matchers {
 
   def failure[A](a: Throwable): Try[A] = Failure(a)
@@ -37,7 +40,6 @@ class ToTrySpec extends AnyFunSuite with Matchers {
       value.toTry shouldEqual expected
     }
   }
-
 
   private case object Error extends RuntimeException with NoStackTrace
 }

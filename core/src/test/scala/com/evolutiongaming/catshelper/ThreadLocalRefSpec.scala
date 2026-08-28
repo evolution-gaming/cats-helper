@@ -1,7 +1,5 @@
 package com.evolutiongaming.catshelper
 
-import java.util.concurrent.Executors
-
 import cats.Parallel
 import cats.arrow.FunctionK
 import cats.effect._
@@ -9,12 +7,13 @@ import cats.effect.kernel.Ref
 import cats.effect.unsafe._
 import cats.implicits._
 import com.evolutiongaming.catshelper.IOSuite._
-
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
+import org.scalatest.Succeeded
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.Succeeded
+
+import java.util.concurrent.Executors
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 
 class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
 
@@ -33,13 +32,13 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
         blockingSh()
         schedulerSh()
       },
-      config = IORuntimeConfig.apply()
+      config = IORuntimeConfig.apply(),
     )
 
     testF[IO](5).timeout(5.seconds).as(Succeeded).unsafeToFuture()(runtime)
   }
 
-  private def testF[F[_] : Async : ThreadLocalOf : Parallel](n: Int): F[Unit] = {
+  private def testF[F[_]: Async: ThreadLocalOf: Parallel](n: Int): F[Unit] = {
 
     def test(ref: ThreadLocalRef[F, String], executor: ExecutionContext) = {
 
@@ -49,12 +48,12 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
         for {
           a0 <- get
           a1 <- get
-          _   = a0 shouldEqual a1
+          _ = a0 shouldEqual a1
         } yield a0
       }
 
       for {
-        a  <- check
+        a <- check
         a1 <- Async[F].evalOn(get, executor)
 //        _   = a should not equal a1 // with IO, execution can happen on any thread
         _  <- ref.set(a + "|")
@@ -67,18 +66,17 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
     }
 
     executor[F](parallelism = n).use { executor =>
-
       for {
-        counter     <- Ref[F].of(0)
-        thread       = for {
-          _        <- counter.update(_ + 1)
-          thread   <- Sync[F].delay { Thread.currentThread().toString }
+        counter <- Ref[F].of(0)
+        thread = for {
+          _ <- counter.update(_ + 1)
+          thread <- Sync[F].delay { Thread.currentThread().toString }
         } yield thread
-        threadLocal  <- ThreadLocalOf.summon[F].apply(thread)
-        threadLocal1  = threadLocal.mapK(FunctionK.id)
-        a             = test(threadLocal1, executor)
-        treadIds     <- List.fill(n)(a).parSequence
-        counter      <- counter.get
+        threadLocal <- ThreadLocalOf.summon[F].apply(thread)
+        threadLocal1 = threadLocal.mapK(FunctionK.id)
+        a = test(threadLocal1, executor)
+        treadIds <- List.fill(n)(a).parSequence
+        counter <- counter.get
       } yield {
         val size = treadIds.distinct.size
 //        size should be > 1 // with IO, execution can happen on any number of threads
@@ -88,7 +86,7 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
     }
   }
 
-  private def executor[F[_] : Sync](parallelism: Int): Resource[F, ExecutionContextExecutorService] = {
+  private def executor[F[_]: Sync](parallelism: Int): Resource[F, ExecutionContextExecutorService] = {
     val result = Sync[F].delay {
       val es = Executors.newFixedThreadPool(parallelism)
       val ec = ExecutionContext.fromExecutorService(es)

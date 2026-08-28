@@ -2,20 +2,20 @@ import sbt._
 
 object Dependencies {
 
-  val scalatest = "org.scalatest" %% "scalatest" % "3.2.19"
-  val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.16"
+  val scalatest = "org.scalatest" %% "scalatest" % "3.2.20"
+  val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.18"
 
   object Logback {
-    val classic = "ch.qos.logback" % "logback-classic" % "1.5.18"
+    val classic = "ch.qos.logback" % "logback-classic" % "1.6.3"
   }
 
   object Cats {
-    private val version = "2.12.0"
+    private val version = "2.13.0"
     val core = "org.typelevel" %% "cats-core" % version
     val kernel = "org.typelevel" %% "cats-kernel" % version
     val macros = "org.typelevel" %% "cats-macros" % version
 
-    private val effectVersion = "3.5.7"
+    private val effectVersion = "3.7.0"
     val effect = "org.typelevel" %% "cats-effect" % effectVersion
     val effectLaws = "org.typelevel" %% "cats-effect-laws" % effectVersion
     val effectTestkit = "org.typelevel" %% "cats-effect-testkit" % effectVersion

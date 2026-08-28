@@ -15,16 +15,20 @@ trait ToFuture[F[_]] {
 
 object ToFuture {
 
-  def apply[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F
+  def apply[F[_]](
+    implicit
+    F: ToFuture[F],
+  ): ToFuture[F] = F
 
-  def summon[F[_]](implicit F: ToFuture[F]): ToFuture[F] = F
-
+  def summon[F[_]](
+    implicit
+    F: ToFuture[F],
+  ): ToFuture[F] = F
 
   def functionK[F[_]: ToFuture]: FunctionK[F, Future] = new FunctionK[F, Future] {
 
     def apply[A](fa: F[A]): Future[A] = ToFuture.summon[F].apply(fa)
   }
-
 
   /**
     * Note: There was an interesting discussion about `SyncIO` in Cats Effect (https://github.com/typelevel/cats-effect/issues/4337)
@@ -34,7 +38,6 @@ object ToFuture {
       fa.unsafeToFuture()
   }
 
-
   implicit val idToFuture: ToFuture[Id] = new ToFuture[Id] {
     def apply[A](fa: Id[A]): Future[A] = Future.successful(fa)
   }
@@ -42,7 +45,6 @@ object ToFuture {
   implicit val futureToFuture: ToFuture[Future] = new ToFuture[Future] {
     def apply[A](fa: Future[A]): Future[A] = fa
   }
-
 
   implicit class ToFutureOps[F[_]](val self: ToFuture[F]) extends AnyVal {
 
