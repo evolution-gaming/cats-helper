@@ -32,14 +32,21 @@ object ToTry {
   }
 
   /**
-    * Please think twice before using this, ideally you should not have toTry in your `pure` code base!
-    *
-    * Note: There was an interesting discussion about `SyncIO` in Cats Effect (https://github.com/typelevel/cats-effect/issues/4337)
-    *
-    * @param timeout used only for computation after first seen async boundary, covering all computations onwards
-    *                in case there is no async boundary found, timeout is not used
-    */
-  def ioToTry(timeout: FiniteDuration)(implicit runtime: IORuntime): ToTry[IO] = new ToTry[IO] {
+   * Please think twice before using this, ideally you should not have toTry in your `pure` code
+   * base!
+   *
+   * Note: There was an interesting discussion about `SyncIO` in Cats Effect
+   * (https://github.com/typelevel/cats-effect/issues/4337)
+   *
+   * @param timeout
+   *   used only for computation after first seen async boundary, covering all computations onwards
+   *   in case there is no async boundary found, timeout is not used
+   */
+  def ioToTry(
+    timeout: FiniteDuration,
+  )(implicit
+    runtime: IORuntime,
+  ): ToTry[IO] = new ToTry[IO] {
     def apply[A](fa: IO[A]): Try[A] =
       Try(fa.timeout(timeout).unsafeRunSync())
 

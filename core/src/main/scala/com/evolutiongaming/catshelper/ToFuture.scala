@@ -31,9 +31,13 @@ object ToFuture {
   }
 
   /**
-    * Note: There was an interesting discussion about `SyncIO` in Cats Effect (https://github.com/typelevel/cats-effect/issues/4337)
-    */
-  implicit def ioToFuture(implicit runtime: IORuntime): ToFuture[IO] = new ToFuture[IO] {
+   * Note: There was an interesting discussion about `SyncIO` in Cats Effect
+   * (https://github.com/typelevel/cats-effect/issues/4337)
+   */
+  implicit def ioToFuture(
+    implicit
+    runtime: IORuntime,
+  ): ToFuture[IO] = new ToFuture[IO] {
     def apply[A](fa: IO[A]): Future[A] =
       fa.unsafeToFuture()
   }

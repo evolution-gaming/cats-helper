@@ -56,12 +56,12 @@ class ThreadLocalRefSpec extends AsyncFunSuite with Matchers {
         a <- check
         a1 <- Async[F].evalOn(get, executor)
 //        _   = a should not equal a1 // with IO, execution can happen on any thread
-        _  <- ref.set(a + "|")
-        _  <- check
-        _  <- ref.update(_ + "|")
-        _  <- check
-        _  <- ref.modify(a => (a + "|", ()))
-        _  <- check
+        _ <- ref.set(a + "|")
+        _ <- check
+        _ <- ref.update(_ + "|")
+        _ <- check
+        _ <- ref.modify(a => (a + "|", ()))
+        _ <- check
       } yield a
     }
 

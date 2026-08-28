@@ -1,7 +1,7 @@
 package com.evolutiongaming.catshelper
 
-import cats.effect.{IO, Ref}
 import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Ref}
 import cats.implicits.*
 import com.evolutiongaming.catshelper.CatsHelper.*
 import org.scalatest.funsuite.AsyncFunSuite
@@ -25,7 +25,7 @@ class ToFutureSpec extends AsyncFunSuite with Matchers {
           result <- ref.get
         } yield result,
 
-        100000.asRight[Throwable]
+        100000.asRight[Throwable],
       ),
     )
   } {
