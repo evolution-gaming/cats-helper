@@ -20,113 +20,121 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
 
   private val error: Throwable = new RuntimeException with NoStackTrace
 
-  test("run in parallel for different keys & serially for same") {
-    val result = for {
-      q <- Queue.of[IO, String, Int]
-      da <- Deferred[IO, Int]
-      _ <- q.start("a") { da.get }
-      a <- q("a") { 1.pure[IO] }
+  private def implementations[K: Hash]: List[(String, IO[SerialKey[IO, K]])] = List(
+    "partitioned" -> SerialKey.of[IO, K],
+    "concurrentHashMap" -> SerialKey.ofConcurrentHashMap[IO, K],
+  )
 
-      db <- Deferred[IO, Int]
-      _ <- q.start("b") { db.get }
-      b <- q("b") { 1.pure[IO] }
-      _ <- db.complete(0)
-      b <- b
-      _ <- IO { b shouldEqual 1 }
-
-      _ <- da.complete(0)
-      a <- a
-      _ <- IO { a shouldEqual 1 }
-
-      rs <- q.records
-      _ <- IO { rs shouldEqual Map(("a", Nel.of(0, 1)), ("b", Nel.of(0, 1))) }
-    } yield {}
-    result.run()
-  }
-
-  test("enqueue is not async") {
-    val threadId = IO { Thread.currentThread().getId }
-    val result = for {
-      q <- Queue.of[IO, String, Int]
-      a <- threadId
-      _ <- q("a") { 1.pure[IO] }
-      b <- threadId
-      _ <- IO { a shouldEqual b }
-    } yield {}
-    result.run()
-  }
-
-  // Ignored: a canceled task wedges the queue for good. Both fixes considered so far cost more
-  // than the defect, see https://github.com/evolution-gaming/cats-helper/issues/404
-  ignore("advance a key after a task cancels") {
-    val result = for {
-      serial <- SerialKey.of[IO, String]
-      canceled <- serial("key")(IO.canceled)
-      next <- serial("key")(IO.pure(1))
-      value <- next
-      _ = value shouldEqual 1
-      fiber <- canceled.start
-      outcome <- fiber.join
-      _ = outcome should matchPattern { case Outcome.Canceled() => }
-    } yield {}
-
-    result.run()
-  }
-
-  test("run many") {
-    val tasks = 1000
-    val keys = 10
-
-    val duration = {
-      val ms = Clock[IO].monotonic.map(_.toMillis)
-      ms.map { a => ms.map { b => (b - a).millis } }
+  implementations[String].foreach { case (name, serialKey) =>
+    test(s"$name runs tasks of one key in submission order") {
+      val tasks = 200
+      val result = for {
+        serial <- serialKey
+        order <- Ref[IO].of(Vector.empty[Int])
+        awaits <- (1 to tasks).toList.traverse { index => serial("key") { order.update { _ :+ index } } }
+        _ <- awaits.sequence_
+        observed <- order.get
+        _ <- IO { observed shouldEqual (1 to tasks).toVector }
+      } yield {}
+      result.run()
     }
 
-    val result = for {
-      logOf <- LogOf.slf4j[IO]
-      log <- logOf(SerParQueueTest.getClass)
-      q <- SerParQueue.of[IO, Int]
-      d <- duration
-      a <- 0
-        .iterateForeverM { a =>
-          for {
-            _ <- q(none) { a.pure[IO] }
-            _ <- Temporal[IO].sleep(100.millis)
-          } yield a + 1
-        }
-        .background
-        .use { _ =>
-          (1 to keys)
-            .toList
-            .parTraverse { key =>
-              (0, 0.pure[IO]).tailRecM {
-                case (n, a) =>
-                  if (n > tasks) {
-                    a.asRight[(Int, IO[Int])].pure[IO]
-                  } else {
-                    for {
-                      a <- q(key.some) { n.pure[IO] }
-                    } yield {
-                      (n + 1, a).asLeft[IO[Int]]
-                    }
-                  }
-              }.flatten
-            }
-        }
-      d <- d
-      _ <- IO { log.info(s"took ${ d.toMillis }ms for $keys parallel streams with $tasks each") }
-      _ <- IO { a.distinct shouldEqual List(tasks) }
-    } yield {}
-    result.run(1.minute)
+    test(s"$name reports a task failure to its caller and keeps the key running") {
+      val result = for {
+        serial <- serialKey
+        failed <- serial("key") { error.raiseError[IO, Int] }
+        next <- serial("key") { 1.pure[IO] }
+        a <- failed.attempt
+        _ <- IO { a shouldEqual error.asLeft }
+        b <- next
+        _ <- IO { b shouldEqual 1 }
+      } yield {}
+      result.run()
+    }
+
+    test(s"$name runs different keys in parallel and one key serially") {
+      val result = for {
+        q <- Queue.of[IO, String, Int](serialKey)
+        da <- Deferred[IO, Int]
+        _ <- q.start("a") { da.get }
+        a <- q("a") { 1.pure[IO] }
+
+        db <- Deferred[IO, Int]
+        _ <- q.start("b") { db.get }
+        b <- q("b") { 1.pure[IO] }
+        _ <- db.complete(0)
+        b <- b
+        _ <- IO { b shouldEqual 1 }
+
+        _ <- da.complete(0)
+        a <- a
+        _ <- IO { a shouldEqual 1 }
+
+        rs <- q.records
+        _ <- IO { rs shouldEqual Map(("a", Nel.of(0, 1)), ("b", Nel.of(0, 1))) }
+      } yield {}
+      result.run()
+    }
+
+    test(s"$name does not make enqueue async") {
+      val threadId = IO { Thread.currentThread().getId }
+      val result = for {
+        q <- Queue.of[IO, String, Int](serialKey)
+        a <- threadId
+        _ <- q("a") { 1.pure[IO] }
+        b <- threadId
+        _ <- IO { a shouldEqual b }
+      } yield {}
+      result.run()
+    }
+
+    // Ignored: a canceled task wedges the key for good. Both fixes considered so far cost more
+    // than the defect, see https://github.com/evolution-gaming/cats-helper/issues/404
+    ignore(s"$name advances a key after a task cancels") {
+      val result = for {
+        serial <- serialKey
+        canceled <- serial("key")(IO.canceled)
+        next <- serial("key")(IO.pure(1))
+        value <- next
+        _ = value shouldEqual 1
+        fiber <- canceled.start
+        outcome <- fiber.join
+        _ = outcome should matchPattern { case Outcome.Canceled() => }
+      } yield {}
+
+      result.run()
+    }
   }
 
   for {
+    (name, serialKey) <- implementations[Int]
     key <- List(0)
   } yield {
 
-    test("run") {
+    test(s"$name runs many tasks across many keys") {
+      val tasksPerKey = 1000
+      val keyCount = 10
+
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        serial <- serialKey
+        last <- (1 to keyCount).toList.parTraverse { key =>
+          (1, 0.pure[IO])
+            .tailRecM {
+              case (n, a) =>
+                if (n > tasksPerKey) a.asRight[(Int, IO[Int])].pure[IO]
+                else serial(key) { n.pure[IO] }.map { a => (n + 1, a).asLeft[IO[Int]] }
+            }
+            .flatten
+        }
+        _ <- IO { last.distinct shouldEqual List(tasksPerKey) }
+      } yield {}
+
+      result.run(1.minute)
+    }
+
+    test(s"$name run") {
+      val result = for {
+        q <- Queue.of[IO, Int, String](serialKey)
         _ <- q.run(key, "a")
         rs <- q.records
         _ <- IO { rs shouldEqual Map((key, Nel.of("a"))) }
@@ -134,9 +142,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("run, fail") {
+    test(s"$name run, fail") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         _ <- q.run(key, "a")
 
@@ -150,9 +158,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("start, add, fail, run") {
+    test(s"$name start, add, fail, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         d <- Deferred[IO, Either[Throwable, String]]
         a <- q(key) { d.get.rethrow }
@@ -172,9 +180,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("fail, run") {
+    test(s"$name fail, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         a <- q(key) { error.raiseError[IO, String] }
         a <- a.attempt
@@ -188,9 +196,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("start, add, add, finish, fail, run") {
+    test(s"$name start, add, add, finish, fail, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         d <- Deferred[IO, String]
         a <- q(key) { d.get }
@@ -215,9 +223,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("run, run") {
+    test(s"$name run, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         _ <- q.run(key, "a")
         _ <- q.run(key, "b")
@@ -228,9 +236,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("add, add, run, run") {
+    test(s"$name add, add, run, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
         d <- Deferred[IO, String]
         a <- q(key) { d.get }
 
@@ -250,9 +258,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("start, add, finish, run") {
+    test(s"$name start, add, finish, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         d <- Deferred[IO, String]
         a <- q.start(key) { d.get }
@@ -273,9 +281,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("add, add, add, run, run, run") {
+    test(s"$name add, add, add, run, run, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         d <- Deferred[IO, String]
         a <- q(key) { d.get }
@@ -301,9 +309,9 @@ class SerialKeyTest extends AsyncFunSuite with Matchers {
       result.run()
     }
 
-    test("start, add, add, finish, run, run") {
+    test(s"$name start, add, add, finish, run, run") {
       val result = for {
-        q <- Queue.of[IO, Int, String]
+        q <- Queue.of[IO, Int, String](serialKey)
 
         d <- Deferred[IO, String]
         a <- q.start(key) { d.get }
@@ -402,9 +410,9 @@ object SerialKeyTest {
 
   object Queue {
 
-    def of[F[_]: Async, K: Hash, A]: F[Queue[F, K, A]] = {
+    def of[F[_]: Async, K: Hash, A](serialKey: F[SerialKey[F, K]]): F[Queue[F, K, A]] = {
       for {
-        queue <- SerialKey.of[F, K]
+        queue <- serialKey
         records0 <- Records.of[F, K, A]
       } yield {
         new Queue[F, K, A] {
