@@ -39,12 +39,6 @@ lazy val commonSettings = Seq(
   scalacOptsFailOnWarn := Some(false),
 )
 
-lazy val groupWithinLocalStateFilters = Seq(
-  mimaBinaryIssueFilters ++= Seq(
-    ProblemFilters.exclude[Problem]("com.evolutiongaming.catshelper.GroupWithin#S#3#Full*"),
-  ),
-)
-
 val alias: Seq[sbt.Def.Setting[?]] =
   addCommandAlias("check", "all scalafmtCheckRepo versionPolicyCheck Compile/doc") ++
     addCommandAlias("fmt", "+scalafmtRepo") ++
@@ -68,7 +62,6 @@ lazy val root = project
 lazy val core = project
   .settings(
     commonSettings,
-    groupWithinLocalStateFilters,
     // formerly this was a top-level module and thus it retains the old name
     name := "cats-helper",
     libraryDependencies ++= Seq(
@@ -92,6 +85,24 @@ lazy val core = project
   )
   .dependsOn(
     testkit % Test,
+  )
+
+// Not aggregated, so `sbt test` and CI never run it. See benchmark/README.md.
+lazy val benchmark = project
+  .enablePlugins(JmhPlugin)
+  .settings(
+    commonSettings,
+    name := "cats-helper-benchmark",
+    publish / skip := true,
+    publishArtifact := false,
+    crossScalaVersions := Seq("2.13.18"),
+    scalacOptions ++= Seq("-Xsource:3"),
+    libraryDependencies ++= Seq(
+      compilerPlugin(("org.typelevel" % "kind-projector" % "0.13.4").cross(CrossVersion.full)),
+    ),
+  )
+  .dependsOn(
+    core,
   )
 
 lazy val logback = project
