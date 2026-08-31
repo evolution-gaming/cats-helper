@@ -6,6 +6,7 @@ import cats.effect.{IO, Sync}
 import cats.implicits._
 import cats.~>
 
+@deprecated("Doesn't make sense with Cats Effect 3, please refactor your code", "3.11.4")
 trait ThreadLocalRef[F[_], A] {
 
   def get: F[A]
@@ -17,6 +18,7 @@ trait ThreadLocalRef[F[_], A] {
   def modify[B](f: A => (A, B)): F[B]
 }
 
+@deprecated("Doesn't make sense with Cats Effect 3, please refactor your code", "3.11.4")
 object ThreadLocalRef {
 
   def apply[F[_]: Sync, A](threadLocal: ThreadLocal[A]): ThreadLocalRef[F, A] = new ThreadLocalRef[F, A] {
@@ -68,6 +70,7 @@ object ThreadLocalRef {
   }
 }
 
+@deprecated("Doesn't make sense with Cats Effect 3, please refactor your code", "3.11.4")
 trait ThreadLocalOf[F[_]] {
 
   def apply[A](fa: F[A]): F[ThreadLocalRef[F, A]]
@@ -75,6 +78,7 @@ trait ThreadLocalOf[F[_]] {
   def apply[A](a: => A): F[ThreadLocalRef[F, A]]
 }
 
+@deprecated("Doesn't make sense with Cats Effect 3, please refactor your code", "3.11.4")
 object ThreadLocalOf {
 
   def apply[F[_]](
