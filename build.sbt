@@ -20,7 +20,7 @@ inThisBuild(Seq(
   startYear := Some(2019),
   licenses := Seq(("MIT", uri("https://opensource.org/licenses/MIT"))),
 
-  crossScalaVersions := Seq("2.13.18", "3.3.8"),
+  crossScalaVersions := Seq("3.9.0", "3.3.8"),
 
   versionScheme := Some("semver-spec"),
 
@@ -95,7 +95,7 @@ lazy val benchmark = project
     name := "cats-helper-benchmark",
     publish / skip := true,
     publishArtifact := false,
-    crossScalaVersions := Seq("2.13.18"),
+    crossScalaVersions := Seq("3.9.0"),
     scalacOptions ++= Seq("-Xsource:3"),
     libraryDependencies ++= Seq(
       compilerPlugin(("org.typelevel" % "kind-projector" % "0.13.4").cross(CrossVersion.full)),
