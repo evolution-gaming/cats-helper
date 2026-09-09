@@ -7,95 +7,84 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
- * `ToTry[IO]` is how `skafka` bridges Kafka's rebalance callback: the IO runs to completion on the
- * poll thread, bounded by `ioToTry(1.minute)`.
+ * `skafka` runs a Kafka rebalance callback through `ToTry[IO]`, so the effect has to finish on the
+ * poll thread within the ambient `ioToTry(1.minute)`. `kafka-flow` recovers a partition inside such
+ * a callback and holds a semaphore permit for the whole recovery, as
+ * `semaphore.permit.use { ... }.uncancelable`, so that a half-done recovery cannot leave the flow
+ * inconsistent.
  *
- * `kafka-flow` runs partition recovery through that bridge: resource-shaped work guarded by a
- * semaphore permit inside `.uncancelable`. The previous `ioToTry` stepped through `.uncancelable`
- * and `onCancel` before handing the remainder to `unsafeRunTimed`, which cancelled it on timeout
- * without waiting: the permit was never released and every subsequent poll blocked on the
- * semaphore. The consumer silently stopped processing.
- *
- * All three specs fail against the previous `ioToTry` and pass with the cooperative timeout.
+ * The previous `ioToTry` stepped inside that `uncancelable` and past the finalizers, then cancelled
+ * what was left when the timeout fired. The permit was never given back, so every later call on the
+ * flow blocked on the semaphore and the consumer stopped processing without failing anything
+ * (kafka-flow#937). Every test below fails against that implementation.
  */
 class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
 
-  private val defaultTimeout = 200.millis
+  // longer than `ToTry` waits; a passing run never reaches it
+  private val slowRecovery = 1.minute
 
-  // longer than any test waits; a passing run never reaches it
-  private val slowRecovery = 10.seconds
+  test("a timeout releases what the effect acquired, and gives the permit back") {
+    val guard = Semaphore[IO](1).unsafeRunSync()
+    val released = new AtomicBoolean(false)
+    // the permit is taken on the calling thread, the state rebuild sleeps past the timeout
+    val recovery = guard.permit.use { _ =>
+      Resource.onFinalize(IO(released.set(true))).use(_ => IO.sleep(slowRecovery))
+    }
 
-  test("timeout releases a resource acquired before the async boundary") {
-    val f = fixture()
+    ToTry.ioToTry(50.millis).apply(recovery) should matchPattern { case Failure(_: TimeoutException) => }
 
-    f.toTry(f.recovery) should matchPattern { case Failure(_: TimeoutException) => }
-
-    f.recorded shouldEqual Vector("acquired", "released")
+    released.get() shouldBe true
+    guard.available.unsafeRunSync() shouldEqual 1L
   }
 
-  test("a timed-out attempt does not strand the guard it acquired") {
-    val f = fixture()
+  test("a retry after a timed-out attempt can take the permit again") {
+    val guard = Semaphore[IO](1).unsafeRunSync()
+    val toTry = ToTry.ioToTry(50.millis)
+    val recovery = guard.permit.use(_ => IO.sleep(slowRecovery))
 
-    f.toTry(f.recovery) should matchPattern { case Failure(_: TimeoutException) => }
-
+    toTry(recovery) should matchPattern { case Failure(_: TimeoutException) => }
     // what a retry around the flow does next
-    f.toTry(f.recovery) should matchPattern { case Failure(_: TimeoutException) => }
+    toTry(recovery) should matchPattern { case Failure(_: TimeoutException) => }
 
-    f.recorded shouldEqual Vector("acquired", "released", "acquired", "released")
+    guard.available.unsafeRunSync() shouldEqual 1L
   }
 
-  test("an uncancelable guarded recovery completes and releases its guard") {
-    val f = fixture(timeout = 100.millis, recoveryDuration = 300.millis)
-
-    // `TopicFlow` guards `add`, `apply` and its own release with one permit, taken inside
+  test("an uncancelable guarded recovery runs past the timeout and gives the permit back") {
+    val guard = Semaphore[IO](1).unsafeRunSync()
+    val cancelled = new AtomicBoolean(false)
+    // `kafka-flow` guards `add`, `apply` and its own release with one permit, taken inside
     // `uncancelable`: a permit lost to cancellation would block all three forever
-    f.toTry(f.guardedRecovery) shouldEqual Success(())
-    f.toTry(f.guardedRecovery) shouldEqual Success(())
+    val recovery = guard
+      .permit
+      .use(_ => IO.sleep(200.millis).onCancel(IO(cancelled.set(true))))
+      .uncancelable
 
-    f.recorded shouldEqual Vector("acquired", "released", "acquired", "released")
+    ToTry.ioToTry(50.millis).apply(recovery) shouldEqual Success(())
+
+    cancelled.get() shouldBe false
+    guard.available.unsafeRunSync() shouldEqual 1L
   }
 
-  private def fixture(
-    timeout: FiniteDuration = defaultTimeout,
-    recoveryDuration: FiniteDuration = slowRecovery,
-  ): Fixture =
-    new Fixture(
-      toTry = ToTry.ioToTry(timeout),
-      guard = Semaphore[IO](1).unsafeRunSync(),
-      log = new AtomicReference(Vector.empty[String]),
-      recoveryDuration = recoveryDuration,
-    )
+  test("nested masks: a timeout reaches a polled region and gives the permit back") {
+    val guard = Semaphore[IO](1).unsafeRunSync()
+    val cancelled = new AtomicBoolean(false)
+    // the sleep sits under two `uncancelable`, both polled, so it stays cancelable. The step stops
+    // at the outermost one and hands the whole block over, nesting included; `IO.timeout` then
+    // follows cats-effect's ordinary rules for it
+    val recovery = guard.permit.use { _ =>
+      IO.uncancelable { outer =>
+        outer(IO.uncancelable(inner => inner(IO.sleep(slowRecovery).onCancel(IO(cancelled.set(true))))))
+      }
+    }
 
-  /**
-   * `guard` stands in for `TopicFlow`'s semaphore: the permit that must survive a timeout.
-   * `recoveryDuration` is how long the recovery body runs past the async boundary.
-   */
-  private class Fixture(
-    val toTry: ToTry[IO],
-    guard: Semaphore[IO],
-    log: AtomicReference[Vector[String]],
-    recoveryDuration: FiniteDuration,
-  ) {
+    ToTry.ioToTry(50.millis).apply(recovery) should matchPattern { case Failure(_: TimeoutException) => }
 
-    def recorded: Vector[String] = log.get()
-
-    /**
-     * Mimics `PartitionFlow`: take the guard and finish the acquire synchronously, then rebuild
-     * state across an asynchronous boundary. The release gives the guard back.
-     */
-    def recovery: IO[Unit] =
-      Resource
-        .make(guard.acquire *> record("acquired"))(_ => record("released") *> guard.release)
-        .use(_ => IO.sleep(recoveryDuration))
-
-    // wrapped the way `TopicFlow` wraps it, so the permit cannot be lost to cancellation
-    def guardedRecovery: IO[Unit] = recovery.uncancelable
-
-    private def record(event: String): IO[Unit] = IO(log.updateAndGet(_ :+ event)).void
+    cancelled.get() shouldBe true
+    guard.available.unsafeRunSync() shouldEqual 1L
   }
 }

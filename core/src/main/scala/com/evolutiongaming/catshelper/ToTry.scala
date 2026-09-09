@@ -35,17 +35,17 @@ object ToTry {
    * Please think twice before using this, ideally you should not have toTry in your `pure` code
    * base!
    *
-   * Runs the effect on the calling thread for as long as it is pure or `delay`-shaped (`pure`,
-   * `delay`, `map`, `flatMap`, `attempt`, `handleErrorWith`, hence also `Ref` operations and
-   * `Deferred#complete`). Such effects complete inline, never touch the runtime and never time out.
-   * At the first asynchronous boundary, `uncancelable`, `onCancel` or `Resource` allocation, the
-   * rest of the effect runs as a fiber on the runtime under `IO.timeout`.
+   * A pure or `delay`-shaped effect (`pure`, `delay`, `map`, `flatMap`, `attempt`,
+   * `handleErrorWith`, hence also `Ref` operations and `Deferred#complete`) runs on the calling
+   * thread: it never reaches the runtime and never times out. From the first asynchronous boundary,
+   * `uncancelable`, `onCancel` or `Resource` allocation onwards, the effect runs as a fiber under
+   * `IO.timeout`.
    *
    * @param timeout
-   *   bound on the part that runs on the runtime. It is cooperative: where the effect is cancelable
-   *   the fiber is cancelled, its finalizers run and the result is `Failure(TimeoutException)`;
-   *   inside an `uncancelable` region it waits for the region to end, so a masked effect can run
-   *   past it.
+   *   bound on the part that runs as a fiber. `IO.timeout` cancels rather than abandons: where the
+   *   effect is cancelable it stops, its finalizers run, and the result is
+   *   `Failure(TimeoutException)`. Cancellation waits for an `uncancelable` region to end, so an
+   *   effect can run past the timeout inside one.
    */
   def ioToTry(
     timeout: FiniteDuration,
@@ -53,7 +53,7 @@ object ToTry {
     runtime: IORuntime,
   ): ToTry[IO] = new ToTry[IO] {
 
-    def apply[A](fa: IO[A]) = Try {
+    def apply[A](fa: IO[A]): Try[A] = Try {
       IO.asyncForIO.syncStep[SyncIO, A](fa, Int.MaxValue)(CancelableSyncIO).unsafeRunSync() match {
         case Right(a) => a
         case Left(rest) => rest.timeout(timeout).unsafeRunSync()
@@ -75,44 +75,69 @@ object ToTry {
   }
 
   /**
-   * `Sync[SyncIO]` that reports a `Cancelable` root scope.
+   * `Sync[SyncIO]` that reports a `Cancelable` root scope, for `IO.syncStep` and nothing else.
    *
-   * `syncStep` steps into `uncancelable` and `onCancel` only when the target's root scope is
-   * `Uncancelable`, handing back a remainder without its mask and finalizers. Under this instance
-   * it stops at those nodes with the remainder intact.
+   * `syncStep` runs an `IO` on the calling thread as far as it can and hands back the rest as an
+   * `IO`. When the `Sync` it steps into reports an `Uncancelable` root scope, as `SyncIO`'s own
+   * instance does, `syncStep` steps inside `uncancelable` regions (masked regions, in cats-effect
+   * terms) and past `onCancel` finalizers, since neither can matter to a target that is never
+   * cancelled. What it hands back is then the inside of such a region, without the `uncancelable`
+   * around it and without the finalizers. Cancelling that, which is what a timeout does, skips the
+   * finalizers.
    *
-   * Unlawful for `SyncIO`, hence private and never implicit. The stepper only uses `pure`,
-   * `raiseError`, `delay`, `defer`, `realTime`, `monotonic`, `map`, `flatMap`, `handleError` and
-   * `handleErrorWith`, so the wrong scope is never observed.
+   * Under this instance `syncStep` stops in front of `uncancelable` and `onCancel` instead, and
+   * hands back the region whole.
+   *
+   * `rootCancelScope` is the only member `syncStep` reads to make that choice. Every other member
+   * is here to satisfy `Sync` and delegates to `SyncIO`'s own instance. The instance is unlawful,
+   * because `SyncIO#canceled` does nothing and an instance calling `SyncIO` cancelable therefore
+   * breaks the `MonadCancel` laws, so it stays private and is never implicit.
+   *
+   * @see
+   *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel MonadCancel]] for masked
+   *   regions, `uncancelable` and finalizers
    */
   private object CancelableSyncIO extends Sync[SyncIO] {
 
     private val F = SyncIO.syncForSyncIO
 
-    def rootCancelScope: CancelScope = CancelScope.Cancelable
+    def rootCancelScope: CancelScope =
+      CancelScope.Cancelable
 
-    def pure[A](a: A): SyncIO[A] = F.pure(a)
+    def pure[A](a: A): SyncIO[A] =
+      F.pure(a)
 
-    def raiseError[A](e: Throwable): SyncIO[A] = F.raiseError(e)
+    def raiseError[A](e: Throwable): SyncIO[A] =
+      F.raiseError(e)
 
-    def handleErrorWith[A](fa: SyncIO[A])(f: Throwable => SyncIO[A]): SyncIO[A] = F.handleErrorWith(fa)(f)
+    def handleErrorWith[A](fa: SyncIO[A])(f: Throwable => SyncIO[A]): SyncIO[A] =
+      F.handleErrorWith(fa)(f)
 
-    def flatMap[A, B](fa: SyncIO[A])(f: A => SyncIO[B]): SyncIO[B] = F.flatMap(fa)(f)
+    def flatMap[A, B](fa: SyncIO[A])(f: A => SyncIO[B]): SyncIO[B] =
+      F.flatMap(fa)(f)
 
-    def tailRecM[A, B](a: A)(f: A => SyncIO[Either[A, B]]): SyncIO[B] = F.tailRecM(a)(f)
+    def tailRecM[A, B](a: A)(f: A => SyncIO[Either[A, B]]): SyncIO[B] =
+      F.tailRecM(a)(f)
 
-    def suspend[A](hint: Sync.Type)(thunk: => A): SyncIO[A] = F.suspend(hint)(thunk)
+    def suspend[A](hint: Sync.Type)(thunk: => A): SyncIO[A] =
+      F.suspend(hint)(thunk)
 
-    def monotonic: SyncIO[FiniteDuration] = F.monotonic
+    def monotonic: SyncIO[FiniteDuration] =
+      F.monotonic
 
-    def realTime: SyncIO[FiniteDuration] = F.realTime
+    def realTime: SyncIO[FiniteDuration] =
+      F.realTime
 
-    def forceR[A, B](fa: SyncIO[A])(fb: SyncIO[B]): SyncIO[B] = F.forceR(fa)(fb)
+    def forceR[A, B](fa: SyncIO[A])(fb: SyncIO[B]): SyncIO[B] =
+      F.forceR(fa)(fb)
 
-    def uncancelable[A](body: Poll[SyncIO] => SyncIO[A]): SyncIO[A] = F.uncancelable(body)
+    def uncancelable[A](body: Poll[SyncIO] => SyncIO[A]): SyncIO[A] =
+      F.uncancelable(body)
 
-    def canceled: SyncIO[Unit] = F.canceled
+    def canceled: SyncIO[Unit] =
+      F.canceled
 
-    def onCancel[A](fa: SyncIO[A], fin: SyncIO[Unit]): SyncIO[A] = F.onCancel(fa, fin)
+    def onCancel[A](fa: SyncIO[A], fin: SyncIO[Unit]): SyncIO[A] =
+      F.onCancel(fa, fin)
   }
 }
