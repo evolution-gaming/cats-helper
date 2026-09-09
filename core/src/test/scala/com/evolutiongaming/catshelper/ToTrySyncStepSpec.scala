@@ -35,7 +35,7 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
 
   test("a 100k-deep flatMap chain over Ref.update steps to completion without a fiber") {
     val effect = IO.ref(0).flatMap { ref =>
-      (1 to 100000).foldLeft(IO.unit)((acc, _) => acc.flatMap(_ => ref.update(_ + 1))) *> ref.modify(n => (n, n))
+      (1 to 100_000).foldLeft(IO.unit)((acc, _) => acc.flatMap(_ => ref.update(_ + 1))) *> ref.modify(n => (n, n))
     }
 
     toTryNoRuntime(effect) shouldEqual Success(100000)
