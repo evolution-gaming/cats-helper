@@ -12,11 +12,9 @@ import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success}
 
 /**
- * Tests that `ioToTry` runs simple effects on the calling thread (no fiber, no runtime) and hands
- * everything else to the runtime. The runtime here rejects fibers, so submitting one fails the
- * conversion immediately.
- *
- * What the timeout does to the fiber part is in [[ToTryTimeoutSpec]].
+ * `ioToTry` runs simple effects on the calling thread and everything else as a fiber. The runtime
+ * here rejects fibers, so submitting one fails the conversion. [[ToTryTimeoutSpec]] covers the
+ * timeout behaviour of the fiber part.
  */
 class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
 
@@ -31,15 +29,15 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
 
   test("a 100k-deep flatMap chain over Ref.update steps to completion without a fiber") {
     val effect = IO.ref(0).flatMap { ref =>
-      (1 to 100_000).foldLeft(IO.unit)((acc, _) => acc.flatMap(_ => ref.update(_ + 1))) *> ref.modify(n => (n, n))
+      (1 to 100_000).foldLeft(IO.unit)((acc, _) => acc.flatMap(_ => ref.update(_ + 1))) *> ref.get
     }
 
     toTry(effect) shouldEqual Success(100_000)
   }
 
-  // `true`: shapes a per-record codec or deserializer runs, must stay on the calling thread.
-  // `false`: shapes the step must not enter (doing so would drop the uncancelable region and its
-  // finalizers). The fiber submission proves it stopped in front of them instead.
+  // `true`: per-record shapes (codecs, deserializers) that must stay on the calling thread.
+  // `false`: shapes the step must not enter because doing so drops protections. A fiber submission
+  // proves it stopped in front of them.
   for {
     (name, effect, callingThread) <- List(
       ("Ref#update", IO.ref(0).flatMap(_.update(_ + 1)), true),

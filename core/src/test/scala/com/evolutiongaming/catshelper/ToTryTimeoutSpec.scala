@@ -12,11 +12,9 @@ import scala.util.{Failure, Success}
 
 /**
  * `skafka` runs a Kafka rebalance callback through `ToTry[IO]`, and `kafka-flow` holds a semaphore
- * permit across its partition recovery as `semaphore.permit.use { ... }.uncancelable`.
- *
- * These tests pin three properties of a timeout against that shape: finalizers run, the permit
- * comes back, and an uncancelable recovery is left to finish. The previous `ioToTry` gave none of
- * the three (kafka-flow#937), so every test fails against it.
+ * permit across its partition recovery as `semaphore.permit.use { ... }.uncancelable`. These tests
+ * pin that a timeout runs finalizers, gives the permit back, and waits for an uncancelable
+ * recovery. The previous `ioToTry` did none of the three (kafka-flow#937).
  */
 class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
 
@@ -30,6 +28,7 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
       recovery = guard.permit.use { _ =>
         Resource.onFinalize(released.set(true)).use(_ => IO.sleep(slowRecovery))
       }
+      // IO.blocking because the conversion blocks the calling thread, as skafka does on the poll thread
       outcome <- IO.blocking { ToTry.ioToTry(50.millis).apply(recovery) }
       wasReleased <- released.get
       permits <- guard.available
@@ -61,8 +60,7 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
     val io = for {
       guard <- Semaphore[IO](1)
       cancelled <- Ref[IO].of(false)
-      // the permit is taken inside `uncancelable`, as `kafka-flow` does it: a lost permit would
-      // block every later call on the flow
+      // permit inside `uncancelable`, as kafka-flow does it
       recovery = guard
         .permit
         .use(_ => IO.sleep(200.millis).onCancel(cancelled.set(true)))
@@ -82,8 +80,7 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
     val io = for {
       guard <- Semaphore[IO](1)
       cancelled <- Ref[IO].of(false)
-      // two `uncancelable`, both polled: the sleep stays cancelable. The step stops at the
-      // outermost one and returns the whole nest; `IO.timeout` handles the rest normally
+      // two uncancelable, both polled: the sleep stays cancelable
       recovery = guard.permit.use { _ =>
         IO.uncancelable { outer =>
           outer(IO.uncancelable(inner => inner(IO.sleep(slowRecovery).onCancel(cancelled.set(true)))))

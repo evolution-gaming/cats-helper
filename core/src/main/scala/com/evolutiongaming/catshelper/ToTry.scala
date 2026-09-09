@@ -35,15 +35,14 @@ object ToTry {
    * Please think twice before using this, ideally you should not have toTry in your `pure` code
    * base!
    *
-   * Simple effects (`pure`, `delay`, `map`, `flatMap`, `attempt`, `handleErrorWith`, and therefore
-   * `Ref` operations and `Deferred#complete`) run on the calling thread and never time out. From
-   * the first `uncancelable`, `onCancel`, `Resource` or asynchronous boundary onwards the effect
-   * runs as a fiber under
+   * Simple effects (`pure`, `delay`, `map`, `flatMap`, `attempt`, `handleErrorWith`) run on the
+   * calling thread and never time out. From the first `uncancelable`, `onCancel`, `Resource` or
+   * asynchronous boundary onwards the effect runs as a fiber under
    * [[https://typelevel.org/cats-effect/docs/datatypes/io#scalatimeout IO.timeout]].
    *
    * @param timeout
-   *   applies to the part that runs as a fiber. On expiry the fiber is cancelled (not abandoned),
-   *   its finalizers run, and the result is `Failure(TimeoutException)`. Inside an
+   *   applies to the fiber part. On expiry the fiber is cancelled (not abandoned), its finalizers
+   *   run, and the result is `Failure(TimeoutException)`. Inside an
    *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel#uncancelable-regions uncancelable region]]
    *   there is nothing to cancel, so the effect runs to completion regardless of the timeout.
    */
@@ -75,23 +74,18 @@ object ToTry {
   }
 
   /**
-   * A `Sync[SyncIO]` whose only purpose is to control where
+   * Controls where
    * [[https://typelevel.org/cats-effect/api/3.x/cats/effect/kernel/Async.html#syncStep syncStep]]
-   * stops walking.
+   * stops walking an `IO`.
    *
-   * `syncStep` walks an `IO` node by node on the calling thread and returns whatever it could not
-   * walk as a new `IO`. How far it walks depends on `rootCancelScope` of the `Sync` instance it is
-   * given. With `SyncIO`'s own instance (scope = `Uncancelable`) it walks inside `uncancelable`
-   * regions and past `onCancel` finalizers, because `SyncIO` can never be cancelled anyway. The
-   * `IO` it returns then lacks those protections, and a timeout cancelling it skips the finalizers.
+   * `syncStep` walks an `IO` node by node on the calling thread. How far it walks depends on
+   * `rootCancelScope` of the `Sync` it is given. With `SyncIO`'s own instance (scope =
+   * `Uncancelable`) it walks inside `uncancelable` and past `onCancel`, so the returned `IO` lacks
+   * those protections. This instance reports scope = `Cancelable`, so `syncStep` stops there and
+   * returns the region whole.
    *
-   * This instance reports scope = `Cancelable`, so `syncStep` stops at `uncancelable` and
-   * `onCancel` and returns the region as is, protections included.
-   *
-   * `rootCancelScope` is the only member `syncStep` consults for this decision. Every other member
-   * delegates to `SyncIO`'s own `Sync`. The instance is unlawful (`SyncIO` cannot actually be
-   * cancelled, which the `Cancelable` scope falsely promises) and therefore private and never
-   * implicit.
+   * Only `rootCancelScope` matters; every other member delegates to `SyncIO`'s own `Sync`. The
+   * instance is unlawful (`SyncIO` cannot actually be cancelled), hence private and never implicit.
    *
    * @see
    *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel MonadCancel]] for
