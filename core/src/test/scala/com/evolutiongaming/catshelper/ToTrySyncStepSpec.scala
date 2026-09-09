@@ -12,15 +12,15 @@ import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success}
 
 /**
- * Pins where `ioToTry` runs an effect: pure and `delay`-shaped ones on the calling thread,
- * everything else as a fiber. The runtime used here throws instead of running a fiber, so a
- * conversion that submits one fails the test.
+ * Tests that `ioToTry` runs simple effects on the calling thread (no fiber, no runtime) and hands
+ * everything else to the runtime. The runtime here rejects fibers, so submitting one fails the
+ * conversion immediately.
  *
- * [[ToTryTimeoutSpec]] covers what the timeout does to the fiber.
+ * What the timeout does to the fiber part is in [[ToTryTimeoutSpec]].
  */
 class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
 
-  // the timeout is never reached here: a fiber submission fails at once
+  // the timeout is never reached: a fiber submission fails before it could matter
   private val toTry = ToTry.ioToTry(1.minute)(runtimeRejectingFibers)
 
   test("pure and delay-shaped effects never touch the runtime") {
@@ -37,9 +37,9 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
     toTry(effect) shouldEqual Success(100_000)
   }
 
-  // `true` shapes are what a per-record codec or deserializer runs; they must stay on the calling
-  // thread. `false` shapes are what the step must not enter, because entering them drops the mask
-  // and the finalizers. Reaching the runtime proves it stopped in front of them.
+  // `true`: shapes a per-record codec or deserializer runs, must stay on the calling thread.
+  // `false`: shapes the step must not enter (doing so would drop the uncancelable region and its
+  // finalizers). The fiber submission proves it stopped in front of them instead.
   for {
     (name, effect, callingThread) <- List(
       ("Ref#update", IO.ref(0).flatMap(_.update(_ + 1)), true),
@@ -59,7 +59,7 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
   private object FiberSubmitted extends RuntimeException("a fiber was submitted to the runtime") with NoStackTrace
 
   /**
-   * Runs nothing: a fiber submission throws [[FiberSubmitted]], which becomes the result.
+   * A runtime that runs nothing: submitting a fiber throws [[FiberSubmitted]].
    */
   private def runtimeRejectingFibers: IORuntime = {
     val rejecting = new ExecutionContext {

@@ -35,15 +35,17 @@ object ToTry {
    * Please think twice before using this, ideally you should not have toTry in your `pure` code
    * base!
    *
-   * A pure or `delay`-shaped effect runs on the calling thread and never times out. That covers
-   * `pure`, `delay`, `map`, `flatMap`, `attempt` and `handleErrorWith`, hence `Ref` operations and
-   * `Deferred#complete` too. Everything from the first asynchronous boundary, `uncancelable` or
-   * `onCancel` runs as a fiber under `IO.timeout`. A `Resource` brings the last two with it.
+   * Simple effects (`pure`, `delay`, `map`, `flatMap`, `attempt`, `handleErrorWith`, and therefore
+   * `Ref` operations and `Deferred#complete`) run on the calling thread and never time out. From
+   * the first `uncancelable`, `onCancel`, `Resource` or asynchronous boundary onwards the effect
+   * runs as a fiber under
+   * [[https://typelevel.org/cats-effect/docs/datatypes/io#scalatimeout IO.timeout]].
    *
    * @param timeout
-   *   applies to the part that runs as a fiber. The effect is cancelled, not abandoned: it stops at
-   *   its next cancelable point, its finalizers run, and the result is `Failure(TimeoutException)`.
-   *   An `uncancelable` region has no such point, so an effect can outlive the timeout inside one.
+   *   applies to the part that runs as a fiber. On expiry the fiber is cancelled (not abandoned),
+   *   its finalizers run, and the result is `Failure(TimeoutException)`. Inside an
+   *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel#uncancelable-regions uncancelable region]]
+   *   there is nothing to cancel, so the effect runs to completion regardless of the timeout.
    */
   def ioToTry(
     timeout: FiniteDuration,
@@ -73,21 +75,27 @@ object ToTry {
   }
 
   /**
-   * `Sync[SyncIO]` that reports a `Cancelable` root scope, for `IO.syncStep` and nothing else.
+   * A `Sync[SyncIO]` whose only purpose is to control where
+   * [[https://typelevel.org/cats-effect/api/3.x/cats/effect/kernel/Async.html#syncStep syncStep]]
+   * stops walking.
    *
-   * `syncStep` runs an `IO` on the calling thread as far as it can and returns the rest as an `IO`.
-   * With an `Uncancelable` root scope, which `SyncIO`'s own instance reports, it steps inside
-   * `uncancelable` regions and past `onCancel` finalizers. The `IO` it returns has lost both, and a
-   * timeout that cancels it skips the finalizers. Under this instance `syncStep` stops in front of
-   * `uncancelable` and `onCancel` and returns the region whole.
+   * `syncStep` walks an `IO` node by node on the calling thread and returns whatever it could not
+   * walk as a new `IO`. How far it walks depends on `rootCancelScope` of the `Sync` instance it is
+   * given. With `SyncIO`'s own instance (scope = `Uncancelable`) it walks inside `uncancelable`
+   * regions and past `onCancel` finalizers, because `SyncIO` can never be cancelled anyway. The
+   * `IO` it returns then lacks those protections, and a timeout cancelling it skips the finalizers.
    *
-   * `rootCancelScope` is the only member `syncStep` reads for that; the others delegate to
-   * `SyncIO`'s own instance. Reporting `SyncIO` as cancelable is false, since `SyncIO#canceled`
-   * does nothing, so the instance is unlawful, private and never implicit.
+   * This instance reports scope = `Cancelable`, so `syncStep` stops at `uncancelable` and
+   * `onCancel` and returns the region as is, protections included.
+   *
+   * `rootCancelScope` is the only member `syncStep` consults for this decision. Every other member
+   * delegates to `SyncIO`'s own `Sync`. The instance is unlawful (`SyncIO` cannot actually be
+   * cancelled, which the `Cancelable` scope falsely promises) and therefore private and never
+   * implicit.
    *
    * @see
-   *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel MonadCancel]] for masked
-   *   regions, `uncancelable` and finalizers
+   *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel MonadCancel]] for
+   *   cancellation, uncancelable regions and finalizers
    */
   private object CancelableSyncIO extends Sync[SyncIO] {
 

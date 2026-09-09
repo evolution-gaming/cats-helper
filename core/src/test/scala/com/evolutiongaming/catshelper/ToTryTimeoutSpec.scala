@@ -11,17 +11,12 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
- * `skafka` runs a Kafka rebalance callback through `ToTry[IO]`, and `kafka-flow` recovers a
- * partition inside one, holding a semaphore permit across the recovery as
- * `semaphore.permit.use { ... }.uncancelable`.
+ * `skafka` runs a Kafka rebalance callback through `ToTry[IO]`, and `kafka-flow` holds a semaphore
+ * permit across its partition recovery as `semaphore.permit.use { ... }.uncancelable`.
  *
- * These tests pin what a timeout does to that shape: finalizers run, the permit comes back, and a
- * masked recovery is left to finish. The previous `ioToTry` gave none of the three and left the
- * flow blocked on its own semaphore (kafka-flow#937), so every test below fails against it.
- *
- * The conversion blocks the thread it is called on, so each test hands it to `IO.blocking`, as
- * `skafka` does on the poll thread. Its own timing is real: a clock outside it would not govern the
- * effect it runs on the ambient runtime.
+ * These tests pin three properties of a timeout against that shape: finalizers run, the permit
+ * comes back, and an uncancelable recovery is left to finish. The previous `ioToTry` gave none of
+ * the three (kafka-flow#937), so every test fails against it.
  */
 class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
 
@@ -32,7 +27,6 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
     val io = for {
       guard <- Semaphore[IO](1)
       released <- Ref[IO].of(false)
-      // the permit is taken on the calling thread; the state rebuild then sleeps past the timeout
       recovery = guard.permit.use { _ =>
         Resource.onFinalize(released.set(true)).use(_ => IO.sleep(slowRecovery))
       }
@@ -53,7 +47,6 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
       toTry = ToTry.ioToTry(50.millis)
       recovery = guard.permit.use(_ => IO.sleep(slowRecovery))
       first <- IO.blocking { toTry(recovery) }
-      // what a retry around the flow does next
       second <- IO.blocking { toTry(recovery) }
       permits <- guard.available
     } yield {
@@ -68,8 +61,8 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
     val io = for {
       guard <- Semaphore[IO](1)
       cancelled <- Ref[IO].of(false)
-      // `kafka-flow` guards `add`, `apply` and its own release with one permit, taken inside
-      // `uncancelable`: a permit lost to cancellation would block all three
+      // the permit is taken inside `uncancelable`, as `kafka-flow` does it: a lost permit would
+      // block every later call on the flow
       recovery = guard
         .permit
         .use(_ => IO.sleep(200.millis).onCancel(cancelled.set(true)))
@@ -89,8 +82,8 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
     val io = for {
       guard <- Semaphore[IO](1)
       cancelled <- Ref[IO].of(false)
-      // the sleep sits under two `uncancelable`, both polled, so it stays cancelable. The step stops
-      // at the outermost one and returns the whole nest, which `IO.timeout` treats like any other `IO`
+      // two `uncancelable`, both polled: the sleep stays cancelable. The step stops at the
+      // outermost one and returns the whole nest; `IO.timeout` handles the rest normally
       recovery = guard.permit.use { _ =>
         IO.uncancelable { outer =>
           outer(IO.uncancelable(inner => inner(IO.sleep(slowRecovery).onCancel(cancelled.set(true)))))
