@@ -12,26 +12,23 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
- * `skafka` runs a Kafka rebalance callback through `ToTry[IO]`, so the effect has to finish on the
- * poll thread within the ambient `ioToTry(1.minute)`. `kafka-flow` recovers a partition inside such
- * a callback and holds a semaphore permit for the whole recovery, as
- * `semaphore.permit.use { ... }.uncancelable`, so that a half-done recovery cannot leave the flow
- * inconsistent.
+ * `skafka` runs a Kafka rebalance callback through `ToTry[IO]`, and `kafka-flow` recovers a
+ * partition inside one, holding a semaphore permit across the recovery as
+ * `semaphore.permit.use { ... }.uncancelable`.
  *
- * The previous `ioToTry` stepped inside that `uncancelable` and past the finalizers, then cancelled
- * what was left when the timeout fired. The permit was never given back, so every later call on the
- * flow blocked on the semaphore and the consumer stopped processing without failing anything
- * (kafka-flow#937). Every test below fails against that implementation.
+ * These tests pin what a timeout does to that shape: finalizers run, the permit comes back, and a
+ * masked recovery is left to finish. The previous `ioToTry` gave none of the three and left the
+ * flow blocked on its own semaphore (kafka-flow#937), so every test below fails against it.
  */
 class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
 
   // longer than `ToTry` waits; a passing run never reaches it
   private val slowRecovery = 1.minute
 
-  test("a timeout releases what the effect acquired, and gives the permit back") {
+  test("a timeout releases what the effect acquired and gives the permit back") {
     val guard = Semaphore[IO](1).unsafeRunSync()
     val released = new AtomicBoolean(false)
-    // the permit is taken on the calling thread, the state rebuild sleeps past the timeout
+    // the permit is taken on the calling thread; the state rebuild then sleeps past the timeout
     val recovery = guard.permit.use { _ =>
       Resource.onFinalize(IO(released.set(true))).use(_ => IO.sleep(slowRecovery))
     }
@@ -58,7 +55,7 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
     val guard = Semaphore[IO](1).unsafeRunSync()
     val cancelled = new AtomicBoolean(false)
     // `kafka-flow` guards `add`, `apply` and its own release with one permit, taken inside
-    // `uncancelable`: a permit lost to cancellation would block all three forever
+    // `uncancelable`: a permit lost to cancellation would block all three
     val recovery = guard
       .permit
       .use(_ => IO.sleep(200.millis).onCancel(IO(cancelled.set(true))))
@@ -70,12 +67,11 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
     guard.available.unsafeRunSync() shouldEqual 1L
   }
 
-  test("nested masks: a timeout reaches a polled region and gives the permit back") {
+  test("nested uncancelable: a timeout reaches a polled region and the permit comes back") {
     val guard = Semaphore[IO](1).unsafeRunSync()
     val cancelled = new AtomicBoolean(false)
     // the sleep sits under two `uncancelable`, both polled, so it stays cancelable. The step stops
-    // at the outermost one and hands the whole block over, nesting included; `IO.timeout` then
-    // follows cats-effect's ordinary rules for it
+    // at the outermost one and returns the whole nest, which `IO.timeout` treats like any other `IO`
     val recovery = guard.permit.use { _ =>
       IO.uncancelable { outer =>
         outer(IO.uncancelable(inner => inner(IO.sleep(slowRecovery).onCancel(IO(cancelled.set(true))))))
