@@ -38,7 +38,7 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
       (1 to 100_000).foldLeft(IO.unit)((acc, _) => acc.flatMap(_ => ref.update(_ + 1))) *> ref.modify(n => (n, n))
     }
 
-    toTryNoRuntime(effect) shouldEqual Success(100000)
+    toTryNoRuntime(effect) shouldEqual Success(100_000)
   }
 
   for {
