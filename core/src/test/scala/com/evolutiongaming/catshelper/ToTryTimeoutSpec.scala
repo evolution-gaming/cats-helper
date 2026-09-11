@@ -83,7 +83,9 @@ class ToTryTimeoutSpec extends AnyFunSuite with Matchers {
       // two uncancelable, both polled: the sleep stays cancelable
       recovery = guard.permit.use { _ =>
         IO.uncancelable { outer =>
-          outer(IO.uncancelable(inner => inner(IO.sleep(slowRecovery).onCancel(cancelled.set(true)))))
+          outer(IO.uncancelable { inner =>
+            inner(IO.sleep(slowRecovery).onCancel(cancelled.set(true)))
+          })
         }
       }
       outcome <- IO.blocking { ToTry.ioToTry(50.millis).apply(recovery) }
