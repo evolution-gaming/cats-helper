@@ -35,9 +35,9 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
     toTry(effect) shouldEqual Success(100_000)
   }
 
-  // `true`: per-record shapes (codecs, deserializers) that must stay on the calling thread.
-  // `false`: shapes the step must not enter because doing so drops protections. A fiber submission
-  // proves it stopped in front of them.
+  // callingThread = true: per-record shapes (codecs, deserializers) that must stay on the calling thread.
+  // callingThread = false: shapes that syncStep must not walk into, because doing so strips the
+  // uncancelable region and its finalizers. The fiber submission proves syncStep stopped before them.
   for {
     (name, effect, callingThread) <- List(
       ("Ref#update", IO.ref(0).flatMap(_.update(_ + 1)), true),
