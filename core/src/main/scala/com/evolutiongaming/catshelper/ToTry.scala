@@ -41,8 +41,8 @@ object ToTry {
    * [[https://typelevel.org/cats-effect/docs/datatypes/io#scalatimeout IO.timeout]].
    *
    * @param timeout
-   *   applies to the fiber part. On expiry the fiber is cancelled (not abandoned), its finalizers
-   *   run, and the result is `Failure(TimeoutException)`. Inside an
+   *   applies to the fiber part. On expiry the fiber is cancelled, its finalizers complete, and
+   *   then `Failure(TimeoutException)` is returned. Inside an
    *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel#uncancelable-regions uncancelable region]]
    *   there is nothing to cancel, so the effect runs to completion regardless of the timeout.
    */
@@ -74,22 +74,19 @@ object ToTry {
   }
 
   /**
-   * Controls where
+   * Makes
    * [[https://typelevel.org/cats-effect/api/3.x/cats/effect/kernel/Async.html#syncStep syncStep]]
-   * stops walking an `IO`.
+   * stop at `uncancelable` and `onCancel`.
    *
-   * `syncStep` walks an `IO` node by node on the calling thread. How far it walks depends on
-   * `rootCancelScope` of the `Sync` it is given. With `SyncIO`'s own instance (scope =
-   * `Uncancelable`) it walks inside `uncancelable` and past `onCancel`, so the returned `IO` lacks
-   * those protections. This instance reports scope = `Cancelable`, so `syncStep` stops there and
-   * returns the region whole.
+   * `syncStep` walks as far as the `rootCancelScope` of the given `Sync` allows. `SyncIO`'s own
+   * instance is `Uncancelable`, so it walks inside those regions and the returned `IO` loses their
+   * masks and finalizers. Reporting `Cancelable` makes `syncStep` fall through and return the
+   * region whole.
    *
-   * Only `rootCancelScope` matters; every other member delegates to `SyncIO`'s own `Sync`. The
-   * instance is unlawful (`SyncIO` cannot actually be cancelled), hence private and never implicit.
+   * Private and never implicit: `syncStep` is the only consumer that reads the scope.
    *
    * @see
-   *   [[https://typelevel.org/cats-effect/docs/typeclasses/monadcancel MonadCancel]] for
-   *   cancellation, uncancelable regions and finalizers
+   *   [[https://github.com/typelevel/cats-effect/issues/4687 typelevel/cats-effect#4687]]
    */
   private object CancelableSyncIO extends Sync[SyncIO] {
 

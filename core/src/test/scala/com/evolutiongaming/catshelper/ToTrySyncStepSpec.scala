@@ -27,7 +27,7 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
     toTry(effect) shouldEqual Success(4)
   }
 
-  test("a 100k-deep flatMap chain over Ref.update steps to completion without a fiber") {
+  test("a 100k-deep flatMap chain over Ref#update steps to completion without a fiber") {
     val effect = IO.ref(0).flatMap { ref =>
       (1 to 100_000).foldLeft(IO.unit)((acc, _) => acc.flatMap(_ => ref.update(_ + 1))) *> ref.get
     }
@@ -35,9 +35,9 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
     toTry(effect) shouldEqual Success(100_000)
   }
 
-  // callingThread = true: per-record shapes (codecs, deserializers) that must stay on the calling thread.
-  // callingThread = false: shapes that syncStep must not walk into, because doing so strips the
-  // uncancelable region and its finalizers. The fiber submission proves syncStep stopped before them.
+  // true: per-record effects (codecs, deserializers) must stay on the calling thread.
+  // false: CancelableSyncIO stops syncStep before these (typelevel/cats-effect#4687);
+  // if fixed upstream and CancelableSyncIO removed, they complete inline and flip to true.
   for {
     (name, effect, callingThread) <- List(
       ("Ref#update", IO.ref(0).flatMap(_.update(_ + 1)), true),
