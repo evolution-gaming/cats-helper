@@ -3,7 +3,7 @@ import sbt._
 object Dependencies {
 
   val scalatest = "org.scalatest" %% "scalatest" % "3.2.20"
-  val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.19"
+  val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.20"
 
   object Logback {
     val classic = "ch.qos.logback" % "logback-classic" % "1.6.3"
