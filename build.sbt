@@ -37,6 +37,11 @@ inThisBuild(Seq(
 // Usually such settings have defaults defined by some plugin in its `projectSettings`.
 lazy val commonSettings = Seq(
   scalacOptsFailOnWarn := Some(false),
+  dependencyOverrides ++= crossSettings(
+    scalaVersion.value,
+    if3 = Seq(scalaOrganization.value %% "scala3-library" % scalaVersion.value),
+    if2 = Nil,
+  ),
 )
 
 val alias: Seq[sbt.Def.Setting[?]] =
