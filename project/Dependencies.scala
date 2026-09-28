@@ -6,7 +6,7 @@ object Dependencies {
   val `slf4j-api` = "org.slf4j" % "slf4j-api" % "2.0.20"
 
   object Logback {
-    val classic = "ch.qos.logback" % "logback-classic" % "1.6.3"
+    val classic = "ch.qos.logback" % "logback-classic" % "1.6.4"
   }
 
   object Cats {
