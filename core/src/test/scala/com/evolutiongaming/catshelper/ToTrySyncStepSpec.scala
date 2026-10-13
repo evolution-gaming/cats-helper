@@ -8,8 +8,8 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.Success
 import scala.util.control.NoStackTrace
-import scala.util.{Failure, Success}
 
 /**
  * `ioToTry` runs simple effects on the calling thread and everything else as a fiber. The runtime
@@ -35,22 +35,29 @@ class ToTrySyncStepSpec extends AnyFunSuite with Matchers {
     toTry(effect) shouldEqual Success(100_000)
   }
 
-  // true: per-record effects (codecs, deserializers) must stay on the calling thread.
-  // false: CancelableSyncIO stops syncStep before these (typelevel/cats-effect#4687);
-  // if fixed upstream and CancelableSyncIO removed, they complete inline and flip to true.
   for {
-    (name, effect, callingThread) <- List(
-      ("Ref#update", IO.ref(0).flatMap(_.update(_ + 1)), true),
-      ("Deferred#complete", IO.deferred[Int].flatMap(_.complete(1).void), true),
-      ("uncancelable", IO.unit.uncancelable, false),
-      ("onCancel", IO.unit.onCancel(IO.unit), false),
-      ("Resource.allocated", Resource.make(IO.unit)(_ => IO.unit).allocated.void, false),
+    (name, effect) <- List(
+      ("Ref#update", IO.ref(0).flatMap(_.update(_ + 1))),
+      ("Deferred#complete", IO.deferred[Int].flatMap(_.complete(1).void)),
+      ("uncancelable", IO.unit.uncancelable),
+      ("onCancel", IO.unit.onCancel(IO.unit)),
+      ("Resource.allocated", Resource.make(IO.unit)(_ => IO.unit).allocated.void),
     )
   } {
-    test(s"$name ${ if (callingThread) "runs on the calling thread" else "goes through the runtime" }") {
-      val expected = if (callingThread) Success(()) else Failure(FiberSubmitted)
+    test(s"$name runs on the calling thread") {
+      toTry(effect) shouldEqual Success(())
+    }
+  }
 
-      toTry(effect) shouldEqual expected
+  for {
+    (name, effect) <- List(
+      ("uncancelable + cede", IO.uncancelable(_ => IO.cede)),
+      ("onCancel + cede", IO.cede.onCancel(IO.unit)),
+      ("Resource.use + cede", Resource.make(IO.unit)(_ => IO.unit).use(_ => IO.cede)),
+    )
+  } {
+    test(s"$name hits an async boundary and goes through the runtime") {
+      toTry(effect).isFailure shouldBe true
     }
   }
 
